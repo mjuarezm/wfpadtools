@@ -4,6 +4,7 @@ import obfsproxy.transports.b64 as b64
 import obfsproxy.transports.obfs2 as obfs2
 import obfsproxy.transports.obfs3 as obfs3
 import obfsproxy.transports.scramblesuit.scramblesuit as scramblesuit
+import obfsproxy.transports.wfpadtools.wfpad as wfpad
 
 transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyClient, 'server' : dummy.DummyServer },
                'b64'   : {'base': b64.B64Transport, 'client' : b64.B64Client, 'server' : b64.B64Server },
@@ -11,7 +12,8 @@ transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyCl
                'scramblesuit' : {'base':  scramblesuit.ScrambleSuitTransport,
                                  'client':scramblesuit.ScrambleSuitClient,
                                  'server':scramblesuit.ScrambleSuitServer },
-               'obfs3' : {'base': obfs3.Obfs3Transport, 'client' : obfs3.Obfs3Client, 'server' : obfs3.Obfs3Server } }
+               'obfs3' : {'base': obfs3.Obfs3Transport, 'client' : obfs3.Obfs3Client, 'server' : obfs3.Obfs3Server },
+               'wfpad': {'base': wfpad.WFPadTransport, 'client': wfpad.WFPadClient, 'server': wfpad.WFPadServer} }
 
 def get_transport_class(name, role):
     # Rewrite equivalent roles.
