@@ -15,8 +15,8 @@ CTRANS_SOCKSPORT = "4999"
 # Tor constants
 ORPORT = "65535"
 SOCKSPORT = "4998"
-DATA_DIRS = {"proxy": join(TEMP_DIR, "proxy-wfpad"),
-             "router": join(TEMP_DIR, "router-wfpad")}
+DATA_DIRS = {"proxy": join(TEMP_DIR, "proxy"),
+             "router": join(TEMP_DIR, "router")}
 TRANSPORT_MODES = {"server": STRANS_SOCKSPORT,
                    "socks": CTRANS_SOCKSPORT}
 DEBUG_FNAME = "debug.log"
@@ -28,5 +28,33 @@ WATCHDOG_TIMEOUT = 60
 DEFAULT_TIME_PERIOD = 60
 
 # Protocol states
-ST_WAIT_FOR_VISIT = 0
-ST_PADDING = 1
+ST_WAIT = 0
+ST_CONNECTED = 1
+ST_PADDING = 2
+
+# Flags header protocol
+FLAG_DATA = (1 << 0)
+FLAG_PADDING = (1 << 1)
+
+# WFPad message structure fields's constants
+TOTLENGTH_POS = 0
+TOTLENGTH_LEN = 2
+
+PAYLOAD_POS = 2
+PAYLOAD_LEN = 2
+
+FLAGS_POS = 4
+FLAGS_LEN = 1
+
+# Header length
+HDR_LENGTH = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
+
+# The maximum amount of padding to be appended to handshake data.
+MAX_PADDING_LENGTH = 1500
+
+# Length of WFPad's MTU in bytes.  Note that this is *not* the link MTU
+# which is probably 1500.
+MTU = 1448
+
+# Maximum payload unit of a WFPad message in bytes.
+MPU = MTU - HDR_LENGTH
