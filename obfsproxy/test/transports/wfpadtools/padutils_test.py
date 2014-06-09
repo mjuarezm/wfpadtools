@@ -1,7 +1,7 @@
 import unittest
 
 from obfsproxy.test.transports.wfpadtools.sttest import STTest
-import obfsproxy.transports.wfpadtools.padutils as pu
+import obfsproxy.transports.wfpadtools.timer as pu
 from obfsproxy.transports.scramblesuit import probdist
 
 

@@ -28,6 +28,8 @@ if DEBUG:
 else:
     log.disable_logs()
 
+TRANSPORT = "buflo"
+
 
 class TransportTest(STTest):
     transport_ends = {}
@@ -35,7 +37,7 @@ class TransportTest(STTest):
     def setUp(self):
         try:
             for mode, port in const.TRANSPORT_MODES.iteritems():
-                self.transport_ends[mode] = self.start_wfpad(mode, port)
+                self.transport_ends[mode] = self.start_transport(mode, port)
         except Exception as exc:
             log.exception("TEST: Exception setting up the class {}: {}"
                           .format(self.__class__.__name__, exc))
@@ -48,7 +50,7 @@ class TransportTest(STTest):
         for mode, transport_end in self.transport_ends:
             self.terminate_process_and_log(transport_end,
                                        "TEST: killed {} transport {}"
-                                       .format(const.TRANSPORT_NAME, mode))
+                                       .format(TRANSPORT, mode))
 
     @classmethod
     def setUpClass(cls):
@@ -58,20 +60,21 @@ class TransportTest(STTest):
     def tearDownClass(cls):
         try:
             for mode in const.TRANSPORT_MODES:
-                pidfile = join(const.TEMP_DIR, "{}-wfpad.pid".format(mode))
+                pidfile = join(const.TEMP_DIR, "{}-{}.pid"
+                               .format(mode, TRANSPORT))
                 if exists(pidfile):
                     pid = int(ut.read_file(pidfile))
                     ut.terminate_process(pid)
                     log.debug("TEST: killed {} transport {}"
-                                       .format(const.TRANSPORT_NAME, mode))
+                                       .format(TRANSPORT, mode))
                     ut.removefile(pidfile)
         except Exception as exc:
             log.exception("Exception raised tearing down class {}: {}"
                           .format(cls.__name__, exc))
 
-    def start_transport(self, transport, mode, dest, listen_port):
-        logfile = join(const.TEMP_DIR, "{}-wfpad.log".format(mode))
-        pidfile = join(const.TEMP_DIR, "{}-wfpad.pid".format(mode))
+    def run_transport(self, transport, mode, dest, listen_port):
+        logfile = join(const.TEMP_DIR, "{}-{}.log".format(mode, TRANSPORT))
+        pidfile = join(const.TEMP_DIR, "{}-{}.pid".format(mode, TRANSPORT))
         pid = ut.read_file(pidfile)
         if ut.is_pid_running(pid):
             log.debug("TEST: transport {} is already running."
@@ -94,8 +97,8 @@ class TransportTest(STTest):
         if msg:
             log.debug(msg)
 
-    def start_wfpad(self, mode, transport_port):
-        return self.start_transport(const.TRANSPORT_NAME,
+    def start_transport(self, mode, transport_port):
+        return self.run_transport(TRANSPORT,
                                     mode,
                                     const.ORPORT,
                                     transport_port)
@@ -196,7 +199,7 @@ class UnmanagedTorTest(TransportTest):
         return self.start_tor(datadir,
                               ["--BridgeRelay", "1",
                                "--Nickname", "{}Test"
-                                    .format(const.TRANSPORT_NAME),
+                                    .format(TRANSPORT),
                                "--SOCKSPort", "auto",
                                "--ORPort", orport,
                                "--ControlPort", "auto",
@@ -208,10 +211,10 @@ class UnmanagedTorTest(TransportTest):
         return self.start_tor(datadir,
                               ["--UseBridges", "1",
                                "--Bridge", "{} localhost:{}"
-                                    .format(const.TRANSPORT_NAME, server_port),
+                                    .format(TRANSPORT, server_port),
                                "--ClientTransportPlugin",
                                     "{} socks5 localhost:{}"
-                                    .format(const.TRANSPORT_NAME, client_port),
+                                    .format(TRANSPORT, client_port),
                                "--SOCKSPort", socksport])
 
 
