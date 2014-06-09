@@ -49,7 +49,7 @@ class Obfsproxy(subprocess.Popen):
     """
     def __init__(self, *args, **kwargs):
         """Spawns obfsproxy with 'args'"""
-        argv = ["bin/obfsproxy", "--no-log"]
+        argv = ["/bin/obfsproxy", "--no-log"]
         if len(args) == 1 and (isinstance(args[0], list) or
                                isinstance(args[0], tuple)):
             argv.extend(args[0])
@@ -305,6 +305,20 @@ class DirectScrambleSuit(DirectTest, unittest.TestCase):
         shutil.rmtree(self.tmpdir_srv)
         shutil.rmtree(self.tmpdir_cli)
 
+class DirectWFPad(DirectTest, unittest.TestCase):
+    transport = "wfpad"
+
+    def setUp(self):
+        self.server_args = ("wfpad", "server",
+               "127.0.0.1:%d" % SERVER_PORT,
+               "--dest=127.0.0.1:%d" % EXIT_PORT)
+        self.client_args = ("wfpad", "client",
+               "127.0.0.1:%d" % ENTRY_PORT,
+               "--dest=127.0.0.1:%d" % SERVER_PORT)
+        super(DirectWFPad, self).setUp()
+
+    def tearDown(self):
+        super(DirectWFPad, self).tearDown()
 
 TEST_FILE = """\
 THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
