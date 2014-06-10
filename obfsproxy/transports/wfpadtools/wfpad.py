@@ -1,13 +1,13 @@
 """
 The wfpad module implements the Tor WF framework to develop WF countermeasures.
 """
-from twisted.internet import reactor
-
-import obfsproxy.common.log as logging
-from obfsproxy.transports.base import BaseTransport
+from obfsproxy.transports.base import BaseTransport, PluggableTransportError
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message
+from twisted.internet import reactor
+
+import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
 import obfsproxy.transports.wfpadtools.util as ut
 
@@ -21,8 +21,7 @@ class WFPadTransport(BaseTransport):
     This class implements methods which implement primitives and protocols
     specifications to further develop WF countermeasures.
     """
-    def __init__(self, time_probdist=probdist.new(lambda: 0.001),
-                       size_probdist=probdist.new(lambda: const.MTU)):
+    def __init__(self):
         """Initialize a WFPadTransport object."""
         log.debug("Initializing %s." % const.TRANSPORT_NAME)
 
@@ -34,16 +33,14 @@ class WFPadTransport(BaseTransport):
         # Buffer for outgoing data.
         self.sendBuf = ""
 
+        # Count time spent on padding
+        self.elapsed = 0
+
         # Buffer used for padding.
         self.padding_buffer = Buffer()
 
         # Used to extract protocol messages from encrypted data.
         self.msg_extractor = message.WFPadMessageExtractor()
-
-        # Initialize probability distributions.
-        # TODO: pass these as argument:
-        self._time_probdist = time_probdist
-        self._size_probdist = size_probdist
 
     @classmethod
     def setup(cls, transportConfig):
@@ -57,6 +54,48 @@ class WFPadTransport(BaseTransport):
         cls.weAreServer = not cls.weAreClient
         cls.weAreExternal = transportConfig.weAreExternal
 
+    @classmethod
+    def register_external_mode_cli(cls, subparser):
+        """Register CLI arguments."""
+        subparser.add_argument("--period",
+                               required=False,
+                               type=float,
+                               help="Time rate at which transport sends "
+                                    "messages (Default: 1ms).",
+                               dest="period")
+        subparser.add_argument("--psize",
+                               required=False,
+                               type=int,
+                               help="Length of messages to be transmitted"
+                                    " (Default: MTU).",
+                               dest="psize")
+        super(WFPadTransport, cls).register_external_mode_cli(subparser)
+
+    @classmethod
+    def validate_external_mode_cli(cls, args):
+        """Assign the given command line arguments to local variables.
+
+        Initializes the probability distributions used by WFPad.
+        """
+        # Defaults for WFPad parameters.
+        period = 0.001
+        psize = const.MTU
+
+        if args.period:
+            period = args.period
+        if args.psize:
+            psize = args.psize
+
+        parentalApproval = super(
+            WFPadTransport, cls).validate_external_mode_cli(args)
+        if not parentalApproval:
+            raise PluggableTransportError(
+                "Pluggable Transport args invalid: %s" % args)
+
+        # Initialize probability distributions used by WFPad.
+        cls._time_probdist = probdist.new(lambda: period)
+        cls._size_probdist = probdist.new(lambda: psize)
+
     def circuitConnected(self):
         """Initiate handshake.
 
@@ -64,9 +103,9 @@ class WFPadTransport(BaseTransport):
         handshakes.
         """
         # Start padding link
-        self._state = const.ST_CONNECTED
         self.flushSendBuffer()
-        self.flushPieces()
+        self._state = const.ST_CONNECTED
+        self.start_padding()
 
     def encapsulate(self, data, flags=const.FLAG_DATA):
         """Return protocol messages containing data as string.
@@ -74,11 +113,8 @@ class WFPadTransport(BaseTransport):
         Data is chopped in chunks. Each chunk is appended to a header
         as payload. Then, we convert the stream of messages to string.
         """
-        # Wrap the application's data in WFPad protocol messages.
         messages = message.createWFPadMessages(data, flags=flags)
-
-        blurb = "".join([str(msg) for msg in messages])
-        return blurb
+        return "".join([str(msg) for msg in messages])
 
     def sendRemote(self, data, flags=const.FLAG_DATA):
         """Send data to the remote end once the connection is established.
@@ -88,8 +124,7 @@ class WFPadTransport(BaseTransport):
         specifies the protocol message flags.
         """
         log.debug("Processing %d bytes of outgoing data." % len(data))
-
-        if self._state is const.ST_CONNECTED:
+        if self._state is const.ST_PADDING:
             self.padding_buffer.write(self.encapsulate(data, flags))
 
     def flushPieces(self):
@@ -121,7 +156,13 @@ class WFPadTransport(BaseTransport):
                                     flags=const.FLAG_PADDING)
             self.circuit.downstream.write(data)
 
-        reactor.callLater(self._time_probdist.randomSample(), self.flushPieces)
+        delay = self._time_probdist.randomSample()
+        self.elapsed += delay
+
+        if self.stop_condition():
+            self.stop_padding()
+            return
+        reactor.callLater(delay, self.flushPieces)
 
     def processMessages(self, data):
         """Acts on extracted protocol messages based on header flags.
@@ -149,6 +190,21 @@ class WFPadTransport(BaseTransport):
                     log.debug("Padding message ignored.")
                 else:
                     log.warning("Invalid message flags: %d." % msg.flags)
+
+    def get_elapsed(self):
+        """Return time elapsed since padding started."""
+        return self.elapsed
+
+    def start_padding(self):
+        """Changes protocol's state to ST_PADDING and starts timer."""
+        self._state = const.ST_PADDING
+        self.elapsed = 0
+        self.flushPieces()
+
+    def stop_padding(self):
+        """Changes protocol's state to ST_CONNECTED and stops timer."""
+        self._state = const.ST_CONNECTED
+        self.flushPieces()
 
     def stop_condition(self):
         """Return the evaluation of the stop condition.
@@ -187,7 +243,7 @@ class WFPadTransport(BaseTransport):
 
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream."""
-        if self._state == const.ST_CONNECTED:
+        if self._state == const.ST_PADDING:
             self.sendRemote(data.read())
 
         # Buffer data we are not ready to transmit yet.
@@ -198,7 +254,7 @@ class WFPadTransport(BaseTransport):
 
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
-        if self._state is const.ST_CONNECTED:
+        if self._state is const.ST_PADDING:
             self.processMessages(data.read())
         else:
             self.flushSendBuffer()
