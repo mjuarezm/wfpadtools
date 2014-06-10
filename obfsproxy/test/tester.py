@@ -307,18 +307,27 @@ class DirectScrambleSuit(DirectTest, unittest.TestCase):
 
 class DirectWFPad(DirectTest, unittest.TestCase):
     transport = "wfpad"
+    server_args = ("wfpad", "server",
+           "127.0.0.1:%d" % SERVER_PORT,
+           "--dest=127.0.0.1:%d" % EXIT_PORT)
+    client_args = ("wfpad", "client",
+           "127.0.0.1:%d" % ENTRY_PORT,
+           "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-    def setUp(self):
-        self.server_args = ("wfpad", "server",
-               "127.0.0.1:%d" % SERVER_PORT,
-               "--dest=127.0.0.1:%d" % EXIT_PORT)
-        self.client_args = ("wfpad", "client",
-               "127.0.0.1:%d" % ENTRY_PORT,
-               "--dest=127.0.0.1:%d" % SERVER_PORT)
-        super(DirectWFPad, self).setUp()
-
-    def tearDown(self):
-        super(DirectWFPad, self).tearDown()
+class DirectBuFLO(DirectTest, unittest.TestCase):
+    transport = "buflo"
+    server_args = ("buflo", "server",
+           "127.0.0.1:%d" % SERVER_PORT,
+           "--period=0.1",
+           "--psize=1448",
+           "--mintime=2",
+           "--dest=127.0.0.1:%d" % EXIT_PORT)
+    client_args = ("buflo", "client",
+           "127.0.0.1:%d" % ENTRY_PORT,
+           "--period=0.1",
+           "--psize=1448",
+           "--mintime=2",
+           "--dest=127.0.0.1:%d" % SERVER_PORT)
 
 TEST_FILE = """\
 THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
