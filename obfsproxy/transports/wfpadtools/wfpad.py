@@ -237,7 +237,7 @@ class WFPadTransport(BaseTransport):
         """Return padding data.
 
         The length of the padding is sampled from the packet length probability
-        distribution `size_probdist`, passed as a parameter in the init.
+        distribution `size_probdist`, passed as parameter during the init.
         """
         return ut.rand_str(self._size_probdist.randomSample())
 
@@ -245,8 +245,6 @@ class WFPadTransport(BaseTransport):
         """Got data from upstream; relay them downstream."""
         if self._state == const.ST_PADDING:
             self.sendRemote(data.read())
-
-        # Buffer data we are not ready to transmit yet.
         else:
             self.sendBuf += data.read()
             log.debug("Buffered %d bytes of outgoing data." %
