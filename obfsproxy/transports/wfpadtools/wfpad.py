@@ -39,6 +39,9 @@ class WFPadTransport(BaseTransport):
         # Buffer used for padding.
         self.padding_buffer = Buffer()
 
+        # Counter for padding messages
+        self.num_padding_msgs = 0
+
         # Used to extract protocol messages from encrypted data.
         self.msg_extractor = message.WFPadMessageExtractor()
 
@@ -152,6 +155,7 @@ class WFPadTransport(BaseTransport):
                 self.circuit.downstream.write(data)
         else:
             log.debug("Generate padding")
+            self.num_padding_msgs += 1
             data = self.encapsulate(self.generate_padding(),
                                     flags=const.FLAG_PADDING)
             self.circuit.downstream.write(data)
@@ -190,6 +194,10 @@ class WFPadTransport(BaseTransport):
                     log.debug("Padding message ignored.")
                 else:
                     log.warning("Invalid message flags: %d." % msg.flags)
+
+    def get_num_padding_msgs(self):
+        """Return number of padding messages."""
+        return self.num_padding_msgs
 
     def get_elapsed(self):
         """Return time elapsed since padding started."""
