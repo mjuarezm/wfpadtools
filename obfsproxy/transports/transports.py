@@ -5,7 +5,7 @@ import obfsproxy.transports.obfs2 as obfs2
 import obfsproxy.transports.obfs3 as obfs3
 import obfsproxy.transports.scramblesuit.scramblesuit as scramblesuit
 import obfsproxy.transports.wfpadtools.wfpad as wfpad
-from obfsproxy.transports import buflo
+from obfsproxy.transports.wfpadtools.specific import buflo
 
 transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyClient, 'server' : dummy.DummyServer },
                'b64'   : {'base': b64.B64Transport, 'client' : b64.B64Client, 'server' : b64.B64Server },
