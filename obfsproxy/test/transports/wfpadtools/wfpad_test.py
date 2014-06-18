@@ -1,12 +1,14 @@
+from obfsproxy.test.tester import DirectTest
+from obfsproxy.test.tester import SERVER_PORT, EXIT_PORT, ENTRY_PORT
+from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.wfpadtools import message
+from obfsproxy.transports.wfpadtools import wfpad, const
 import random
 from time import sleep
 import unittest
 
 from obfsproxy.test.transports.wfpadtools.sttest import STTest
-from obfsproxy.transports.wfpadtools import wfpad, const
 import obfsproxy.transports.wfpadtools.util as ut
-from obfsproxy.transports.wfpadtools import message
-from obfsproxy.transports.scramblesuit import probdist
 
 
 class MessagesTest(STTest):
@@ -59,6 +61,31 @@ class MessageExtractorTest(MessagesTest):
         self.assertEqual(flags, const.FLAG_DATA,
                          "FLAG_DATA (%s) is not correctly parsed from the"
                          " message: %s" % (const.FLAG_DATA, flags))
+
+
+class WFPadTests(DirectTest, STTest):
+    transport = "buflo"
+
+    def setUp(self):
+        self.server_args = ("buflo", "server",
+               "127.0.0.1:%d" % SERVER_PORT,
+               "--period=0.1",
+               "--psize=1448",
+               "--mintime=2",
+               "--dest=127.0.0.1:%d" % EXIT_PORT)
+        self.client_args = ("buflo", "client",
+               "127.0.0.1:%d" % ENTRY_PORT,
+               "--period=0.1",
+               "--psize=1448",
+               "--mintime=2",
+               "--dest=127.0.0.1:%d" % SERVER_PORT)
+        super(WFPadTests, self).setUp()
+
+    def tearDown(self):
+        super(WFPadTests, self).tearDown()
+
+    def test_padding(self):
+        pass
 
 
 class WFPadTest(STTest):

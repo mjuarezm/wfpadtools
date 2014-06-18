@@ -9,7 +9,7 @@ from twisted.internet import reactor
 
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
-import obfsproxy.transports.wfpadtools.util as ut
+from obfsproxy.transports.wfpadtools.message import WFPadMessage
 
 
 log = logging.get_obfslogger()
@@ -43,6 +43,7 @@ class WFPadTransport(BaseTransport):
         self.num_padding_msgs = 0
 
         # Used to extract protocol messages from encrypted data.
+        self.msg_factory = message.WFPadMessageFactory()
         self.msg_extractor = message.WFPadMessageExtractor()
 
     @classmethod
@@ -96,8 +97,8 @@ class WFPadTransport(BaseTransport):
                 "Pluggable Transport args invalid: %s" % args)
 
         # Initialize probability distributions used by WFPad.
-        cls._time_probdist = probdist.new(lambda: period)
-        cls._size_probdist = probdist.new(lambda: psize)
+        cls._delay_probdist = probdist.new(lambda: period)
+        cls._length_probdist = probdist.new(lambda: psize)
 
     def circuitConnected(self):
         """Initiate handshake.
@@ -110,15 +111,6 @@ class WFPadTransport(BaseTransport):
         self._state = const.ST_CONNECTED
         self.start_padding()
 
-    def encapsulate(self, data, flags=const.FLAG_DATA):
-        """Return protocol messages containing data as string.
-
-        Data is chopped in chunks. Each chunk is appended to a header
-        as payload. Then, we convert the stream of messages to string.
-        """
-        messages = message.createWFPadMessages(data, flags=flags)
-        return "".join([str(msg) for msg in messages])
-
     def sendRemote(self, data, flags=const.FLAG_DATA):
         """Send data to the remote end once the connection is established.
 
@@ -128,7 +120,7 @@ class WFPadTransport(BaseTransport):
         """
         log.debug("Processing %d bytes of outgoing data." % len(data))
         if self._state is const.ST_PADDING:
-            self.padding_buffer.write(self.encapsulate(data, flags))
+            self.padding_buffer.write(data)
 
     def flushPieces(self):
         """Write the application data in chunks to the wire.
@@ -141,32 +133,53 @@ class WFPadTransport(BaseTransport):
         probability distribution.
         """
         if self.stop_condition():
-            self._timer.stop()
-            return
-        if len(self.padding_buffer) > 0:
-            if len(self.padding_buffer) > const.MTU:
-                data = self.padding_buffer \
-                    .read(self._size_probdist.randomSample())
-                log.debug("Flush buffer")
-                self.circuit.downstream.write(data)
-            else:
-                data = self.padding_buffer.read()
-                log.debug("Flush buffer")
-                self.circuit.downstream.write(data)
-        else:
-            log.debug("Generate padding")
-            self.num_padding_msgs += 1
-            data = self.encapsulate(self.generate_padding(),
-                                    flags=const.FLAG_PADDING)
-            self.circuit.downstream.write(data)
-
-        delay = self._time_probdist.randomSample()
-        self.elapsed += delay
-
-        if self.stop_condition():
             self.stop_padding()
             return
+
+        msg = WFPadMessage()
+        msg_total_len = self.get_msg_length()
+        payload_len = msg_total_len - const.HDR_LENGTH
+        data_len = len(self.padding_buffer)
+        if data_len > 0:
+            log.debug("Flush buffer")
+            if data_len > payload_len:
+                log.debug("Message with no padding.")
+                data = self.padding_buffer.read(payload_len)
+                msg = self.msg_factory.createWFPadMessage(data)
+            else:
+                log.debug("Message with padding.")
+                data = self.padding_buffer.read()
+                padding_len = payload_len - data_len
+                msg = self.msg_factory.createWFPadMessage(data,
+                                                    padding_len)
+        else:
+            log.debug("Generate padding")
+			self.num_padding_msgs += 1
+            msg = self.msg_factory.createWFPadMessage("", payload_len,
+                                                      flags=const.FLAG_PADDING)
+        self.circuit.downstream.write(str(msg))
+
+        delay = self.get_flush_delay()
+        self.elapsed += delay
         reactor.callLater(delay, self.flushPieces)
+
+    def get_msg_length(self):
+        """Return length for a specific message.
+
+        The final countermeasure could override this method to,
+        instead of drawing the delay from a probability distribution,
+        iterate over a list to mimic a specific pattern of lengths.
+        """
+        return self._length_probdist.randomSample()
+
+    def get_flush_delay(self):
+        """Return delay between calls to `flushPieces`.
+
+        The final countermeasure could override this method to,
+        instead of drawing the delay from a probability distribution,
+        iterate over a list to mimic a specific pattern of delays.
+        """
+        return self._delay_probdist.randomSample()
 
     def processMessages(self, data):
         """Acts on extracted protocol messages based on header flags.
@@ -241,20 +254,21 @@ class WFPadTransport(BaseTransport):
         self.sendRemote(self.sendBuf)
         self.sendBuf = ""
 
-    def generate_padding(self):
-        """Return padding data.
+    def run_before_flushing(self):
+        """Perform the following operations before flushing the buffer.
 
-        The length of the padding is sampled from the packet length probability
-        distribution `size_probdist`, passed as a parameter in the init.
+        This method is called at the beginning of the flushPieces method. It
+        might be used to eventually change the probability distributions used
+        for sampling lengths and delays. An edge case could be to change the
+        length and delay for each individual message to mimick some predefined
+        traffic template.
         """
-        return ut.rand_str(self._size_probdist.randomSample())
+        pass
 
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream."""
         if self._state == const.ST_PADDING:
             self.sendRemote(data.read())
-
-        # Buffer data we are not ready to transmit yet.
         else:
             self.sendBuf += data.read()
             log.debug("Buffered %d bytes of outgoing data." %
