@@ -36,12 +36,14 @@ class RandProbDist:
         self.dist = self.genDistribution(genSingleton)
         self.dumpDistribution()
 
-    def genDistribution( self, genSingleton ):
+    def genDistribution( self, genSingleton, genProbSignleton ):
         """
         Generate a discrete probability distribution.
 
-        The parameter `genSingleton' is a function which is used to generate
-        singletons for the probability distribution.
+        The parameter `genSingleton` is a function which is used to generate
+        singletons for the probability distribution. `genProbSignleton`
+        returns the probabilities for the singletons returned by
+        `genSingleton`.
         """
 
         dist = {}
@@ -52,8 +54,9 @@ class RandProbDist:
         # Cumulative probability of all bins.
         cumulProb = 0
 
-        for _ in xrange(bins):
-            prob = self.prng.uniform(0, (1 - cumulProb))
+        for index in xrange(bins):
+            #prob = self.prng.uniform(0, (1 - cumulProb))
+            prob = genProbSignleton(index, bins, cumulProb)
             cumulProb += prob
 
             singleton = genSingleton()
