@@ -20,7 +20,7 @@ class RandProbDist:
     Provides code to generate, sample and dump probability distributions.
     """
 
-    def __init__( self, genSingleton, seed=None ):
+    def __init__( self, genSingleton, genProbSignleton, seed=None ):
         """
         Initialise a discrete probability distribution.
 
@@ -33,7 +33,7 @@ class RandProbDist:
         self.prng = random if (seed is None) else random.Random(seed)
 
         self.sampleList = []
-        self.dist = self.genDistribution(genSingleton)
+        self.dist = self.genDistribution(genSingleton, genProbSignleton)
         self.dumpDistribution()
 
     def genDistribution( self, genSingleton, genProbSignleton ):
