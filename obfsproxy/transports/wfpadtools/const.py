@@ -35,6 +35,11 @@ ST_PADDING = 2
 # Flags header protocol
 FLAG_DATA = (1 << 0)
 FLAG_PADDING = (1 << 1)
+FLAG_CONTROl = (1 << 2)
+
+# Control OP codes
+OP_START = (1 << 0)
+OP_STOP = (1 << 1)
 
 # WFPad message structure fields's constants
 TOTLENGTH_POS = 0
