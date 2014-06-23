@@ -1,122 +1,139 @@
-from obfsproxy.test.tester import DirectTest
-from obfsproxy.test.tester import SERVER_PORT, EXIT_PORT, ENTRY_PORT
-from obfsproxy.transports.scramblesuit import probdist
-from obfsproxy.transports.wfpadtools import message
-from obfsproxy.transports.wfpadtools import wfpad, const
-import random
-from time import sleep
+import multiprocessing
+from obfsproxy.common import transport_config
+from obfsproxy.network.network import StaticDestinationServerFactory
+from obfsproxy.test.tester import ENTRY_PORT, SERVER_PORT
+from obfsproxy.test.tester import Obfsproxy, \
+    connect_with_retry, SOCKET_TIMEOUT, TEST_FILE
+from obfsproxy.transports.wfpadtools import const
+from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
+from time import sleep, time
+from twisted.internet import reactor
 import unittest
 
+import obfsproxy.common.log as logging
+import obfsproxy.common.serialize as pack
 from obfsproxy.test.transports.wfpadtools.sttest import STTest
-import obfsproxy.transports.wfpadtools.util as ut
 
 
-class MessagesTest(STTest):
+DEBUG = False
 
-    def assert_num_encapsulated_msgs(self, len_data, expected_num):
-        test_msgs = self.create_test_msgs(len_data)
-        num_msgs = len(test_msgs)
-        self.assertEqual(num_msgs, expected_num,
-                         "Number of messages created %s does not match with "
-                         "expected number of messages %s, Length data is %s."
-                         % (num_msgs, expected_num, len_data))
+# Logging settings:
+log = logging.get_obfslogger()
+log.set_log_severity('error')
 
-    def create_test_msg(self, length=const.MPU, flags=const.FLAG_DATA):
-        data = ut.rand_str(length)
-        return message.WFPadMessage(data)
-
-    def create_test_msgs(self, length=const.MPU, flags=const.FLAG_DATA):
-        data = ut.rand_str(length)
-        return message.createWFPadMessages(data, flags=const.FLAG_DATA)
-
-    def test_create_wfpad_msgs(self):
-        # Assert size of message's payload
-        self.assert_num_encapsulated_msgs(const.MPU - 1, 1)
-        self.assert_num_encapsulated_msgs(const.MPU, 1)
-        self.assert_num_encapsulated_msgs(const.MPU + 1, 2)
-
-        # Assert flag
-        test_msg = self.create_test_msg()
-        self.assertEqual(test_msg.flags, const.FLAG_DATA,
-                         "Flag data is not set correctly in test message.")
+if DEBUG:
+    log.set_log_severity('debug')
 
 
-class MessageExtractorTest(MessagesTest):
+class WFPadServerTestWrapper(WFPadTransport, STTest):
+    """This class is a wrapper of WFPadTransport for testing.
+
+    Overrides most WFPadTransport methods and extends some of them for
+    testing.
+    """
+    def __init__(self):
+        self.start = 0
+        self.rcvIndex = 0
+        self.ticking = False
+        self.final = False
+        self.messages = []
+        super(WFPadServerTestWrapper, self).__init__()
+
+    def receivedDownstream(self, data):
+        """Test data received from client is sent within the time period."""
+        if self.ticking:
+            self.rcvIndex += 1
+            obs_period = time() - self.start
+            log.debug("Observed period in reception number %s: %s"
+                       % (self.rcvIndex, obs_period))
+            self.assertAlmostEqual(self.period, obs_period, None,
+                                   "The observed period %s does not match"
+                                   " with the expected period %s"
+                                   % (obs_period, self.period), delta=0.05)
+        else:
+            self.rcvIndex = 0
+            self.ticking = True
+        self.start = time()
+        super(WFPadServerTestWrapper, self).receivedDownstream(data)
+
+    def processMessages(self, data):
+        """Test data received from client satisfies specified length."""
+        self.msgExtractor.recvBuf += data
+        obsLen = 0
+        while len(self.msgExtractor.recvBuf) >= const.HDR_LENGTH:
+            self.msgExtractor.totalLen = pack.ntohs(self.msgExtractor\
+                                .get_field(const.TOTLENGTH_POS,
+                                           const.TOTLENGTH_LEN))
+            if (len(self.msgExtractor.recvBuf) - const.HDR_LENGTH)\
+                     < self.msgExtractor.totalLen:
+                break
+            obsLen = self.msgExtractor.totalLen + const.HDR_LENGTH
+            self.msgExtractor.reset()
+        if obsLen:
+            log.debug("Observed length in reception number %s: %s"
+                       % (self.rcvIndex, obsLen))
+            self.assertTrue(self.psize == obsLen,
+                       "The observed length %s does not match"
+                       " with the expected length %s"
+                       % (obsLen, self.psize))
+        super(WFPadServerTestWrapper, self).processMessages(data)
+
+
+class WFPadWorker(object):
+
+    @staticmethod
+    def work(ip, port):
+        pt_config = transport_config.TransportConfig()
+        pt_config.setListenerMode("server")
+        pt_config.setObfsproxyMode("external")
+        WFPadServerTestWrapper.setup(pt_config)
+        factory = StaticDestinationServerFactory((ip, port), "server",
+                                                 WFPadServerTestWrapper,
+                                                 pt_config)
+        reactor.listenTCP(port, factory, interface=ip)
+        reactor.run()
+
+    def __init__(self, address):
+        self.worker = multiprocessing.Process(target=self.work,
+                                              args=(address))
+        self.worker.start()
+
+    def stop(self):
+        if self.worker.is_alive():
+            self.worker.terminate()
+
+
+class IntermediateTest(object):
 
     def setUp(self):
-        self.extractor = message.WFPadMessageExtractor()
-        MessagesTest.setUp(self)
+        self.obfs_server = WFPadWorker(("127.0.0.1", SERVER_PORT))
+        sleep(0.2)
+        self.obfs_client = Obfsproxy(self.client_args)
+        self.input_chan = connect_with_retry(("127.0.0.1", ENTRY_PORT))
+        self.input_chan.settimeout(SOCKET_TIMEOUT)
 
-    def msg_to_str(self, msg):
-        return str(msg.totalLen) + str(msg.payloadLen) \
-            + str(msg.flags) + str(msg.payload)
+    def tearDown(self):
+        self.obfs_client.stop()
+        self.obfs_server.stop()
+        self.input_chan.close()
 
-    def test_extract_msgs(self):
-        NUM_TEST_MSGS = 4
-        msgs = self.create_test_msgs(const.MPU * NUM_TEST_MSGS)
-        data = "".join([self.msg_to_str(msg) for msg in msgs])
-        msgs = self.extractor.extract(data)
-        msg1 = msgs[0]
-        flags = msg1.flags
-        self.assertEqual(flags, const.FLAG_DATA,
-                         "FLAG_DATA (%s) is not correctly parsed from the"
-                         " message: %s" % (const.FLAG_DATA, flags))
+    def test_send_data(self):
+        self.input_chan.sendall(TEST_FILE)
+        sleep(2)
+        self.input_chan.close()
 
 
-class WFPadTests(DirectTest, STTest):
-    transport = "buflo"
+class WFPadTests(IntermediateTest, STTest):
+    transport = "wfpad"
 
     def setUp(self):
-        self.server_args = ("buflo", "server",
-               "127.0.0.1:%d" % SERVER_PORT,
-               "--period=0.1",
-               "--psize=1448",
-               "--mintime=2",
-               "--dest=127.0.0.1:%d" % EXIT_PORT)
-        self.client_args = ("buflo", "client",
+        self.client_args = ("wfpad", "client",
                "127.0.0.1:%d" % ENTRY_PORT,
-               "--period=0.1",
-               "--psize=1448",
-               "--mintime=2",
                "--dest=127.0.0.1:%d" % SERVER_PORT)
         super(WFPadTests, self).setUp()
 
     def tearDown(self):
         super(WFPadTests, self).tearDown()
-
-    def test_padding(self):
-        pass
-
-
-class WFPadTest(STTest):
-    """Test methods from WFPadTransport class."""
-    class DataStream():
-
-        def __init__(self, data):
-            self.data = data
-
-        def __len__(self):
-            return len(self.data)
-
-        def read(self):
-            return self.data
-
-    def generate_stream(self, output, t_max, psize=1):
-        t = 0
-        while t < t_max:
-            sleep_t = random.random()
-            t += sleep_t
-            if random.randrange(2):
-                output(self.DataStream(ut.rand_str(size=psize)))
-            sleep(sleep_t)
-
-    def test_buflo(self):
-        period = 2
-        psize = 1
-        wfpad_client = wfpad.WFPadClient(probdist.new(lambda: period),
-                                         probdist.new(lambda: psize))
-        wfpad_client.circuitConnected()
-        self.generate_stream(wfpad_client.receivedUpstream, 20)
 
 
 if __name__ == "__main__":
