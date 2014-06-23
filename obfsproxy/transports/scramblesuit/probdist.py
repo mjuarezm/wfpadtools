@@ -20,7 +20,7 @@ class RandProbDist:
     Provides code to generate, sample and dump probability distributions.
     """
 
-    def __init__( self, genSingleton, genProbSignleton, seed=None ):
+    def __init__( self, genSingleton, genProbSignleton=None, seed=None ):
         """
         Initialise a discrete probability distribution.
 
@@ -55,8 +55,10 @@ class RandProbDist:
         cumulProb = 0
 
         for index in xrange(bins):
-            #prob = self.prng.uniform(0, (1 - cumulProb))
-            prob = genProbSignleton(index, bins, cumulProb)
+            if genProbSignleton:
+                prob = genProbSignleton(index, bins, cumulProb)
+            else:
+                prob = self.prng.uniform(0, (1 - cumulProb))
             cumulProb += prob
 
             singleton = genSingleton()
