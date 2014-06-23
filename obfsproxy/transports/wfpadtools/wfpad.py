@@ -1,7 +1,10 @@
+"""The wfpad module implements the Tor WF framework to develop WF defenses.
+
+This module allows the development of various WF countermeasures based on
+link-padding. It implements a faming layer to introduce dummy messages into
+the stream and discard them at the other end.
 """
-The wfpad module implements the Tor WF framework to develop WF countermeasures.
-"""
-from obfsproxy.transports.base import BaseTransport, PluggableTransportError
+from obfsproxy.transports.base import BaseTransport
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message
@@ -37,14 +40,22 @@ class WFPadTransport(BaseTransport):
         self.elapsed = 0
 
         # Buffer used for padding.
-        self.padding_buffer = Buffer()
+        self.paddingBuffer = Buffer()
 
         # Counter for padding messages
-        self.num_padding_msgs = 0
+        self.consecPaddingMsgs = 0
 
         # Used to extract protocol messages from encrypted data.
-        self.msg_factory = message.WFPadMessageFactory()
-        self.msg_extractor = message.WFPadMessageExtractor()
+        self.msgFactory = message.WFPadMessageFactory()
+        self.msgExtractor = message.WFPadMessageExtractor()
+
+        # Initialize probability distributions
+        self.period = 0.001
+        self.delayProbdist = probdist.new(lambda: self.period,
+                                            lambda i, n, c: 1)
+        self.psize = const.MTU
+        self.lengthProbdist = probdist.new(lambda: self.psize,
+                                             lambda i, n, c: 1)
 
     @classmethod
     def setup(cls, transportConfig):
@@ -58,58 +69,16 @@ class WFPadTransport(BaseTransport):
         cls.weAreServer = not cls.weAreClient
         cls.weAreExternal = transportConfig.weAreExternal
 
-    @classmethod
-    def register_external_mode_cli(cls, subparser):
-        """Register CLI arguments."""
-        subparser.add_argument("--period",
-                               required=False,
-                               type=float,
-                               help="Time rate at which transport sends "
-                                    "messages (Default: 1ms).",
-                               dest="period")
-        subparser.add_argument("--psize",
-                               required=False,
-                               type=int,
-                               help="Length of messages to be transmitted"
-                                    " (Default: MTU).",
-                               dest="psize")
-        super(WFPadTransport, cls).register_external_mode_cli(subparser)
-
-    @classmethod
-    def validate_external_mode_cli(cls, args):
-        """Assign the given command line arguments to local variables.
-
-        Initializes the probability distributions used by WFPad.
-        """
-        # Defaults for WFPad parameters.
-        period = 0.001
-        psize = const.MTU
-
-        if args.period:
-            period = args.period
-        if args.psize:
-            psize = args.psize
-
-        parentalApproval = super(
-            WFPadTransport, cls).validate_external_mode_cli(args)
-        if not parentalApproval:
-            raise PluggableTransportError(
-                "Pluggable Transport args invalid: %s" % args)
-
-        # Initialize probability distributions used by WFPad.
-        cls._delay_probdist = probdist.new(lambda: period)
-        cls._length_probdist = probdist.new(lambda: psize)
-
     def circuitConnected(self):
         """Initiate handshake.
 
         This method is only relevant for clients since servers never initiate
         handshakes.
         """
-        # Start padding link
-        self.flushSendBuffer()
         self._state = const.ST_CONNECTED
-        self.start_padding()
+        self.flushSendBuffer()
+        # Start padding link
+        self.startPadding()
 
     def sendRemote(self, data, flags=const.FLAG_DATA):
         """Send data to the remote end once the connection is established.
@@ -120,7 +89,7 @@ class WFPadTransport(BaseTransport):
         """
         log.debug("Processing %d bytes of outgoing data." % len(data))
         if self._state is const.ST_PADDING:
-            self.padding_buffer.write(data)
+            self.paddingBuffer.write(data)
 
     def flushPieces(self):
         """Write the application data in chunks to the wire.
@@ -132,54 +101,53 @@ class WFPadTransport(BaseTransport):
         again after a certain delay, which is sampled from the time
         probability distribution.
         """
-        if self.stop_condition():
-            self.stop_padding()
+        if self.stopCondition():
+            self.stopPadding()
             return
 
         msg = WFPadMessage()
-        msg_total_len = self.get_msg_length()
-        payload_len = msg_total_len - const.HDR_LENGTH
-        data_len = len(self.padding_buffer)
-        if data_len > 0:
+        msgTotalLen = self.drawMessageLength()
+        payloadLen = msgTotalLen - const.HDR_LENGTH
+        dataLen = len(self.paddingBuffer)
+        if dataLen > 0:
             log.debug("Flush buffer")
-            if data_len > payload_len:
+            if dataLen > payloadLen:
                 log.debug("Message with no padding.")
-                data = self.padding_buffer.read(payload_len)
-                msg = self.msg_factory.createWFPadMessage(data)
+                data = self.paddingBuffer.read(payloadLen)
+                msg = self.msgFactory.createWFPadMessage(data)
             else:
                 log.debug("Message with padding.")
-                data = self.padding_buffer.read()
-                padding_len = payload_len - data_len
-                msg = self.msg_factory.createWFPadMessage(data,
-                                                    padding_len)
+                data = self.paddingBuffer.read()
+                paddingLen = payloadLen - dataLen
+                msg = self.msgFactory.createWFPadMessage(data, paddingLen)
         else:
             log.debug("Generate padding")
-			self.num_padding_msgs += 1
-            msg = self.msg_factory.createWFPadMessage("", payload_len,
+            self.consecPaddingMsgs += 1
+            msg = self.msgFactory.createWFPadMessage("", payloadLen,
                                                       flags=const.FLAG_PADDING)
         self.circuit.downstream.write(str(msg))
 
-        delay = self.get_flush_delay()
+        delay = self.drawFlushDelay()
         self.elapsed += delay
         reactor.callLater(delay, self.flushPieces)
 
-    def get_msg_length(self):
+    def drawMessageLength(self):
         """Return length for a specific message.
 
         The final countermeasure could override this method to,
         instead of drawing the delay from a probability distribution,
         iterate over a list to mimic a specific pattern of lengths.
         """
-        return self._length_probdist.randomSample()
+        return self.lengthProbdist.randomSample()
 
-    def get_flush_delay(self):
+    def drawFlushDelay(self):
         """Return delay between calls to `flushPieces`.
 
         The final countermeasure could override this method to,
         instead of drawing the delay from a probability distribution,
         iterate over a list to mimic a specific pattern of delays.
         """
-        return self._delay_probdist.randomSample()
+        return self.delayProbdist.randomSample()
 
     def processMessages(self, data):
         """Acts on extracted protocol messages based on header flags.
@@ -192,14 +160,14 @@ class WFPadTransport(BaseTransport):
             return
 
         # Try to extract protocol messages.
-        msgs = self.msg_extractor.extract(data)
+        msgs = self.msgExtractor.extract(data)
         for msg in msgs:
             if (msgs is None) or (len(msgs) == 0):
                 return
             for msg in msgs:
                 # Forward data to the application.
                 if msg.flags == const.FLAG_DATA:
-                    log.debug("Fata flag detected, relaying tor data stream")
+                    log.debug("Data flag detected, relaying to data stream")
                     self.circuit.upstream.write(msg.payload)
 
                 # Filter padding messages out.
@@ -207,27 +175,32 @@ class WFPadTransport(BaseTransport):
                     log.debug("Padding message ignored.")
                 else:
                     log.warning("Invalid message flags: %d." % msg.flags)
+        return msgs
 
-    def get_num_padding_msgs(self):
+    def getConsecPaddingMsgs(self):
         """Return number of padding messages."""
-        return self.num_padding_msgs
+        return self.consecPaddingMsgs
 
-    def get_elapsed(self):
+    def setConsecPaddingMsgs(self, numPaddingMsgs):
+        """Set number of padding messages."""
+        self.consecPaddingMsgs = numPaddingMsgs
+
+    def getElapsed(self):
         """Return time elapsed since padding started."""
         return self.elapsed
 
-    def start_padding(self):
+    def startPadding(self):
         """Changes protocol's state to ST_PADDING and starts timer."""
         self._state = const.ST_PADDING
         self.elapsed = 0
         self.flushPieces()
 
-    def stop_padding(self):
+    def stopPadding(self):
         """Changes protocol's state to ST_CONNECTED and stops timer."""
         self._state = const.ST_CONNECTED
         self.flushPieces()
 
-    def stop_condition(self):
+    def stopCondition(self):
         """Return the evaluation of the stop condition.
 
         We assume that the most general scheme is to be continuously padding.
@@ -254,7 +227,7 @@ class WFPadTransport(BaseTransport):
         self.sendRemote(self.sendBuf)
         self.sendBuf = ""
 
-    def run_before_flushing(self):
+    def runBeforeFlushing(self):
         """Perform the following operations before flushing the buffer.
 
         This method is called at the beginning of the flushPieces method. It
