@@ -48,13 +48,13 @@ class TamarawTransport(WFPadTransport):
         # Initialize minimum time for padding at each visit to a web page.
         cls._mintime = mintime
 
-    def stop_condition(self):
+    def stopCondition(self):
         """Returns the evaluation of the condition to stop padding.
 
         Tamaraw stops padding if the visit has finished and the elapsed time has
         exceeded the minimum padding time.
         """
-        return self.get_elapsed() > self._mintime \
+        return self.getElapsed() > self._mintime \
                 and self._state is const.ST_PADDING
 
 
