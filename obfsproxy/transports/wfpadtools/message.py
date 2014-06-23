@@ -7,13 +7,13 @@ of application data.
 This module is basically the same as ScrambleSuit's message but modified to
 our protocol specification.
 """
+from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.wfpadtools import const
+import random
+
 import obfsproxy.common.log as logging
 import obfsproxy.common.serialize as pack
 import obfsproxy.transports.base as base
-from obfsproxy.transports.wfpadtools import const
-from obfsproxy.transports.scramblesuit import probdist
-import random
-
 
 log = logging.get_obfslogger()
 
@@ -21,13 +21,12 @@ log = logging.get_obfslogger()
 class WFPadMessage(object):
     """Represents a WFPad protocol message.
 
-    This class provides methods to deal with protocol messages.
+    This class provides methods to deal with WFPad protocol messages.
     """
     def __init__(self, payload="", paddingLen=0, flags=const.FLAG_DATA):
         payloadLen = len(payload)
         if (payloadLen + paddingLen) > const.MPU:
             raise base.PluggableTransportError("No overly long messages.")
-
         self.totalLen = payloadLen + paddingLen
         self.payloadLen = payloadLen
         self.payload = payload
@@ -58,8 +57,9 @@ class WFPadMessageFactory(object):
             self.len_dist = len_dist
         else:
             self.len_dist = probdist.new(lambda: random.randint(
-                                                            const.HDR_LENGTH,
-                                                            const.MTU))
+                                                const.HDR_LENGTH,
+                                                const.MTU),
+                                         lambda i, n, c: 1)
 
     def set_len_distribution(self, new_len_dist):
         """Set a new length probability distribution."""
@@ -140,6 +140,30 @@ class WFPadMessageExtractor(object):
     def get_field(self, position, length):
         return self.recvBuf[position:position + length]
 
+    def parse(self):
+        """Extract header fields, if necessary."""
+        if self.totalLen == self.payloadLen == self.flags == None:
+            self.totalLen = pack.ntohs(self.get_field(const.TOTLENGTH_POS,
+                                                      const.TOTLENGTH_LEN))
+            self.payloadLen = pack.ntohs(self.get_field(const.PAYLOAD_POS,
+                                                        const.PAYLOAD_LEN))
+            self.flags = ord(self.get_field(const.FLAGS_POS,
+                                            const.FLAGS_LEN))
+
+            if not isSane(self.totalLen, self.payloadLen, self.flags):
+                raise base.PluggableTransportError("Invalid header.")
+
+    def filter(self):
+        """Filter padding messages out and remove data messages from buffer."""
+        extracted = self.recvBuf[const.HDR_LENGTH:
+                     (self.totalLen + const.HDR_LENGTH)][:self.payloadLen]
+        return extracted
+
+    def reset(self):
+        # Protocol message processed; now reset length fields.
+        self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
+        self.totalLen = self.payloadLen = self.flags = None
+
     def extract(self, data):
         """Extracts WFPad protocol messages.
 
@@ -151,30 +175,11 @@ class WFPadMessageExtractor(object):
 
         # Keep trying to unpack as long as there is at least a header.
         while len(self.recvBuf) >= const.HDR_LENGTH:
-
-            # If necessary, extract the header fields.
-            if self.totalLen == self.payloadLen == self.flags == None:
-                self.totalLen = pack.ntohs(self.get_field(const.TOTLENGTH_POS,
-                                                          const.TOTLENGTH_LEN))
-                self.payloadLen = pack.ntohs(self.get_field(const.PAYLOAD_POS,
-                                                            const.PAYLOAD_LEN))
-                self.flags = ord(self.get_field(const.FLAGS_POS,
-                                                const.FLAGS_LEN))
-
-                if not isSane(self.totalLen, self.payloadLen, self.flags):
-                    raise base.PluggableTransportError("Invalid header.")
-
+            self.parse()
             # Parts of the message are still on the wire; waiting.
             if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
                 break
-
-            # Filter padding messages out and remove data messages the buffer.
-            extracted = self.recvBuf[const.HDR_LENGTH:
-                         (self.totalLen + const.HDR_LENGTH)][:self.payloadLen]
+            extracted = self.filter()
             msgs.append(WFPadMessage(payload=extracted, flags=self.flags))
-            self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
-
-            # Protocol message processed; now reset length fields.
-            self.totalLen = self.payloadLen = self.flags = None
-
+            self.reset()
         return msgs
