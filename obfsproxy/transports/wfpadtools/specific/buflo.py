@@ -3,13 +3,33 @@ This module implements the BuFLO countermeasure proposed by Dyer et al.
 """
 from obfsproxy.transports.base import PluggableTransportError
 from obfsproxy.transports.scramblesuit import probdist
-from obfsproxy.transports.wfpadtools import const
-from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
+from obfsproxy.transports.wfpadtools import const, socks_shim
+from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport, \
+    WFPadShimObserver
 
 import obfsproxy.common.log as logging
+from obfsproxy.transports.wfpadtools.const import ST_PADDING
 
 
 log = logging.get_obfslogger()
+
+
+# Globals
+ST_VISITING = 3
+
+
+class BuFLOShimObserver(WFPadShimObserver):
+
+    def onSessionStarts(self):
+        """Do operations to be done when session starts."""
+        self.wfpad.startPadding()
+        self.wfpad.state = ST_VISITING
+        print "SESSION STARTED!!!"
+
+    def onSessionEnds(self):
+        """Do operations to be done when session ends."""
+        self.wfpad.state = ST_PADDING
+        print "SESSION ENDED!!!"
 
 
 class BuFLOTransport(WFPadTransport):
@@ -20,8 +40,24 @@ class BuFLOTransport(WFPadTransport):
     minimum time for which the link will be padded is also specified.
     """
     def __init__(self):
-        self._mintime = 1
+        if self.weAreClient:
+            socks_shim.new(int(const.SHIM_PORT), int(const.SOCKSPORT))
+            # Register observer for shim events
+            sessionObserver = BuFLOShimObserver(self)
+            shim = socks_shim.get()
+            shim.registerObserver(sessionObserver)
         super(BuFLOTransport, self).__init__()
+
+    def circuitConnected(self):
+        """Initiate handshake.
+
+        This method is only relevant for clients since servers never initiate
+        handshakes.
+        """
+        self._state = const.ST_CONNECTED
+        self.flushSendBuffer()
+        # Start padding link
+        #self.startPadding()
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
@@ -41,9 +77,7 @@ class BuFLOTransport(WFPadTransport):
         subparser.add_argument("--mintime",
                                required=False,
                                type=int,
-                               help="Minimum padding time per visit. For"
-                                    " negative values the padding is constant"
-                                    " (Default: -1)",
+                               help="Minimum padding time per visit.",
                                dest="mintime")
         super(BuFLOTransport, cls).register_external_mode_cli(subparser)
 
@@ -83,7 +117,7 @@ class BuFLOTransport(WFPadTransport):
         exceeded the minimum padding time.
         """
         return self.getElapsed() > self._mintime \
-                and self._state is const.ST_PADDING
+                and self._state is ST_VISITING
 
 
 class BuFLOClient(BuFLOTransport):

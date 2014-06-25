@@ -13,9 +13,43 @@ from twisted.internet import reactor
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
 from obfsproxy.transports.wfpadtools.message import WFPadMessage
+import obfsproxy.transports.wfpadtools.socks_shim as socks_shim
 
 
 log = logging.get_obfslogger()
+
+
+class WFPadShimObserver(object):
+    """Observer class for the SOCKS's shim.
+
+    This class provides signaling to start and end of web page sessions.
+    We need to monitor how many sessions are currently pending by counting
+    connect/disconnect notifications.
+    """
+    def __init__(self, instanceWFPadTransport):
+        """Instantiates a new `ShimObserver` object."""
+        self._numOpenConnections = 0
+        self.wfpad = instanceWFPadTransport
+
+    def onConnect(self, conn_id):
+        """A new connection starts."""
+        self._numOpenConnections += 1
+        if self._numOpenConnections == 0:
+            self.onSessionStarts()
+
+    def onDisconnect(self, conn_id):
+        """An open connection finishes."""
+        self._numOpenConnections -= 1
+        if self._numOpenConnections == 0:
+            self.onSessionEnds()
+
+    def onSessionStarts(self):
+        """Do operations to be done when session starts."""
+        print "SESSION STARTED!!!"
+
+    def onSessionEnds(self):
+        """Do operations to be done when session ends."""
+        print "SESSION ENDED!!!"
 
 
 class WFPadTransport(BaseTransport):

@@ -4,10 +4,10 @@ Browser and the SocksPort to allow extraction of request start/stop times.
 
 Limitations:
 
- * Currently only SOCKS session start/end times are measured.  Things like HTTP
+ * Currently only SOCKS session start/end times are measured. Things like HTTP
    pipelining will make the estimate inaccurate.
 
- * The information is only available on the client side.  If the server needs
+ * The information is only available on the client side. If the server needs
    to continue to send padding till a specified duration past the request end,
    the application request ("visit") termination time must be communicated to
    the server.
