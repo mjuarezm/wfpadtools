@@ -122,6 +122,7 @@ class TransportTest(STTest):
                            .format(const.SHIM_PORT)}
         return session.get(url)
 
+    @unittest.skip("")
     def test_transport(self):
         sleep(500000)
 

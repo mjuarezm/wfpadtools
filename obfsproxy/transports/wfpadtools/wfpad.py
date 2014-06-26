@@ -13,7 +13,6 @@ from twisted.internet import reactor
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
 from obfsproxy.transports.wfpadtools.message import WFPadMessage
-import obfsproxy.transports.wfpadtools.socks_shim as socks_shim
 
 
 log = logging.get_obfslogger()
@@ -84,7 +83,7 @@ class WFPadTransport(BaseTransport):
         self.msgExtractor = message.WFPadMessageExtractor()
 
         # Initialize probability distributions
-        self.period = 0.001
+        self.period = 0.1
         self.delayProbdist = probdist.new(lambda: self.period,
                                             lambda i, n, c: 1)
         self.psize = const.MTU

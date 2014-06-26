@@ -227,7 +227,6 @@ class DirectTest(object):
 #
 # Concrete test classes specialize the above base classes for each protocol.
 #
-@unittest.skip("")
 class DirectDummy(DirectTest, unittest.TestCase):
     transport = "dummy"
     server_args = ("dummy", "server",
@@ -237,7 +236,6 @@ class DirectDummy(DirectTest, unittest.TestCase):
                    "127.0.0.1:%d" % ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectObfs2(DirectTest, unittest.TestCase):
     transport = "obfs2"
     server_args = ("obfs2", "server",
@@ -247,7 +245,6 @@ class DirectObfs2(DirectTest, unittest.TestCase):
                    "127.0.0.1:%d" % ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectObfs2_ss(DirectTest, unittest.TestCase):
     transport = "obfs2"
     server_args = ("obfs2", "server",
@@ -261,7 +258,6 @@ class DirectObfs2_ss(DirectTest, unittest.TestCase):
                    "--ss-hash-iterations=50",
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectB64(DirectTest, unittest.TestCase):
     transport = "b64"
     server_args = ("b64", "server",
@@ -271,7 +267,6 @@ class DirectB64(DirectTest, unittest.TestCase):
                    "127.0.0.1:%d" % ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectObfs3(DirectTest, unittest.TestCase):
     transport = "obfs3"
     server_args = ("obfs3", "server",
@@ -281,7 +276,6 @@ class DirectObfs3(DirectTest, unittest.TestCase):
                    "127.0.0.1:%d" % ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectScrambleSuit(DirectTest, unittest.TestCase):
     transport = "scramblesuit"
 
@@ -314,7 +308,6 @@ class DirectScrambleSuit(DirectTest, unittest.TestCase):
         shutil.rmtree(self.tmpdir_srv)
         shutil.rmtree(self.tmpdir_cli)
 
-@unittest.skip("")
 class DirectWFPad(DirectTest, unittest.TestCase):
     transport = "wfpad"
     server_args = ("wfpad", "server",
@@ -328,15 +321,15 @@ class DirectBuFLO(DirectTest, unittest.TestCase):
     transport = "buflo"
     server_args = ("buflo", "server",
            "127.0.0.1:%d" % SERVER_PORT,
-           "--period=0.01",
-           "--psize=1443",
+           "--period=0.1",
+           "--psize=1448",
            "--mintime=2",
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = (#"--socks-shim %d,%d" % (SHIMS_PORT, SOCKS_PORT),
            "buflo", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
-           "--period=0.01",
-           "--psize=1443",
+           "--period=0.1",
+           "--psize=1448",
            "--mintime=2",
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
