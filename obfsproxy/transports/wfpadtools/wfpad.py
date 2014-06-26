@@ -32,12 +32,14 @@ class WFPadShimObserver(object):
 
     def onConnect(self, conn_id):
         """A new connection starts."""
-        self._numOpenConnections += 1
+        print "New connection (id=%d)" % conn_id
         if self._numOpenConnections == 0:
             self.onSessionStarts()
+        self._numOpenConnections += 1
 
     def onDisconnect(self, conn_id):
         """An open connection finishes."""
+        print "Connection %s finishes!" % conn_id
         self._numOpenConnections -= 1
         if self._numOpenConnections == 0:
             self.onSessionEnds()
@@ -273,8 +275,10 @@ class WFPadTransport(BaseTransport):
 
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream."""
-        if self._state == const.ST_PADDING:
-            self.sendRemote(data.read())
+        if self._state is const.ST_CONNECTED:
+            self.circuit.downstream.write(data.read())
+        elif self._state == const.ST_PADDING:
+                self.sendRemote(data.read())
         else:
             self.sendBuf += data.read()
             log.debug("Buffered %d bytes of outgoing data." %
@@ -282,7 +286,9 @@ class WFPadTransport(BaseTransport):
 
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
-        if self._state is const.ST_PADDING:
+        if self._state is const.ST_CONNECTED:
+            self.circuit.upstream.write(data.read())
+        elif self._state == const.ST_PADDING:
             self.processMessages(data.read())
         else:
             self.flushSendBuffer()

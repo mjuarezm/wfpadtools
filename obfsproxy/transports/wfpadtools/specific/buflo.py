@@ -4,11 +4,11 @@ This module implements the BuFLO countermeasure proposed by Dyer et al.
 from obfsproxy.transports.base import PluggableTransportError
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const, socks_shim
+from obfsproxy.transports.wfpadtools.const import ST_PADDING
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport, \
     WFPadShimObserver
 
 import obfsproxy.common.log as logging
-from obfsproxy.transports.wfpadtools.const import ST_PADDING
 
 
 log = logging.get_obfslogger()
@@ -22,9 +22,9 @@ class BuFLOShimObserver(WFPadShimObserver):
 
     def onSessionStarts(self):
         """Do operations to be done when session starts."""
+        print "SESSION STARTED!!!"
         self.wfpad.startPadding()
         self.wfpad.state = ST_VISITING
-        print "SESSION STARTED!!!"
 
     def onSessionEnds(self):
         """Do operations to be done when session ends."""
@@ -40,13 +40,23 @@ class BuFLOTransport(WFPadTransport):
     minimum time for which the link will be padded is also specified.
     """
     def __init__(self):
+        super(BuFLOTransport, self).__init__()
+        # Initialize minimum time for padding at each visit to a web page.
+        self.delayProbdist = probdist.new(lambda: self._period,
+                                          lambda i, n, c: 1)
+        self.lengthProbdist = probdist.new(lambda: self._psize,
+                                           lambda i, n, c: 1)
+
         if self.weAreClient:
-            socks_shim.new(int(const.SHIM_PORT), int(const.SOCKSPORT))
+            try:
+                socks_shim.new(int(self.shim_port), int(self.socks_port))
+            except Exception as e:
+                log.error('Failed to initialize SOCKS shim: %s', e)
+
             # Register observer for shim events
             sessionObserver = BuFLOShimObserver(self)
             shim = socks_shim.get()
             shim.registerObserver(sessionObserver)
-        super(BuFLOTransport, self).__init__()
 
     def circuitConnected(self):
         """Initiate handshake.
@@ -79,6 +89,12 @@ class BuFLOTransport(WFPadTransport):
                                type=int,
                                help="Minimum padding time per visit.",
                                dest="mintime")
+        subparser.add_argument('--socks-shim',
+                               action='store',
+                               required=False,
+                               dest='shim',
+                               help='buflo SOCKS shim (shim_port,socks_port)')
+
         super(BuFLOTransport, cls).register_external_mode_cli(subparser)
 
     @classmethod
@@ -89,26 +105,26 @@ class BuFLOTransport(WFPadTransport):
         constant size `psize`.
         """
         super(BuFLOTransport, cls).validate_external_mode_cli(args)
+
         # Defaults for BuFLO specifications.
-        period = 0.001
-        psize = const.MTU
-        mintime = -1
+        cls._period = 0.01
+        cls._psize = const.MTU
+        cls._mintime = -1
+
         if args.mintime:
-            mintime = int(args.mintime)
+            cls._mintime = int(args.mintime)
         if args.period:
-            period = args.period
+            cls._period = args.period
         if args.psize:
-            psize = args.psize
+            cls._psize = args.psize
+        if args.shim:
+            cls.shim_port, cls.socks_port = args.shim.split(',')
 
         parentalApproval = super(
             WFPadTransport, cls).validate_external_mode_cli(args)
         if not parentalApproval:
             raise PluggableTransportError(
                 "Pluggable Transport args invalid: %s" % args)
-        # Initialize minimum time for padding at each visit to a web page.
-        cls._mintime = mintime
-        cls.delayProbdist = probdist.new(lambda: period, lambda i, n, c: 1)
-        cls.lengthProbdist = probdist.new(lambda: psize, lambda i, n, c: 1)
 
     def stopCondition(self):
         """Returns the evaluation of the condition to stop padding.
