@@ -46,11 +46,11 @@ class WFPadShimObserver(object):
 
     def onSessionStarts(self):
         """Do operations to be done when session starts."""
-        print "SESSION STARTED!!!"
+        pass
 
     def onSessionEnds(self):
         """Do operations to be done when session ends."""
-        print "SESSION ENDED!!!"
+        pass
 
 
 class WFPadTransport(BaseTransport):

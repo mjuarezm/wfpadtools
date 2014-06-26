@@ -4,7 +4,6 @@ This module implements the BuFLO countermeasure proposed by Dyer et al.
 from obfsproxy.transports.base import PluggableTransportError
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const, socks_shim
-from obfsproxy.transports.wfpadtools.const import ST_PADDING
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport, \
     WFPadShimObserver
 
@@ -14,21 +13,17 @@ import obfsproxy.common.log as logging
 log = logging.get_obfslogger()
 
 
-# Globals
-ST_VISITING = 3
-
-
 class BuFLOShimObserver(WFPadShimObserver):
 
     def onSessionStarts(self):
         """Do operations to be done when session starts."""
         print "SESSION STARTED!!!"
         self.wfpad.startPadding()
-        self.wfpad.state = ST_VISITING
+        self.wfpad.visiting = True
 
     def onSessionEnds(self):
         """Do operations to be done when session ends."""
-        self.wfpad.state = ST_PADDING
+        self.wfpad.visiting = False
         print "SESSION ENDED!!!"
 
 
@@ -46,6 +41,8 @@ class BuFLOTransport(WFPadTransport):
                                           lambda i, n, c: 1)
         self.lengthProbdist = probdist.new(lambda: self._psize,
                                            lambda i, n, c: 1)
+
+        self.visiting = False
 
         if self.weAreClient:
             try:
@@ -133,7 +130,7 @@ class BuFLOTransport(WFPadTransport):
         exceeded the minimum padding time.
         """
         return self.getElapsed() > self._mintime \
-                and self._state is ST_VISITING
+                and self._state is self.visiting
 
 
 class BuFLOClient(BuFLOTransport):

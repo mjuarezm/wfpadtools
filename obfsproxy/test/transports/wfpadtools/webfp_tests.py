@@ -60,7 +60,6 @@ class UnmanagedTorTest(tester.TransportsSetUp):
             super(UnmanagedTorTest, self).tearDown()
             if LEAVE_TOR_RUNNING:
                 return
-            print self.tor_endpoints
             for torend_name, torend in self.tor_endpoints.iteritems():
                 self.terminate_process_and_log(torend,
                                        "TEST: killed Tor {}."
@@ -167,6 +166,7 @@ class WFPadToolsTransportTests():
         pass
 
 
+@unittest.skip("")
 class WFPadTorTest(UnmanagedTorTest, WFPadToolsTransportTests, STTest):
     transport = tester.DirectWFPad.transport
     client_args = list(tester.DirectWFPad.client_args)
