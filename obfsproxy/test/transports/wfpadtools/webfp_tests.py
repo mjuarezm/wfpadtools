@@ -9,9 +9,12 @@ import obfsproxy.transports.wfpadtools.util as ut
 import requesocks as requests
 from time import sleep
 
+# Test config
 TRANSPORT = "wfpad"
-
+TOR_WATCHDOG_WAIT_TIME = 3
+WATCHDOG_TIMEOUT = 120
 DEBUG = True
+
 # Switch to leave Tor running and speed-up tests
 LEAVE_TOR_RUNNING = False
 LEAVE_TRANSPORT_RUNNING = False
@@ -135,6 +138,7 @@ class UnmanagedTorTest(TransportTest):
         try:
             self.tor_endpoints["router"] = self.start_tor_bridge(const.ORPORT,
                                                 const.DATA_DIRS["router"])
+            sleep(5000000)
             self.tor_endpoints["proxy"] = self.start_tor_proxy(const.SOCKSPORT,
                                                 const.CTRANS_PORT,
                                                 const.STRANS_PORT,
@@ -180,8 +184,8 @@ class UnmanagedTorTest(TransportTest):
     def tor_log_watchdog(self, logfile):
         ut.log_watchdog(const.FINISH_BOOTSRAP_LOGLINE,
                         logfile,
-                        const.TOR_WATCHDOG_WAIT_TIME,
-                        const.WATCHDOG_TIMEOUT)
+                        TOR_WATCHDOG_WAIT_TIME,
+                        WATCHDOG_TIMEOUT)
 
     def start_tor(self, datadir, args, stdout_loglevel=DEFAULT_TOR_LOGLEVEL,
                   quiet=DEFAULT_TOR_LOG_QUIET):
@@ -220,7 +224,7 @@ class UnmanagedTorTest(TransportTest):
                                "--SOCKSPort", "auto",
                                "--ORPort", orport,
                                "--ControlPort", "auto",
-                               "--ExitPolicy", "reject *:*",
+                               #"--ExitPolicy", "reject *:*",
                                "--AssumeReachable", "1",
                                "--PublishServerDescriptor", "0"])
 
@@ -238,7 +242,7 @@ class UnmanagedTorTest(TransportTest):
 class WFPadToolsTransportTest(UnmanagedTorTest):
     """Test protection offered by transport against Website Fingerprinting."""
 
-    @unittest.skip("")
+    #@unittest.skip("")
     def test_unmanaged_tor_connection(self):
         resp = self.get_page("http://torcheck.xenobite.eu/")
         self.assertEqual(resp.status_code, 200,
@@ -249,6 +253,7 @@ class WFPadToolsTransportTest(UnmanagedTorTest):
                       "Tor-check does not detect Tor: %s"
                       % resp.text)
 
+    @unittest.skip("")
     def test_wfpad_shim(self):
         log.debug("Running Shim test...")
         resp = self.get_page_through_shim("http://torcheck.xenobite.eu/")

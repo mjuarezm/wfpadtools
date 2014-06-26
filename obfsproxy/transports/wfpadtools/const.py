@@ -26,8 +26,6 @@ DEBUG_FNAME = "debug.log"
 FINISH_BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done."
 
 # Times
-TOR_WATCHDOG_WAIT_TIME = 3
-WATCHDOG_TIMEOUT = 60
 DEFAULT_TIME_PERIOD = 60
 
 # Protocol states
