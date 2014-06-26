@@ -7,17 +7,14 @@ from obfsproxy.test.transports.wfpadtools.sttest import STTest
 from obfsproxy.transports.wfpadtools import const
 import obfsproxy.transports.wfpadtools.util as ut
 import requesocks as requests
-from time import sleep
+from obfsproxy.test import tester
 
 # Test config
-TRANSPORT = "wfpad"
-TOR_WATCHDOG_WAIT_TIME = 3
-WATCHDOG_TIMEOUT = 120
+WATCHDOG_TIMEOUT = 180
 DEBUG = True
 
 # Switch to leave Tor running and speed-up tests
 LEAVE_TOR_RUNNING = False
-LEAVE_TRANSPORT_RUNNING = False
 
 # Logging settings:
 log = logging.get_obfslogger()
@@ -34,115 +31,23 @@ else:
     log.disable_logs()
 
 
-class TransportTest(STTest):
-    transport_ends = {}
-
-    def setUp(self):
-        try:
-            for mode, port in const.TRANSPORT_MODES.iteritems():
-                self.transport_ends[mode] = self.start_transport(mode, port)
-        except Exception as exc:
-            log.exception("TEST: Exception setting up the class {}: {}"
-                          .format(self.__class__.__name__, exc))
-            LEAVE_TOR_RUNNING = False
-            self.tearDownClass()
-
-    def tearDown(self):
-        if LEAVE_TRANSPORT_RUNNING:
-            return
-        for mode, transport_end in self.transport_ends:
-            self.terminate_process_and_log(transport_end,
-                                       "TEST: killed {} transport {}"
-                                       .format(TRANSPORT, mode))
-
-    @classmethod
-    def setUpClass(cls):
-        pass
-
-    @classmethod
-    def tearDownClass(cls):
-        try:
-            for mode in const.TRANSPORT_MODES:
-                pidfile = join(const.TEMP_DIR, "{}-{}.pid"
-                               .format(mode, TRANSPORT))
-                if exists(pidfile):
-                    pid = int(ut.read_file(pidfile))
-                    ut.terminate_process(pid)
-                    log.debug("TEST: killed {} transport {}"
-                                       .format(TRANSPORT, mode))
-                    ut.removefile(pidfile)
-        except Exception as exc:
-            log.exception("Exception raised tearing down class {}: {}"
-                          .format(cls.__name__, exc))
-
-    def run_transport(self, transport, mode, dest, listen_port):
-        logfile = join(const.TEMP_DIR, "{}-{}.log".format(mode, TRANSPORT))
-        pidfile = join(const.TEMP_DIR, "{}-{}.pid".format(mode, TRANSPORT))
-        pid = ut.read_file(pidfile)
-        if ut.is_pid_running(pid):
-            log.debug("TEST: transport {} is already running."
-                      .format(mode))
-            return int(pid)
-        log.debug("TEST: Starting {} of transport {} listening at {}"
-                  .format(mode, transport, listen_port))
-        cmd = ["python", const.PYOBFSPROXY_PATH,
-                         "--log-file", logfile,
-                         "--log-min-severity", "debug",
-                         #"--socks-shim 9250,9150",
-                         transport,
-                         mode,
-                         "--dest", "localhost:{}".format(dest),
-                         "localhost:{}".format(listen_port)]
-        log.debug("COMMAND: {}".format(" ".join(cmd)))
-        process = Popen(cmd)
-        ut.write_to_file(pidfile, str(process.pid))
-        return process.pid
-
-    def terminate_process_and_log(self, pid, msg=None):
-        ut.terminate_process(pid)
-        if msg:
-            log.debug(msg)
-
-    def start_transport(self, mode, transport_port):
-        return self.run_transport(TRANSPORT,
-                                    mode,
-                                    const.ORPORT,
-                                    transport_port)
-
-    def get_page(self, url):
-        session = requests.session()
-        session.proxies = {'http': 'socks5://127.0.0.1:{}'
-                           .format(const.SOCKSPORT),
-                           'https': 'socks5://127.0.0.1:{}'
-                           .format(const.SOCKSPORT)}
-        return session.get(url)
-
-    def get_page_through_shim(self, url):
-        session = requests.session()
-        session.proxies = {'http': 'socks5://127.0.0.1:{}'
-                           .format(const.SHIM_PORT),
-                           'https': 'socks5://127.0.0.1:{}'
-                           .format(const.SHIM_PORT)}
-        return session.get(url)
-
-    @unittest.skip("")
-    def test_transport(self):
-        sleep(500000)
-
-
-class UnmanagedTorTest(TransportTest):
+class UnmanagedTorTest(tester.TransportsSetUp):
     tor_endpoints = {}
 
     def setUp(self):
+        # Run transport client and server
         super(UnmanagedTorTest, self).setUp()
         try:
-            self.tor_endpoints["router"] = self.start_tor_bridge(const.ORPORT,
+            # Run Tor bridge
+            self.tor_endpoints["router"] = self.start_tor_bridge(
+                                                str(tester.EXIT_PORT),
                                                 const.DATA_DIRS["router"])
-            sleep(5000000)
-            self.tor_endpoints["proxy"] = self.start_tor_proxy(const.SOCKSPORT,
-                                                const.CTRANS_PORT,
-                                                const.STRANS_PORT,
-                                                const.DATA_DIRS["proxy"])
+            # Run Onion proxy
+            self.tor_endpoints["proxy"] = self.start_tor_proxy(
+                                                    str(tester.SOCKS_PORT),
+                                                    str(tester.ENTRY_PORT),
+                                                    str(tester.SERVER_PORT),
+                                                    const.DATA_DIRS["proxy"])
         except Exception as exc:
             log.exception("TEST: Exception setting up the class {}: {}"
                     .format(self.__class__.__name__, exc))
@@ -151,20 +56,18 @@ class UnmanagedTorTest(TransportTest):
 
     def tearDown(self):
         try:
+            # Close transports ports
             super(UnmanagedTorTest, self).tearDown()
             if LEAVE_TOR_RUNNING:
                 return
-            for torend_name, torend in self.tor_endpoints:
+            print self.tor_endpoints
+            for torend_name, torend in self.tor_endpoints.iteritems():
                 self.terminate_process_and_log(torend,
                                        "TEST: killed Tor {}."
                                             .format(torend_name))
         except Exception as exc:
             log.exception("TEST: Exception tearing down the class {}: {}"
                     .format(self.__class__.__name__, exc))
-
-    @classmethod
-    def setUpClass(cls):
-        pass
 
     @classmethod
     def tearDownClass(cls):
@@ -184,8 +87,13 @@ class UnmanagedTorTest(TransportTest):
     def tor_log_watchdog(self, logfile):
         ut.log_watchdog(const.FINISH_BOOTSRAP_LOGLINE,
                         logfile,
-                        TOR_WATCHDOG_WAIT_TIME,
-                        WATCHDOG_TIMEOUT)
+                        WATCHDOG_TIMEOUT,
+                        delay=3)
+
+    def terminate_process_and_log(self, pid, msg=None):
+        ut.terminate_process(pid)
+        if msg:
+            log.debug(msg)
 
     def start_tor(self, datadir, args, stdout_loglevel=DEFAULT_TOR_LOGLEVEL,
                   quiet=DEFAULT_TOR_LOG_QUIET):
@@ -218,55 +126,64 @@ class UnmanagedTorTest(TransportTest):
 
     def start_tor_bridge(self, orport, datadir):
         return self.start_tor(datadir,
-                              ["--BridgeRelay", "1",
-                               "--Nickname", "{}Test"
-                                    .format(TRANSPORT),
-                               "--SOCKSPort", "auto",
-                               "--ORPort", orport,
-                               "--ControlPort", "auto",
-                               #"--ExitPolicy", "reject *:*",
-                               "--AssumeReachable", "1",
-                               "--PublishServerDescriptor", "0"])
+              ["--BridgeRelay", "1",
+               "--Nickname", "{}Test".format(self.transport),
+               "--SOCKSPort", "auto",
+               "--ORPort", orport,
+               "--ControlPort", "auto",
+               "--AssumeReachable", "1",
+               "--PublishServerDescriptor", "0"])
 
     def start_tor_proxy(self, socksport, client_port, server_port, datadir):
         return self.start_tor(datadir,
-                              ["--UseBridges", "1",
-                               "--Bridge", "{} localhost:{}"
-                                    .format(TRANSPORT, server_port),
-                               "--ClientTransportPlugin",
-                                    "{} socks5 localhost:{}"
-                                    .format(TRANSPORT, client_port),
-                               "--SOCKSPort", socksport])
+            ["--UseBridges", "1",
+             "--Bridge", "{} localhost:{}".format(self.transport, server_port),
+             "--ClientTransportPlugin", "{} socks5 localhost:{}"
+                    .format(self.transport, client_port),
+             "--SOCKSPort", socksport])
+
+    def get_page(self, url, port=tester.SOCKS_PORT):
+        session = requests.session()
+        session.proxies = {'http': 'socks5://127.0.0.1:{}'.format(port),
+                           'https': 'socks5://127.0.0.1:{}'.format(port)}
+        return session.get(url)
+
+    def test_tor(self):
+        resp = self.get_page("http://torcheck.xenobite.eu/", self.entry_port)
+        self.assertEqual(resp.status_code, 200,
+                         "The status code (%s) is not OK."
+                         % resp.status_code)
+        self.failUnless(resp.text)  # make sure it has body
+        self.assertIn("using Tor successfully to reach the web", resp.text,
+                      "Tor-check does not detect Tor: %s"
+                      % resp.text)
 
 
-class WFPadToolsTransportTest(UnmanagedTorTest):
+class WFPadToolsTransportTests():
     """Test protection offered by transport against Website Fingerprinting."""
 
-    #@unittest.skip("")
-    def test_unmanaged_tor_connection(self):
-        resp = self.get_page("http://torcheck.xenobite.eu/")
-        self.assertEqual(resp.status_code, 200,
-                         "The status code (%s) is not OK."
-                         % resp.status_code)
-        self.failUnless(resp.text)  # make sure it has body
-        self.assertIn("using Tor successfully to reach the web", resp.text,
-                      "Tor-check does not detect Tor: %s"
-                      % resp.text)
-
     @unittest.skip("")
-    def test_wfpad_shim(self):
-        log.debug("Running Shim test...")
-        resp = self.get_page_through_shim("http://torcheck.xenobite.eu/")
-        self.assertEqual(resp.status_code, 200,
-                         "The status code (%s) is not OK."
-                         % resp.status_code)
-        self.failUnless(resp.text)  # make sure it has body
-        self.assertIn("using Tor successfully to reach the web", resp.text,
-                      "Tor-check does not detect Tor: %s"
-                      % resp.text)
-
     def test_attacks(self):
         pass
+
+
+class WFPadTorTest(UnmanagedTorTest, WFPadToolsTransportTests, STTest):
+    transport = tester.DirectWFPad.transport
+    client_args = list(tester.DirectWFPad.client_args)
+    client_args[1] = "socks"
+    client_args = tuple(client_args)
+    server_args = tester.DirectWFPad.server_args
+    entry_port = tester.SOCKS_PORT
+
+
+class BuFLOTorTest(UnmanagedTorTest, WFPadToolsTransportTests, STTest):
+    transport = tester.DirectBuFLO.transport
+    client_args = list(tester.DirectBuFLO.client_args)
+    client_args[1] = "socks"
+    client_args = tuple(client_args)
+    server_args = tester.DirectBuFLO.server_args
+    entry_port = tester.SHIM_PORT
+
 
 if __name__ == "__main__":
     # import sys;sys.argv = ['', 'Test.testName']

@@ -175,9 +175,9 @@ class ReadWorker(object):
 # (except that I have fleshed out the SOCKS test a bit).
 # It will be made more general and parametric Real Soon.
 
-SHIMS_PORT  = 9250
-SOCKS_PORT  = 9150
-ENTRY_PORT  = 4998
+SHIM_PORT  = 4997
+SOCKS_PORT  = 4998
+ENTRY_PORT  = 4999
 SERVER_PORT = 5000
 EXIT_PORT   = 5001
 
@@ -188,18 +188,29 @@ EXIT_PORT   = 5001
 # further code from subclasses).
 #
 
-class DirectTest(object):
+class TransportsSetUp(object):
+
     def setUp(self):
-        self.output_reader = ReadWorker(("127.0.0.1", EXIT_PORT))
+        print self.client_args
         self.obfs_server = Obfsproxy(self.server_args)
         time.sleep(0.1)
+        print self.server_args
         self.obfs_client = Obfsproxy(self.client_args)
-        self.input_chan = connect_with_retry(("127.0.0.1", ENTRY_PORT))
-        self.input_chan.settimeout(SOCKET_TIMEOUT)
 
     def tearDown(self):
         self.obfs_client.stop()
         self.obfs_server.stop()
+
+class DirectTest(TransportsSetUp):
+
+    def setUp(self):
+        self.output_reader = ReadWorker(("127.0.0.1", EXIT_PORT))
+        super(DirectTest, self).setUp()
+        self.input_chan = connect_with_retry(("127.0.0.1", ENTRY_PORT))
+        self.input_chan.settimeout(SOCKET_TIMEOUT)
+
+    def tearDown(self):
+        super(DirectTest, self).tearDown()
         self.output_reader.stop()
         self.input_chan.close()
 
@@ -325,9 +336,9 @@ class DirectBuFLO(DirectTest, unittest.TestCase):
            "--psize=1448",
            "--mintime=2",
            "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = (#"--socks-shim %d,%d" % (SHIMS_PORT, SOCKS_PORT),
-           "buflo", "client",
+    client_args = ("buflo", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
+           "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
            "--period=0.1",
            "--psize=1448",
            "--mintime=2",

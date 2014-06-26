@@ -72,12 +72,12 @@ def cancel_timeout():
     signal.alarm(0)
 
 
-def log_watchdog(line, logfile, wait_time, timeout):
+def log_watchdog(line, logfile, timeout, delay=1):
     set_timeout(timeout)
     while not exists(logfile):
-        sleep(wait_time)
+        sleep(delay)
     while line not in read_file(logfile):
-        sleep(wait_time)
+        sleep(delay)
     cancel_timeout()
 
 

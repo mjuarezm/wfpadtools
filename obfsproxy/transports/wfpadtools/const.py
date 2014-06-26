@@ -9,19 +9,12 @@ PYOBFSPROXY_PATH = join(BASE_DIR, "pyobfsproxy.py")
 
 # Trnasport constants
 TRANSPORT_NAME = "wfpad"  # The protocol name which is used in log messages.
-STRANS_PORT = "5000"
-CTRANS_PORT = "4999"
-
-# Shim constants
-SHIM_PORT = "9250"
 
 # Tor constants
 ORPORT = "65535"
-SOCKSPORT = "4998"
 DATA_DIRS = {"proxy": join(TEMP_DIR, "proxy"),
              "router": join(TEMP_DIR, "router")}
-TRANSPORT_MODES = {"server": STRANS_PORT,
-                   "socks": CTRANS_PORT}
+
 DEBUG_FNAME = "debug.log"
 FINISH_BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done."
 
