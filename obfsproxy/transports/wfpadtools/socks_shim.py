@@ -118,6 +118,9 @@ class SocksShim(object):
     def deregisterObserver(self, observer):
         self._observers.remove(observer)
 
+    def isRegistered(self, observer):
+        return observer in self._observers
+
     def notifyConnect(self):
         self._id += 1
         log.debug('[shim]: notifyConnect: id=%d', self._id)

@@ -1,7 +1,6 @@
 """
 This module implements the BuFLO countermeasure proposed by Dyer et al.
 """
-from obfsproxy.transports.base import PluggableTransportError
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const, socks_shim
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport, \
@@ -46,9 +45,9 @@ class BuFLOTransport(WFPadTransport):
 
         # Register observer for shim events
         if self.weAreClient:
-            sessionObserver = BuFLOShimObserver(self)
             shim = socks_shim.get()
-            shim.registerObserver(sessionObserver)
+            self.sessionObserver = BuFLOShimObserver(self)
+            shim.registerObserver(self.sessionObserver)
 
     def circuitConnected(self):
         """Initiate handshake.
@@ -58,8 +57,13 @@ class BuFLOTransport(WFPadTransport):
         """
         self._state = const.ST_CONNECTED
         self.flushSendBuffer()
-        # Start padding link
-        #self.startPadding()
+
+    def circuitDestroyed(self, reason, side):
+        """Unregister shim observers."""
+        if self.weAreClient:
+            shim = socks_shim.get()
+            if shim.isRegistered(self.sessionObserver):
+                shim.deregisterObserver(self.sessionObserver)
 
     @classmethod
     def register_external_mode_cli(cls, subparser):

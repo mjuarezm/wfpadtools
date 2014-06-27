@@ -65,7 +65,6 @@ class WFPadTransport(BaseTransport):
     """
     def __init__(self):
         """Initialize a WFPadTransport object."""
-        print "INITIALIZING..." + str(id(self))
         log.debug("Initializing %s." % const.TRANSPORT_NAME)
 
         super(WFPadTransport, self).__init__()
@@ -97,9 +96,9 @@ class WFPadTransport(BaseTransport):
         self.lengthProbdist = probdist.new(lambda: self.psize,
                                              lambda i, n, c: 1)
 
-        if self.weAreClient and self.shim and not socks_shim.get():
+        if self.weAreClient and self.shim_args and not socks_shim.get():
             try:
-                shim_port, socks_port = self.shim.split(',')
+                shim_port, socks_port = self.shim_args
                 socks_shim.new(int(shim_port), int(socks_port))
             except Exception as e:
                 log.error('Failed to initialize SOCKS shim: %s', e)
@@ -120,8 +119,9 @@ class WFPadTransport(BaseTransport):
         if not parentalApproval:
             raise PluggableTransportError(
                 "Pluggable Transport args invalid: %s" % args)
+        cls.shim_args = None
         if args.shim:
-            cls.shim = args.shim
+            cls.shim_args = args.shim.split(',')
 
     @classmethod
     def setup(cls, transportConfig):
