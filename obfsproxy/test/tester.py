@@ -191,10 +191,8 @@ EXIT_PORT   = 5001
 class TransportsSetUp(object):
 
     def setUp(self):
-        print self.client_args
         self.obfs_server = Obfsproxy(self.server_args)
         time.sleep(0.1)
-        print self.server_args
         self.obfs_client = Obfsproxy(self.client_args)
 
     def tearDown(self):

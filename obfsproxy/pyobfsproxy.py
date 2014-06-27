@@ -56,8 +56,6 @@ def set_up_cli_parsing():
 
     parser.add_argument('--proxy', action='store', dest='proxy',
                         help='Outgoing proxy (<proxy_type>://[<user_name>][:<password>][@]<ip>:<port>)')
-    parser.add_argument('--socks-shim', action='store', dest='shim',
-                        help='wfpadtools SOCKS shim (shim_port,socks_port)')
 
     # Managed mode is a subparser for now because there are no
     # optional subparsers: bugs.python.org/issue9253
@@ -171,15 +169,6 @@ def pyobfsproxy():
     # Fire up our heartbeat.
     l = task.LoopingCall(heartbeat.heartbeat.talk)
     l.start(3600.0, now=False) # do heartbeat every hour
-
-    # Initiate the SOCKS shim.
-    if args.shim:
-        try:
-            shim_port, socks_port = args.shim.split(',')
-            socks_shim.new(int(shim_port), int(socks_port))
-        except Exception as e:
-            log.error('Failed to initialize SOCKS shim: %s', e)
-            sys.exit(1)
 
     # Initiate obfsproxy.
     if (args.name == 'managed'):

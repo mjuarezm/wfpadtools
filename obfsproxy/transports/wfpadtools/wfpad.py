@@ -4,15 +4,16 @@ This module allows the development of various WF countermeasures based on
 link-padding. It implements a faming layer to introduce dummy messages into
 the stream and discard them at the other end.
 """
-from obfsproxy.transports.base import BaseTransport
+from obfsproxy.transports.base import BaseTransport, PluggableTransportError
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
-from obfsproxy.transports.wfpadtools import message
+from obfsproxy.transports.wfpadtools import message, socks_shim
 from twisted.internet import reactor
 
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
 from obfsproxy.transports.wfpadtools.message import WFPadMessage
+from sets import Set
 
 
 log = logging.get_obfslogger()
@@ -27,21 +28,24 @@ class WFPadShimObserver(object):
     """
     def __init__(self, instanceWFPadTransport):
         """Instantiates a new `ShimObserver` object."""
-        self._numOpenConnections = 0
+        self._connections = Set([])
         self.wfpad = instanceWFPadTransport
+
+    def getNumConnections(self):
+        """Return num of open connections."""
+        return len(self._connections)
 
     def onConnect(self, conn_id):
         """A new connection starts."""
-        print "New connection (id=%d)" % conn_id
-        if self._numOpenConnections == 0:
+        if self.getNumConnections() == 0:
             self.onSessionStarts()
-        self._numOpenConnections += 1
+        self._connections.add(conn_id)
 
     def onDisconnect(self, conn_id):
         """An open connection finishes."""
-        print "Connection %s finishes!" % conn_id
-        self._numOpenConnections -= 1
-        if self._numOpenConnections == 0:
+        if conn_id in self._connections:
+            self._connections.remove(conn_id)
+        if self.getNumConnections() == 0:
             self.onSessionEnds()
 
     def onSessionStarts(self):
@@ -61,6 +65,7 @@ class WFPadTransport(BaseTransport):
     """
     def __init__(self):
         """Initialize a WFPadTransport object."""
+        print "INITIALIZING..." + str(id(self))
         log.debug("Initializing %s." % const.TRANSPORT_NAME)
 
         super(WFPadTransport, self).__init__()
@@ -91,6 +96,32 @@ class WFPadTransport(BaseTransport):
         self.psize = const.MTU
         self.lengthProbdist = probdist.new(lambda: self.psize,
                                              lambda i, n, c: 1)
+
+        if self.weAreClient and self.shim and not socks_shim.get():
+            try:
+                shim_port, socks_port = self.shim.split(',')
+                socks_shim.new(int(shim_port), int(socks_port))
+            except Exception as e:
+                log.error('Failed to initialize SOCKS shim: %s', e)
+
+    @classmethod
+    def register_external_mode_cli(cls, subparser):
+        """Register CLI arguments."""
+        subparser.add_argument('--socks-shim',
+                               action='store',
+                               dest='shim',
+                               help='wfpad SOCKS shim (shim_port,socks_port)')
+        super(WFPadTransport, cls).register_external_mode_cli(subparser)
+
+    @classmethod
+    def validate_external_mode_cli(cls, args):
+        parentalApproval = super(
+            WFPadTransport, cls).validate_external_mode_cli(args)
+        if not parentalApproval:
+            raise PluggableTransportError(
+                "Pluggable Transport args invalid: %s" % args)
+        if args.shim:
+            cls.shim = args.shim
 
     @classmethod
     def setup(cls, transportConfig):

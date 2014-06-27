@@ -44,13 +44,8 @@ class BuFLOTransport(WFPadTransport):
 
         self.visiting = False
 
+        # Register observer for shim events
         if self.weAreClient:
-            try:
-                socks_shim.new(int(self.shim_port), int(self.socks_port))
-            except Exception as e:
-                log.error('Failed to initialize SOCKS shim: %s', e)
-
-            # Register observer for shim events
             sessionObserver = BuFLOShimObserver(self)
             shim = socks_shim.get()
             shim.registerObserver(sessionObserver)
@@ -86,11 +81,6 @@ class BuFLOTransport(WFPadTransport):
                                type=int,
                                help="Minimum padding time per visit.",
                                dest="mintime")
-        subparser.add_argument('--socks-shim',
-                               action='store',
-                               required=False,
-                               dest='shim',
-                               help='buflo SOCKS shim (shim_port,socks_port)')
 
         super(BuFLOTransport, cls).register_external_mode_cli(subparser)
 
@@ -114,14 +104,6 @@ class BuFLOTransport(WFPadTransport):
             cls._period = args.period
         if args.psize:
             cls._psize = args.psize
-        if args.shim:
-            cls.shim_port, cls.socks_port = args.shim.split(',')
-
-        parentalApproval = super(
-            WFPadTransport, cls).validate_external_mode_cli(args)
-        if not parentalApproval:
-            raise PluggableTransportError(
-                "Pluggable Transport args invalid: %s" % args)
 
     def stopCondition(self):
         """Returns the evaluation of the condition to stop padding.

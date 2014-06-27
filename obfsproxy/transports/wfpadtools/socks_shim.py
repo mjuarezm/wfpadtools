@@ -141,6 +141,5 @@ def new(shim_port=9250, socks_port=9150):
 def get():
     global _instance
     if _instance is None:
-        # XXX: Should this just return None?
-        raise RuntimeError('SOCKS shim is not running')
+        return None
     return _instance
