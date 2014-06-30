@@ -7,13 +7,14 @@ of application data.
 This module is basically the same as ScrambleSuit's message but modified to
 our protocol specification.
 """
+import random
+
+import obfsproxy.transports.base as base
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const
-import random
 
 import obfsproxy.common.log as logging
 import obfsproxy.common.serialize as pack
-import obfsproxy.transports.base as base
 
 log = logging.get_obfslogger()
 
@@ -23,7 +24,8 @@ class WFPadMessage(object):
 
     This class provides methods to deal with WFPad protocol messages.
     """
-    def __init__(self, payload="", paddingLen=0, flags=const.FLAG_DATA):
+    def __init__(self, payload="", paddingLen=0, flags=const.FLAG_DATA,
+                        opcode=None):
         payloadLen = len(payload)
         if (payloadLen + paddingLen) > const.MPU:
             raise base.PluggableTransportError("No overly long messages.")
@@ -31,17 +33,23 @@ class WFPadMessage(object):
         self.payloadLen = payloadLen
         self.payload = payload
         self.flags = flags
+        self.opcode = opcode
 
     def __str__(self):
         """Return message as string."""
+        str_opcode = '' if self.opcode is None else chr(self.opcode)
         return pack.htons(self.totalLen) + \
                     pack.htons(self.payloadLen) + \
-                    chr(self.flags) + self.payload + \
+                    chr(self.flags) + str_opcode + \
+                    self.payload + \
                     (self.totalLen - self.payloadLen) * '\0'
 
     def __len__(self):
         """Return the length of this protocol message."""
-        return const.HDR_LENGTH + self.totalLen
+        if self.opcode:
+            return const.HDR_CTRL_LENGTH + self.totalLen
+        else:
+            return const.HDR_LENGTH + self.totalLen
 
 
 class WFPadMessageFactory(object):
@@ -66,8 +74,8 @@ class WFPadMessageFactory(object):
         self.len_dist = new_len_dist
 
     def createWFPadMessage(self, payload="", paddingLen=0,
-                           flags=const.FLAG_DATA):
-        return WFPadMessage(payload, paddingLen, flags)
+                           flags=const.FLAG_DATA, opcode=None):
+        return WFPadMessage(payload, paddingLen, flags, opcode)
 
     def createWFPadMessages(self, data, flags=const.FLAG_DATA):
         """Create protocol messages out of the given payload.
@@ -100,6 +108,8 @@ def getFlagNames(flags):
         return "DATA"
     elif flags == const.FLAG_PADDING:
         return "PADDING"
+    elif flags == const.FLAG_CONTROl:
+        return "CONTROL"
     else:
         return "Undefined"
 
@@ -120,7 +130,8 @@ def isSane(totalLen, payloadLen, flags):
 
     validFlags = [
         const.FLAG_DATA,
-        const.FLAG_PADDING
+        const.FLAG_PADDING,
+        const.FLAG_CONTROl
     ]
 
     return isFine(totalLen) and \
@@ -136,6 +147,7 @@ class WFPadMessageExtractor(object):
         self.totalLen = None
         self.payloadLen = None
         self.flags = None
+        self.opcode = None
 
     def get_field(self, position, length):
         return self.recvBuf[position:position + length]
@@ -153,16 +165,25 @@ class WFPadMessageExtractor(object):
             if not isSane(self.totalLen, self.payloadLen, self.flags):
                 raise base.PluggableTransportError("Invalid header.")
 
+            if self.flags == const.FLAG_CONTROl:
+                self.opcode = ord(self.get_field(const.CONTROL_POS,
+                                                 const.CONTROL_LEN))
+
     def filter(self):
         """Filter padding messages out and remove data messages from buffer."""
-        extracted = self.recvBuf[const.HDR_LENGTH:
+        if self.flags == const.FLAG_CONTROl:
+            # If it's a control message, extract payload for piggybacking
+            extracted = self.recvBuf[const.HDR_CTRL_LENGTH:
+                     (self.totalLen + const.HDR_CTRL_LENGTH)][:self.payloadLen]
+        else:
+            extracted = self.recvBuf[const.HDR_LENGTH:
                      (self.totalLen + const.HDR_LENGTH)][:self.payloadLen]
         return extracted
 
     def reset(self):
         # Protocol message processed; now reset length fields.
         self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
-        self.totalLen = self.payloadLen = self.flags = None
+        self.totalLen = self.payloadLen = self.flags = self.opcode = None
 
     def extract(self, data):
         """Extracts WFPad protocol messages.
@@ -180,6 +201,8 @@ class WFPadMessageExtractor(object):
             if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
                 break
             extracted = self.filter()
-            msgs.append(WFPadMessage(payload=extracted, flags=self.flags))
+            msgs.append(WFPadMessage(payload=extracted,
+                                     flags=self.flags,
+                                     opcode=self.opcode))
             self.reset()
         return msgs

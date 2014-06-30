@@ -32,8 +32,24 @@ FLAG_PADDING = (1 << 1)
 FLAG_CONTROl = (1 << 2)
 
 # Control OP codes
-OP_START = (1 << 0)
-OP_STOP = (1 << 1)
+OP_START = 0
+OP_STOP = 1
+
+# Generic primitives
+OP_IGNORE = 2
+OP_SEND_PADDING = 3
+OP_APP_HINT = 4
+
+# Adaptive padding primitives
+OP_BURST_HISTO = 5
+OP_INJECT_HISTO = 6
+
+# CS-BuFLO primitives
+OP_TOTAL_PAD = 7
+OP_PAYLOAD_PAD = 8
+
+# Tamaraw primitives
+OP_BATCH_PAD = 9
 
 # WFPad message structure fields's constants
 TOTLENGTH_POS = 0
@@ -45,8 +61,12 @@ PAYLOAD_LEN = 2
 FLAGS_POS = 4
 FLAGS_LEN = 1
 
+CONTROL_POS = 5
+CONTROL_LEN = 1
+
 # Header length
 HDR_LENGTH = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
+HDR_CTRL_LENGTH = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN + CONTROL_LEN
 
 # The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 1500
@@ -57,3 +77,4 @@ MTU = 1448
 
 # Maximum payload unit of a WFPad message in bytes.
 MPU = MTU - HDR_LENGTH
+MPU_CTRL = MTU - HDR_CTRL_LENGTH

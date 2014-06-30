@@ -2,11 +2,11 @@
 This module implements the BuFLO countermeasure proposed by Dyer et al.
 """
 from obfsproxy.transports.scramblesuit import probdist
-from obfsproxy.transports.wfpadtools import const, socks_shim
-from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport, \
-    WFPadShimObserver
-
 import obfsproxy.common.log as logging
+
+from obfsproxy.transports.wfpadtools import const, socks_shim
+from obfsproxy.transports.wfpadtools.wfpad import WFPadShimObserver
+from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 
 
 log = logging.get_obfslogger()
@@ -16,14 +16,14 @@ class BuFLOShimObserver(WFPadShimObserver):
 
     def onSessionStarts(self):
         """Do operations to be done when session starts."""
-        print "SESSION STARTED!!!"
+        log.debug("A session has started.")
         self.wfpad.startPadding()
         self.wfpad.visiting = True
 
     def onSessionEnds(self):
         """Do operations to be done when session ends."""
+        log.debug("A session has ended.")
         self.wfpad.visiting = False
-        print "SESSION ENDED!!!"
 
 
 class BuFLOTransport(WFPadTransport):

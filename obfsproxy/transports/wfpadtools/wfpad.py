@@ -84,6 +84,9 @@ class WFPadTransport(BaseTransport):
         # Counter for padding messages
         self.consecPaddingMsgs = 0
 
+        # Opcode for messages
+        self.opcode = None
+
         # Used to extract protocol messages from encrypted data.
         self.msgFactory = message.WFPadMessageFactory()
         self.msgExtractor = message.WFPadMessageExtractor()
@@ -180,19 +183,24 @@ class WFPadTransport(BaseTransport):
             if dataLen > payloadLen:
                 log.debug("Message with no padding.")
                 data = self.paddingBuffer.read(payloadLen)
-                msg = self.msgFactory.createWFPadMessage(data)
+                msg = self.msgFactory.createWFPadMessage(data,
+                                                         opcode=self.opcode)
             else:
                 log.debug("Message with padding.")
                 data = self.paddingBuffer.read()
                 paddingLen = payloadLen - dataLen
-                msg = self.msgFactory.createWFPadMessage(data, paddingLen)
+                msg = self.msgFactory.createWFPadMessage(data,
+                                                         paddingLen,
+                                                         opcode=self.opcode)
         else:
             log.debug("Generate padding")
             self.consecPaddingMsgs += 1
-            msg = self.msgFactory.createWFPadMessage("", payloadLen,
-                                                      flags=const.FLAG_PADDING)
+            msg = self.msgFactory.createWFPadMessage("",
+                                                     payloadLen,
+                                                     flags=const.FLAG_PADDING,
+                                                     opcode=self.opcode)
         self.circuit.downstream.write(str(msg))
-
+        self.opcode = None
         delay = self.drawFlushDelay()
         self.elapsed += delay
         reactor.callLater(delay, self.flushPieces)
@@ -239,9 +247,42 @@ class WFPadTransport(BaseTransport):
                 # Filter padding messages out.
                 elif msg.flags == const.FLAG_PADDING:
                     log.debug("Padding message ignored.")
+                elif msg.flags == const.FLAG_CONTROl:
+                    log.debug("Message with control data received.")
+                    self.circuit.upstream.write(msg.payload)
+                    self.doPrimitive(msg.opcode)
                 else:
                     log.warning("Invalid message flags: %d." % msg.flags)
         return msgs
+
+    def doPrimitive(self, opcode):
+        """Do operation indicated by the opcode."""
+        # Generic primitives
+        if opcode == const.OP_START:
+            pass
+        elif opcode == const.OP_STOP:
+            pass
+        elif opcode == const.OP_IGNORE:
+            pass
+        elif opcode == const.OP_SEND_PADDING:
+            pass
+        elif opcode == const.OP_APP_HINT:
+            pass
+        # Adaptive padding primitives
+        elif opcode == const.OP_BURST_HISTO:
+            pass
+        elif opcode == const.OP_INJECT_HISTO:
+            pass
+        # CS-BuFLO primitives
+        elif opcode == const.OP_TOTAL_PAD:
+            pass
+        elif opcode == const.OP_PAYLOAD_PAD:
+            pass
+        # Tamaraw primitives
+        elif opcode == const.OP_BATCH_PAD:
+            pass
+        else:
+            pass
 
     def getConsecPaddingMsgs(self):
         """Return number of padding messages."""
