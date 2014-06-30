@@ -29,7 +29,7 @@ ST_PADDING = 2
 # Flags header protocol
 FLAG_DATA = (1 << 0)
 FLAG_PADDING = (1 << 1)
-FLAG_CONTROl = (1 << 2)
+FLAG_CONTROL = (1 << 2)
 
 # Control OP codes
 OP_START = 0
@@ -64,9 +64,32 @@ FLAGS_LEN = 1
 CONTROL_POS = 5
 CONTROL_LEN = 1
 
+ARGS_POS = 6
+
+
+# arguments specification [arg_1, arg_2, ...] where arg_i = (length, type)
+class arg(object):
+
+    def __init__(self, arg_length, arg_type, name=None):
+        self.length = arg_length
+        self.type = arg_type
+        self.name = name
+
+    def __len__(self):
+        return self.length
+
+
+def get_args_len(self, opcode):
+    return sum(map(len, ARGS_DICT[opcode]))
+
+ARGS_DICT = {OP_SEND_PADDING: [arg(1, ord, "num_padding_msgs"), arg(1, ord, "delay")],
+             OP_APP_HINT: [arg(1, str, "session_id"), arg(1, str, "status")]
+                # TODO
+            }
+
 # Header length
-HDR_LENGTH = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
-HDR_CTRL_LENGTH = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN + CONTROL_LEN
+MIN_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
+CTRL_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN + CONTROL_LEN
 
 # The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 1500
@@ -76,5 +99,5 @@ MAX_PADDING_LENGTH = 1500
 MTU = 1448
 
 # Maximum payload unit of a WFPad message in bytes.
-MPU = MTU - HDR_LENGTH
-MPU_CTRL = MTU - HDR_CTRL_LENGTH
+MPU = MTU - MIN_HDR_LEN
+MPU_CTRL = MTU - CTRL_HDR_LEN

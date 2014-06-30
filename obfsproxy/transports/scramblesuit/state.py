@@ -101,7 +101,7 @@ class State( object ):
 
         # Distributions for packet lengths and inter arrival times.
         prng = random.Random(self.prngSeed)
-        self.pktDist = probdist.new(lambda: prng.randint(const.HDR_LENGTH,
+        self.pktDist = probdist.new(lambda: prng.randint(const.MIN_HDR_LEN,
                                                          const.MTU),
                                     seed=self.prngSeed)
         self.iatDist = probdist.new(lambda: prng.random() %

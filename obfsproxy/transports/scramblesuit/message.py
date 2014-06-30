@@ -148,7 +148,7 @@ class ProtocolMessage( object ):
             return
 
         log.debug("Adding %d bytes of padding to %d-byte message." %
-                  (paddingLen, const.HDR_LENGTH + self.totalLen))
+                  (paddingLen, const.MIN_HDR_LEN + self.totalLen))
         self.totalLen += paddingLen
 
     def __len__( self ):
@@ -156,7 +156,7 @@ class ProtocolMessage( object ):
         Return the length of this protocol message.
         """
 
-        return const.HDR_LENGTH + self.totalLen
+        return const.MIN_HDR_LEN + self.totalLen
 
 # Alias class name in order to provide a more intuitive API.
 new = ProtocolMessage
@@ -191,7 +191,7 @@ class MessageExtractor( object ):
         msgs = []
 
         # Keep trying to unpack as long as there is at least a header.
-        while len(self.recvBuf) >= const.HDR_LENGTH:
+        while len(self.recvBuf) >= const.MIN_HDR_LEN:
 
             # If necessary, extract the header fields.
             if self.totalLen == self.payloadLen == self.flags == None:
@@ -203,22 +203,22 @@ class MessageExtractor( object ):
                     raise base.PluggableTransportError("Invalid header.")
 
             # Parts of the message are still on the wire; waiting.
-            if (len(self.recvBuf) - const.HDR_LENGTH) < self.totalLen:
+            if (len(self.recvBuf) - const.MIN_HDR_LEN) < self.totalLen:
                 break
 
             rcvdHMAC = self.recvBuf[0:const.HMAC_SHA256_128_LENGTH]
             vrfyHMAC = mycrypto.HMAC_SHA256_128(hmacKey,
                               self.recvBuf[const.HMAC_SHA256_128_LENGTH:
-                              (self.totalLen + const.HDR_LENGTH)])
+                              (self.totalLen + const.MIN_HDR_LEN)])
 
             if rcvdHMAC != vrfyHMAC:
                 raise base.PluggableTransportError("Invalid message HMAC.")
 
             # Decrypt the message and remove it from the input buffer.
-            extracted = aes.decrypt(self.recvBuf[const.HDR_LENGTH:
-                         (self.totalLen + const.HDR_LENGTH)])[:self.payloadLen]
+            extracted = aes.decrypt(self.recvBuf[const.MIN_HDR_LEN:
+                         (self.totalLen + const.MIN_HDR_LEN)])[:self.payloadLen]
             msgs.append(ProtocolMessage(payload=extracted, flags=self.flags))
-            self.recvBuf = self.recvBuf[const.HDR_LENGTH + self.totalLen:]
+            self.recvBuf = self.recvBuf[const.MIN_HDR_LEN + self.totalLen:]
 
             # Protocol message processed; now reset length fields.
             self.totalLen = self.payloadLen = self.flags = None

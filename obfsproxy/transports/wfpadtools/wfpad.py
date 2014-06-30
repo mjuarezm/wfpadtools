@@ -176,7 +176,7 @@ class WFPadTransport(BaseTransport):
 
         msg = WFPadMessage()
         msgTotalLen = self.drawMessageLength()
-        payloadLen = msgTotalLen - const.HDR_LENGTH
+        payloadLen = msgTotalLen - const.MIN_HDR_LEN
         dataLen = len(self.paddingBuffer)
         if dataLen > 0:
             log.debug("Flush buffer")
@@ -243,11 +243,10 @@ class WFPadTransport(BaseTransport):
                 if msg.flags == const.FLAG_DATA:
                     log.debug("Data flag detected, relaying to data stream")
                     self.circuit.upstream.write(msg.payload)
-
                 # Filter padding messages out.
                 elif msg.flags == const.FLAG_PADDING:
                     log.debug("Padding message ignored.")
-                elif msg.flags == const.FLAG_CONTROl:
+                elif msg.flags == const.FLAG_CONTROL:
                     log.debug("Message with control data received.")
                     self.circuit.upstream.write(msg.payload)
                     self.doPrimitive(msg.opcode)
@@ -255,15 +254,15 @@ class WFPadTransport(BaseTransport):
                     log.warning("Invalid message flags: %d." % msg.flags)
         return msgs
 
-    def doPrimitive(self, opcode):
+    def doPrimitive(self, opcode, args=None):
         """Do operation indicated by the opcode."""
         # Generic primitives
         if opcode == const.OP_START:
-            pass
+            self.startPadding()
         elif opcode == const.OP_STOP:
-            pass
+            self.stopPadding()
         elif opcode == const.OP_IGNORE:
-            pass
+            self.sendRemote("", flags=const.FLAG_PADDING)
         elif opcode == const.OP_SEND_PADDING:
             pass
         elif opcode == const.OP_APP_HINT:

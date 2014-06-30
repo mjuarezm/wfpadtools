@@ -232,14 +232,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                                  msg in messages]))
 
         # If padding > header length, a single message will do...
-        if paddingLen > const.HDR_LENGTH:
+        if paddingLen > const.MIN_HDR_LEN:
             messages.append(message.new("", paddingLen=paddingLen -
-                                                       const.HDR_LENGTH))
+                                                       const.MIN_HDR_LEN))
 
         # ...otherwise, we use two padding-only messages.
         else:
             messages.append(message.new("", paddingLen=const.MPU -
-                                                       const.HDR_LENGTH))
+                                                       const.MIN_HDR_LEN))
             messages.append(message.new("", paddingLen=paddingLen))
 
         blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
@@ -319,7 +319,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 assert len(msg.payload) == const.PRNG_SEED_LENGTH
                 log.debug("Obtained PRNG seed.")
                 prng = random.Random(msg.payload)
-                pktDist = probdist.new(lambda: prng.randint(const.HDR_LENGTH,
+                pktDist = probdist.new(lambda: prng.randint(const.MIN_HDR_LEN,
                                                             const.MTU),
                                        seed=msg.payload)
                 self.pktMorpher = packetmorpher.new(pktDist)

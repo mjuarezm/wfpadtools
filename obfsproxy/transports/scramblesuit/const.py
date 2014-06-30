@@ -28,7 +28,7 @@ FLAG_NEW_TICKET =     (1 << 1)
 FLAG_PRNG_SEED =      (1 << 2)
 
 # Length of ScrambleSuit's header in bytes.
-HDR_LENGTH = 16 + 2 + 2 + 1
+MIN_HDR_LEN = 16 + 2 + 2 + 1
 
 # Length of the HMAC-SHA256-128 digest in bytes.
 HMAC_SHA256_128_LENGTH = 16
@@ -60,7 +60,7 @@ MAX_PADDING_LENGTH = 1500
 MTU = 1448
 
 # Maximum payload unit of a ScrambleSuit message in bytes.
-MPU = MTU - HDR_LENGTH
+MPU = MTU - MIN_HDR_LEN
 
 # The minimum amount of distinct bins for probability distributions.
 MIN_BINS = 1

@@ -60,14 +60,14 @@ class WFPadServerTestWrapper(WFPadTransport, STTest):
         """Test data received from client satisfies specified length."""
         self.msgExtractor.recvBuf += data
         obsLen = 0
-        while len(self.msgExtractor.recvBuf) >= const.HDR_LENGTH:
+        while len(self.msgExtractor.recvBuf) >= const.MIN_HDR_LEN:
             self.msgExtractor.totalLen = pack.ntohs(self.msgExtractor\
-                                .get_field(const.TOTLENGTH_POS,
+                                .getMessageField(const.TOTLENGTH_POS,
                                            const.TOTLENGTH_LEN))
-            if (len(self.msgExtractor.recvBuf) - const.HDR_LENGTH)\
+            if (len(self.msgExtractor.recvBuf) - const.MIN_HDR_LEN)\
                      < self.msgExtractor.totalLen:
                 break
-            obsLen = self.msgExtractor.totalLen + const.HDR_LENGTH
+            obsLen = self.msgExtractor.totalLen + const.MIN_HDR_LEN
             self.msgExtractor.reset()
         if obsLen:
             log.debug("Observed length in reception number %s: %s"
