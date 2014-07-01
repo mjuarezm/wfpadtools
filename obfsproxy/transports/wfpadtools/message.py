@@ -25,11 +25,13 @@ class WFPadMessage(object):
 
     The basic structure of a WFPad message is:
 
+   <-------------------------------  MTU  ------------------------------->
     2 Bytes  2 Bytes  1 Byte      1 Byte     Variable <--- Up to MPU ---->
   +--------+---------+-------+--------------+--------+----------+---------+
   | Total  | Payload | Flags |    Opcode    |  Args  |  Payload | Padding |
   | length | length  |       | (if CONTROL) |  (opt) |   (opt)  |  (opt)  |
   +--------+---------+-------+--------------+--------+----------+---------+
+  <------- Min Header ------>
   <-------------------  Header  --------------------> <------ Body ------>
 
       - Total length: message body length (payload length + padding length)
@@ -56,9 +58,11 @@ class WFPadMessage(object):
       - Padding (optional): contains string of null chars (`\0`).
 
 
-    Note that there are two kinds of padding:
+    Note 1: there are two kinds of padding:
         - At message level: padding is appended to the message's payload
         - At link level: the message itself is a padding message
+    Note 2: all messages share the first three fields (min header) in the
+                         header.
     """
     def __init__(self, payload='', paddingLen=0, flags=const.FLAG_DATA,
                         opcode=None, args=None):
