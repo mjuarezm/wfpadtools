@@ -8,9 +8,11 @@ from obfsproxy.transports.wfpadtools import const
 import obfsproxy.transports.wfpadtools.util as ut
 import requesocks as requests
 from obfsproxy.test import tester
+from time import sleep
 
 # Test config
 WATCHDOG_TIMEOUT = 180
+SLEEP_IN_PAGE = 5
 DEBUG = True
 
 # Switch to leave Tor running and speed-up tests
@@ -149,6 +151,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
 
     def test_tor(self):
         resp = self.get_page("http://torcheck.xenobite.eu/", self.entry_port)
+        sleep(SLEEP_IN_PAGE)
         self.assertEqual(resp.status_code, 200,
                          "The status code (%s) is not OK."
                          % resp.status_code)
