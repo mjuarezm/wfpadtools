@@ -160,22 +160,15 @@ class WFPadTransport(BaseTransport):
         if self._state is const.ST_PADDING:
             self.paddingBuffer.write(data)
 
-    def flushPieces(self):
-        """Write the application data in chunks to the wire.
+    def injectMessage(self, length=None, opcode=None):
+        """Creates and injects WFPad messages in order to pad the link.
 
         In case the buffer is not empty, the buffer is flushed and we send
         these data over the wire. Otherwise, we generate random padding
-        and we send it over the wire in chunks. After every write call,
-        control is given back to the Twisted reactor. The function is called
-        again after a certain delay, which is sampled from the time
-        probability distribution.
+        and we send it over the wire in chunks.
         """
-        if self.stopCondition():
-            self.stopPadding()
-            return
-
         msg = WFPadMessage()
-        msgTotalLen = self.drawMessageLength()
+        msgTotalLen = length if length else self.drawMessageLength()
         payloadLen = msgTotalLen - const.MIN_HDR_LEN
         dataLen = len(self.paddingBuffer)
         if dataLen > 0:
@@ -184,26 +177,45 @@ class WFPadTransport(BaseTransport):
                 log.debug("Message with no padding.")
                 data = self.paddingBuffer.read(payloadLen)
                 msg = self.msgFactory.createWFPadMessage(data,
-                                                         opcode=self.opcode)
+                                                         opcode=opcode)
             else:
                 log.debug("Message with padding.")
                 data = self.paddingBuffer.read()
                 paddingLen = payloadLen - dataLen
                 msg = self.msgFactory.createWFPadMessage(data,
                                                          paddingLen,
-                                                         opcode=self.opcode)
+                                                         opcode=opcode)
         else:
             log.debug("Generate padding")
             self.consecPaddingMsgs += 1
             msg = self.msgFactory.createWFPadMessage("",
                                                      payloadLen,
                                                      flags=const.FLAG_PADDING,
-                                                     opcode=self.opcode)
+                                                     opcode=opcode)
         self.circuit.downstream.write(str(msg))
+
+    def flushPieces(self):
+        """Write the application data in chunks to the wire.
+
+        After every write call, control is given back to the Twisted reactor.
+        The function is called again after a certain delay, which is sampled
+        from the time probability distribution.
+        """
+        if self.stopCondition():
+            self.stopPadding()
+            return
+
+        self.injectMessage(opcode=self.opcode)
         self.opcode = None
+
         delay = self.drawFlushDelay()
         self.elapsed += delay
+
         reactor.callLater(delay, self.flushPieces)
+
+    def sendControlMessage(self, opcode, delay=0):
+        """Send a message with a specific opcode field."""
+        reactor.callLater(delay, self.injectMessage(opcode=opcode))
 
     def drawMessageLength(self):
         """Return length for a specific message.
@@ -249,7 +261,7 @@ class WFPadTransport(BaseTransport):
                 elif msg.flags == const.FLAG_CONTROL:
                     log.debug("Message with control data received.")
                     self.circuit.upstream.write(msg.payload)
-                    self.doPrimitive(msg.opcode)
+                    self.doPrimitive(msg.opcode, msg.args)
                 else:
                     log.warning("Invalid message flags: %d." % msg.flags)
         return msgs
@@ -262,26 +274,110 @@ class WFPadTransport(BaseTransport):
         elif opcode == const.OP_STOP:
             self.stopPadding()
         elif opcode == const.OP_IGNORE:
-            self.sendRemote("", flags=const.FLAG_PADDING)
+            self.sendIgnore()
         elif opcode == const.OP_SEND_PADDING:
-            pass
+            self.sendPadding(*args)
         elif opcode == const.OP_APP_HINT:
-            pass
+            self.sendAppHint(*args)
         # Adaptive padding primitives
         elif opcode == const.OP_BURST_HISTO:
-            pass
+            self.sendBurstHistogram(*args)
+        elif opcode == const.OP_GAP_HISTO:
+            self.sendGapHistogram(*args)
         elif opcode == const.OP_INJECT_HISTO:
-            pass
+            self.sendInjectHistogram(*args)
         # CS-BuFLO primitives
         elif opcode == const.OP_TOTAL_PAD:
-            pass
+            self.sendTotalPad(*args)
         elif opcode == const.OP_PAYLOAD_PAD:
-            pass
+            self.sendPayloadPad(*args)
         # Tamaraw primitives
         elif opcode == const.OP_BATCH_PAD:
-            pass
+            self.sendBatchPad(*args)
         else:
-            pass
+            log.error("The received operation code is not recognized.")
+
+    def sendIgnore(self):
+        """Reply with a padding message."""
+        reactor.callLater(0, self.injectMessage())
+
+    def sendPadding(self, N, t):
+        """Reply with `N` padding messages delayed `t` ms."""
+        for _ in xrange(N):
+            reactor.callLater(t, self.injectMessage())
+
+    def sendAppHint(self, sessId, status):
+        """Provides information to the server about the current session."""
+        pass
+
+    def sendBurstHistogram(self, histo, labels, remove_toks=False):
+        """Replies to a burst_histo request.
+
+        Parameters
+        ----------
+        histo : list
+                contains delay distribution of sending an IGNORE packet after
+                sending an *real* packet (with "Infinity" bin to indicate run
+                termination probability).
+        labels_ms : list
+                    millisecond labels for the bins
+        remove_toks : bool
+                      if true, follow Adaptive Padding token removal rules.
+                      If false, histograms are immutable.
+        """
+        pass
+
+    def sendGapHistogram(self, histo, labels, remove_toks=False):
+        """Replies to a gap_histo request.
+
+        Parameters
+        ----------
+        histo : list
+                contains delay distribution of sending an IGNORE packet after
+                sending an IGNORE packet (with "Infinity" bin to indicate run
+                termination probability).
+        labels_ms : list
+                    millisecond labels for the bins
+        remove_toks : bool
+                      if true, follow Adaptive Padding token removal rules.
+                      If false, histograms are immutable.
+        """
+        pass
+
+    def sendInjectHistogram(self, histo, labels):
+        """Replies to an inject_histogram request.
+
+        Parameters
+        ----------
+        histo : list
+                contains probability distribution of sending an IGNORE packet
+                if the wire was completely silent for that amount of time.
+        labels_ms : list
+                    millisecond labels for the bins
+
+        Note: This is not an Adaptive Padding primitive, but it seems
+        useful to model push-based protocols (like XMPP).
+        """
+        pass
+
+    def sendTotalPad(self):
+        pass
+
+    def sendPayloadPad(self, sess_id, t):
+        """Pad all batches to 2^K cells total.
+
+        Pad all batches to 2^K cells total within `t` microseconds,
+        or until APP_HINT(session_id, stop).
+        """
+        pass
+
+    def sendBatchPad(self, sess_id, L, t):
+        """Pad all batches to L cells total.
+
+        Pad all batches to `L` cells total within `t` microseconds,
+        or until APP_HINT(session_id, stop).
+       """
+        pass
 
     def getConsecPaddingMsgs(self):
         """Return number of padding messages."""

@@ -42,14 +42,15 @@ OP_APP_HINT = 4
 
 # Adaptive padding primitives
 OP_BURST_HISTO = 5
-OP_INJECT_HISTO = 6
+OP_GAP_HISTO = 6
+OP_INJECT_HISTO = 7
 
 # CS-BuFLO primitives
-OP_TOTAL_PAD = 7
-OP_PAYLOAD_PAD = 8
+OP_TOTAL_PAD = 8
+OP_PAYLOAD_PAD = 9
 
 # Tamaraw primitives
-OP_BATCH_PAD = 9
+OP_BATCH_PAD = 10
 
 # WFPad message structure fields's constants
 TOTLENGTH_POS = 0
