@@ -175,7 +175,8 @@ def pyobfsproxy():
     # Initiate the test server.
     if args.shim:
         try:
-            test_server.new(args.test_server)
+            pass
+            #TODO: run test server listening at the client's destination port
         except Exception as e:
             log.error('Failed to initialize the test server: %s', e)
             sys.exit(1)
