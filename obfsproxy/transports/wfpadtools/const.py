@@ -4,6 +4,7 @@ import tempfile
 
 # Constant paths
 TEMP_DIR = tempfile.gettempdir()
+TEST_SERVER_DIR = join(TEMP_DIR, "test_server")
 BASE_DIR = abspath(join(dirname(__file__), pardir, pardir))
 PYOBFSPROXY_PATH = join(BASE_DIR, "pyobfsproxy.py")
 

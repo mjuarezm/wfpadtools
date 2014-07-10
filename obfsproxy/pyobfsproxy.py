@@ -18,7 +18,7 @@ import obfsproxy.common.heartbeat as heartbeat
 import obfsproxy.common.transport_config as transport_config
 import obfsproxy.managed.server as managed_server
 import obfsproxy.managed.client as managed_client
-import obfsproxy.transports.wfpadtools.socks_shim as socks_shim
+from obfsproxy.test.transports.wfpadtools import test_server
 from obfsproxy import __version__
 
 try:
@@ -56,6 +56,8 @@ def set_up_cli_parsing():
 
     parser.add_argument('--proxy', action='store', dest='proxy',
                         help='Outgoing proxy (<proxy_type>://[<user_name>][:<password>][@]<ip>:<port>)')
+    parser.add_argument('--test-server', action='store', dest='dest_port',
+                        help='--test-server dest_port')
 
     # Managed mode is a subparser for now because there are no
     # optional subparsers: bugs.python.org/issue9253
@@ -169,6 +171,14 @@ def pyobfsproxy():
     # Fire up our heartbeat.
     l = task.LoopingCall(heartbeat.heartbeat.talk)
     l.start(3600.0, now=False) # do heartbeat every hour
+
+    # Initiate the test server.
+    if args.shim:
+        try:
+            test_server.new(args.test_server)
+        except Exception as e:
+            log.error('Failed to initialize the test server: %s', e)
+            sys.exit(1)
 
     # Initiate obfsproxy.
     if (args.name == 'managed'):

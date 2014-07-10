@@ -268,8 +268,7 @@ class WFPadTransport(BaseTransport):
 
     def doPrimitive(self, opcode, args=None):
         """Do operation indicated by the opcode."""
-        # Generic primitives
-        if opcode == const.OP_START:
+        if opcode == const.OP_START:  # Generic primitives
             self.startPadding()
         elif opcode == const.OP_STOP:
             self.stopPadding()
@@ -279,20 +278,17 @@ class WFPadTransport(BaseTransport):
             self.sendPadding(*args)
         elif opcode == const.OP_APP_HINT:
             self.sendAppHint(*args)
-        # Adaptive padding primitives
-        elif opcode == const.OP_BURST_HISTO:
+        elif opcode == const.OP_BURST_HISTO:  # Adaptive padding primitives
             self.sendBurstHistogram(*args)
         elif opcode == const.OP_GAP_HISTO:
             self.sendGapHistogram(*args)
         elif opcode == const.OP_INJECT_HISTO:
             self.sendInjectHistogram(*args)
-        # CS-BuFLO primitives
-        elif opcode == const.OP_TOTAL_PAD:
+        elif opcode == const.OP_TOTAL_PAD:  # CS-BuFLO primitives
             self.sendTotalPad(*args)
         elif opcode == const.OP_PAYLOAD_PAD:
             self.sendPayloadPad(*args)
-        # Tamaraw primitives
-        elif opcode == const.OP_BATCH_PAD:
+        elif opcode == const.OP_BATCH_PAD:  # Tamaraw primitives
             self.sendBatchPad(*args)
         else:
             log.error("The received operation code is not recognized.")
@@ -473,5 +469,6 @@ class WFPadServer(WFPadTransport):
     """Extend the WFPad class."""
 
     def __init__(self):
+        print "Starting", id(self)
         """Initialize a WFPadServer object."""
         WFPadTransport.__init__(self)
