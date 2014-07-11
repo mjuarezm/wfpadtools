@@ -173,10 +173,21 @@ def pyobfsproxy():
     l.start(3600.0, now=False) # do heartbeat every hour
 
     # Initiate the test server.
-    if args.shim:
+    if args.dest_port:
+        pt_config = transport_config.TransportConfig()
+        pt_config.setStateLocation(args.data_dir)
+        pt_config.setListenerMode("server")
+        pt_config.setObfsproxyMode("external")
         try:
-            pass
-            #TODO: run test server listening at the client's destination port
+            # Run test server listening at the client's destination port
+            run_transport_setup(pt_config)
+            launch_transport.launch_transport_listener("testserver",
+                                                       args.dest,
+                                                       "server",
+                                                       args.dest_port,
+                                                       pt_config,)
+            log.info("Launched 'test-server' listener at '%s:%s'." %\
+                 (log.safe_addr_str(args.dest[0]), args.dest[1]))
         except Exception as e:
             log.error('Failed to initialize the test server: %s', e)
             sys.exit(1)
