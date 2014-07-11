@@ -53,10 +53,10 @@ class WFPadTests(TestSetUp, STTest):
 
     def setUp(self):
         self.client_args = (
-               "--test-server %d" % tester.EXIT_PORT,
+               "--test-server=%d" % tester.EXIT_PORT,
                "wfpad", "client",
                "127.0.0.1:%d" % tester.ENTRY_PORT,
-               "--dest 127.0.0.1:%d" % tester.SERVER_PORT,
+               "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
                )
         super(WFPadTests, self).setUp()
 
@@ -70,15 +70,14 @@ class BuFLOTests(TestSetUp, STTest):
     psize = 1448
     mintime = 2
     client_args = (
-           "--test-server %d" % tester.EXIT_PORT,
+           "--test-server=%s" % tester.EXIT_PORT,
            "buflo", "client",
            "127.0.0.1:%d" % tester.ENTRY_PORT,
-           "--socks-shim %d,%d" % (tester.SHIM_PORT, tester.SOCKS_PORT),
-           "--period %s" % period,
-           "--psize %s" % psize,
-           "--mintime %s" % mintime,
-           "--dest 127.0.0.1:%d" % tester.SERVER_PORT,
-           )
+           "--socks-shim=%d,%d" % (tester.SHIM_PORT, tester.SOCKS_PORT),
+           "--period=%s" % period,
+           "--psize=%s" % psize,
+           "--mintime=%s" % mintime,
+           "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
 
     def test_timing(self):
         self.send_data()
