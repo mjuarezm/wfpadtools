@@ -34,6 +34,7 @@ class BuFLOTransport(WFPadTransport):
     minimum time for which the link will be padded is also specified.
     """
     def __init__(self):
+        # print "start: ", id(self)
         super(BuFLOTransport, self).__init__()
         # Initialize minimum time for padding at each visit to a web page.
         self.delayProbdist = probdist.new(lambda: self._period,
@@ -41,6 +42,7 @@ class BuFLOTransport(WFPadTransport):
         self.lengthProbdist = probdist.new(lambda: self._psize,
                                            lambda i, n, c: 1)
 
+        # Flag indicating wheter we are in the middle of a visit or not
         self.visiting = False
 
         # Register observer for shim events
@@ -100,7 +102,7 @@ class BuFLOTransport(WFPadTransport):
         # Defaults for BuFLO specifications.
         cls._period = 0.01
         cls._psize = const.MTU
-        cls._mintime = -1
+        cls._mintime = 5
 
         if args.mintime:
             cls._mintime = int(args.mintime)
