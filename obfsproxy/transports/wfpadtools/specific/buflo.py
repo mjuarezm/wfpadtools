@@ -33,8 +33,14 @@ class BuFLOTransport(WFPadTransport):
     for time, and a constant probability distribution for packet lengths. The
     minimum time for which the link will be padded is also specified.
     """
+    # Defaults for BuFLO specifications.
+    _period = 0.01
+    _psize = const.MTU
+    _mintime = -1
+
     def __init__(self):
         super(BuFLOTransport, self).__init__()
+
         # Initialize minimum time for padding at each visit to a web page.
         self.delayProbdist = probdist.new(lambda: self._period,
                                           lambda i, n, c: 1)
@@ -96,11 +102,6 @@ class BuFLOTransport(WFPadTransport):
         constant size `psize`.
         """
         super(BuFLOTransport, cls).validate_external_mode_cli(args)
-
-        # Defaults for BuFLO specifications.
-        cls._period = 0.01
-        cls._psize = const.MTU
-        cls._mintime = -1
 
         if args.mintime:
             cls._mintime = int(args.mintime)
