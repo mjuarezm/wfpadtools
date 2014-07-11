@@ -1,18 +1,14 @@
-import multiprocessing
-from obfsproxy.common import transport_config
-from obfsproxy.network.network import StaticDestinationServerFactory
-from obfsproxy.test.tester import ENTRY_PORT, SERVER_PORT
-from obfsproxy.test.tester import Obfsproxy, \
-    connect_with_retry, SOCKET_TIMEOUT, TEST_FILE
+from obfsproxy.test import tester
 from obfsproxy.transports.wfpadtools import const
-from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
-from time import sleep, time
-from twisted.internet import reactor
-import unittest
-
-import obfsproxy.common.log as logging
-import obfsproxy.common.serialize as pack
+from obfsproxy.transports.wfpadtools import util as ut
 from obfsproxy.test.transports.wfpadtools.sttest import STTest
+import obfsproxy.common.log as logging
+
+import pickle
+import unittest
+from time import sleep
+from os import listdir
+from os.path import join, isfile
 
 
 DEBUG = False
@@ -25,115 +21,76 @@ if DEBUG:
     log.set_log_severity('debug')
 
 
-class WFPadServerTestWrapper(WFPadTransport, STTest):
-    """This class is a wrapper of WFPadTransport for testing.
-
-    Overrides most WFPadTransport methods and extends some of them for
-    testing.
-    """
-    def __init__(self):
-        self.start = 0
-        self.rcvIndex = 0
-        self.ticking = False
-        self.final = False
-        self.messages = []
-        super(WFPadServerTestWrapper, self).__init__()
-
-    def receivedDownstream(self, data):
-        """Test data received from client is sent within the time period."""
-        if self.ticking:
-            self.rcvIndex += 1
-            obs_period = time() - self.start
-            log.debug("Observed period in reception number %s: %s"
-                       % (self.rcvIndex, obs_period))
-            self.assertAlmostEqual(self.period, obs_period, None,
-                                   "The observed period %s does not match"
-                                   " with the expected period %s"
-                                   % (obs_period, self.period), delta=0.05)
-        else:
-            self.rcvIndex = 0
-            self.ticking = True
-        self.start = time()
-        super(WFPadServerTestWrapper, self).receivedDownstream(data)
-
-    def processMessages(self, data):
-        """Test data received from client satisfies specified length."""
-        self.msgExtractor.recvBuf += data
-        obsLen = 0
-        while len(self.msgExtractor.recvBuf) >= const.MIN_HDR_LEN:
-            self.msgExtractor.totalLen = pack.ntohs(self.msgExtractor\
-                                .getMessageField(const.TOTLENGTH_POS,
-                                           const.TOTLENGTH_LEN))
-            if (len(self.msgExtractor.recvBuf) - const.MIN_HDR_LEN)\
-                     < self.msgExtractor.totalLen:
-                break
-            obsLen = self.msgExtractor.totalLen + const.MIN_HDR_LEN
-            self.msgExtractor.reset()
-        if obsLen:
-            log.debug("Observed length in reception number %s: %s"
-                       % (self.rcvIndex, obsLen))
-            self.assertTrue(self.psize == obsLen,
-                       "The observed length %s does not match"
-                       " with the expected length %s"
-                       % (obsLen, self.psize))
-        super(WFPadServerTestWrapper, self).processMessages(data)
-
-
-class WFPadWorker(object):
-
-    @staticmethod
-    def work(ip, port):
-        pt_config = transport_config.TransportConfig()
-        pt_config.setListenerMode("server")
-        pt_config.setObfsproxyMode("external")
-        WFPadServerTestWrapper.setup(pt_config)
-        factory = StaticDestinationServerFactory((ip, port), "server",
-                                                 WFPadServerTestWrapper,
-                                                 pt_config)
-        reactor.listenTCP(port, factory, interface=ip)
-        reactor.run()
-
-    def __init__(self, address):
-        self.worker = multiprocessing.Process(target=self.work,
-                                              args=(address))
-        self.worker.start()
-
-    def stop(self):
-        if self.worker.is_alive():
-            self.worker.terminate()
-
-
-class IntermediateTest(object):
+class TestSetUp(object):
 
     def setUp(self):
-        self.obfs_server = WFPadWorker(("127.0.0.1", SERVER_PORT))
+        ut.createdir(const.TEST_SERVER_DIR)  # Create temp dir
+        self.obfs_client = tester.Obfsproxy(self.client_args)
         sleep(0.2)
-        self.obfs_client = Obfsproxy(self.client_args)
-        self.input_chan = connect_with_retry(("127.0.0.1", ENTRY_PORT))
-        self.input_chan.settimeout(SOCKET_TIMEOUT)
+        self.input_chan = tester.connect_with_retry(("127.0.0.1",
+                                                     tester.ENTRY_PORT))
+        self.input_chan.settimeout(tester.SOCKET_TIMEOUT)
 
     def tearDown(self):
         self.obfs_client.stop()
-        self.obfs_server.stop()
+        self.input_chan.close()
+        ut.removedir(const.TEST_SERVER_DIR)  # Remove temp dir
+
+    def send_data(self):
+        self.input_chan.sendall(tester.TEST_FILE)
+        sleep(5)
         self.input_chan.close()
 
-    def test_send_data(self):
-        self.input_chan.sendall(TEST_FILE)
-        sleep(2)
-        self.input_chan.close()
+    def load_wrappers(self):
+        return [pickle.load(open(join(const.TEST_SERVER_DIR, f)))
+                    for f in listdir(const.TEST_SERVER_DIR)
+                        if isfile(join(const.TEST_SERVER_DIR, f))]
 
 
-class WFPadTests(IntermediateTest, STTest):
+#@unittest.skip("")
+class WFPadTests(TestSetUp, STTest):
     transport = "wfpad"
 
     def setUp(self):
-        self.client_args = ("wfpad", "client",
-               "127.0.0.1:%d" % ENTRY_PORT,
-               "--dest=127.0.0.1:%d" % SERVER_PORT)
+        self.client_args = (
+               "--test-server %d" % tester.EXIT_PORT,
+               "wfpad", "client",
+               "127.0.0.1:%d" % tester.ENTRY_PORT,
+               "--dest 127.0.0.1:%d" % tester.SERVER_PORT,
+               )
         super(WFPadTests, self).setUp()
 
     def tearDown(self):
         super(WFPadTests, self).tearDown()
+
+
+class BuFLOTests(TestSetUp, STTest):
+    transport = "buflo"
+    period = 0.1
+    psize = 1448
+    mintime = 2
+    client_args = (
+           "--test-server %d" % tester.EXIT_PORT,
+           "buflo", "client",
+           "127.0.0.1:%d" % tester.ENTRY_PORT,
+           "--socks-shim %d,%d" % (tester.SHIM_PORT, tester.SOCKS_PORT),
+           "--period %s" % period,
+           "--psize %s" % psize,
+           "--mintime %s" % mintime,
+           "--dest 127.0.0.1:%d" % tester.SERVER_PORT,
+           )
+
+    def test_timing(self):
+        self.send_data()
+        for wrapper in self.load_wrappers():
+            for obsIat in wrapper:
+                print obsIat
+                self.assertAlmostEqual(self.period, obsIat,
+                                       None,
+                                       "The observed period %s does not match"
+                                       " with the expected period %s"
+                                       % (obsIat, self.period),
+                                       delta=0.05)
 
 
 if __name__ == "__main__":

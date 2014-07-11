@@ -12,7 +12,7 @@ from time import sleep
 
 # Test config
 WATCHDOG_TIMEOUT = 180
-SLEEP_IN_PAGE = 5
+SLEEP_IN_PAGE = 10
 DEBUG = True
 
 # Switch to leave Tor running and speed-up tests
