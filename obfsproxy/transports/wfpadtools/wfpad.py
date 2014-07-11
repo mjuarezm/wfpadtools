@@ -376,7 +376,7 @@ class WFPadTransport(BaseTransport):
 
         Pad all batches to `L` cells total within `t` microseconds,
         or until APP_HINT(session_id, stop).
-       """
+        """
         pass
 
     def getConsecPaddingMsgs(self):
