@@ -160,7 +160,7 @@ class WFPadTransport(BaseTransport):
         if self._state is const.ST_PADDING:
             self.paddingBuffer.write(data)
 
-    def injectMessage(self, length=None, opcode=None):
+    def injectMessage(self, length=None, opcode=None, args=None):
         """Creates and injects WFPad messages in order to pad the link.
 
         In case the buffer is not empty, the buffer is flushed and we send
@@ -177,21 +177,24 @@ class WFPadTransport(BaseTransport):
                 log.debug("Message with no padding.")
                 data = self.paddingBuffer.read(payloadLen)
                 msg = self.msgFactory.createWFPadMessage(data,
-                                                         opcode=opcode)
+                                                         opcode=opcode,
+                                                         args=args)
             else:
                 log.debug("Message with padding.")
                 data = self.paddingBuffer.read()
                 paddingLen = payloadLen - dataLen
                 msg = self.msgFactory.createWFPadMessage(data,
                                                          paddingLen,
-                                                         opcode=opcode)
+                                                         opcode=opcode,
+                                                         args=args)
         else:
             log.debug("Generate padding")
             self.consecPaddingMsgs += 1
             msg = self.msgFactory.createWFPadMessage("",
                                                      payloadLen,
                                                      flags=const.FLAG_PADDING,
-                                                     opcode=opcode)
+                                                     opcode=opcode,
+                                                     args=args)
         self.circuit.downstream.write(str(msg))
 
     def flushPieces(self):
@@ -213,7 +216,7 @@ class WFPadTransport(BaseTransport):
 
         reactor.callLater(delay, self.flushPieces)
 
-    def sendControlMessage(self, opcode, delay=0):
+    def sendControlMessage(self, opcode, args, delay=0):
         """Send a message with a specific opcode field."""
         reactor.callLater(delay, self.injectMessage(opcode=opcode))
 
@@ -261,12 +264,12 @@ class WFPadTransport(BaseTransport):
                 elif msg.flags == const.FLAG_CONTROL:
                     log.debug("Message with control data received.")
                     self.circuit.upstream.write(msg.payload)
-                    self.doPrimitive(msg.opcode, msg.args)
+                    self.receivedControlMessage(msg.opcode, msg.args)
                 else:
                     log.warning("Invalid message flags: %d." % msg.flags)
         return msgs
 
-    def doPrimitive(self, opcode, args=None):
+    def receivedControlMessage(self, opcode, args=None):
         """Do operation indicated by the opcode."""
         if opcode == const.OP_START:  # Generic primitives
             self.startPadding()
@@ -372,7 +375,7 @@ class WFPadTransport(BaseTransport):
 
         Pad all batches to `L` cells total within `t` microseconds,
         or until APP_HINT(session_id, stop).
-       """
+        """
         pass
 
     def getConsecPaddingMsgs(self):

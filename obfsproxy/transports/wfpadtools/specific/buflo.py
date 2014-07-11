@@ -47,6 +47,7 @@ class BuFLOTransport(WFPadTransport):
         self.lengthProbdist = probdist.new(lambda: self._psize,
                                            lambda i, n, c: 1)
 
+        # Flag indicating wheter we are in the middle of a visit or not
         self.visiting = False
 
         # Register observer for shim events
