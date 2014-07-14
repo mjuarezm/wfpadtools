@@ -58,7 +58,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.protoState = const.ST_WAIT_FOR_AUTH
 
         # Buffer for outgoing data.
-        self.sendBuf = ""
+        self._sendBuf = ""
 
         # Buffer for inter-arrival time obfuscation.
         self.choppingBuf = fifobuf.Buffer()
@@ -336,19 +336,19 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         The application could have sent data while we were busy authenticating
         the remote machine.  This method flushes the data which could have been
-        queued in the meanwhile in `self.sendBuf'.
+        queued in the meanwhile in `self._sendBuf'.
         """
 
-        if len(self.sendBuf) == 0:
+        if len(self._sendBuf) == 0:
             log.debug("Send buffer is empty; nothing to flush.")
             return
 
         # Flush the buffered data, the application is so eager to send.
         log.debug("Flushing %d bytes of buffered application data." %
-                  len(self.sendBuf))
+                  len(self._sendBuf))
 
-        self.sendRemote(self.sendBuf)
-        self.sendBuf = ""
+        self.sendRemote(self._sendBuf)
+        self._sendBuf = ""
 
     def receiveTicket( self, data ):
         """
@@ -429,9 +429,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Buffer data we are not ready to transmit yet.
         else:
-            self.sendBuf += data.read()
+            self._sendBuf += data.read()
             log.debug("Buffered %d bytes of outgoing data." %
-                      len(self.sendBuf))
+                      len(self._sendBuf))
 
     def sendTicketAndSeed( self ):
         """

@@ -16,14 +16,8 @@ class BuFLOShimObserver(WFPadShimObserver):
 
     def onSessionStarts(self):
         """Do operations to be done when session starts."""
-        log.debug("A session has started.")
+        super(BuFLOShimObserver, self).onSessionStarts()
         self.wfpad.startPadding()
-        self.wfpad._visiting = True
-
-    def onSessionEnds(self):
-        """Do operations to be done when session ends."""
-        log.debug("A session has ended.")
-        self.wfpad._visiting = False
 
 
 class BuFLOTransport(WFPadTransport):
@@ -46,9 +40,6 @@ class BuFLOTransport(WFPadTransport):
                                           lambda i, n, c: 1)
         self._lengthProbdist = probdist.new(lambda: self._psize,
                                            lambda i, n, c: 1)
-
-        # Flag indicating wheter we are in the middle of a visit or not
-        self._visiting = False
 
         # Register observer for shim events
         if self.weAreClient:

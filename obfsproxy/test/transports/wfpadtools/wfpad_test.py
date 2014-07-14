@@ -66,16 +66,16 @@ class WFPadTests(TestSetUp, STTest):
 
 class BuFLOTests(TestSetUp, STTest):
     transport = "buflo"
-    period = 0.1
-    psize = 1448
+    _period = 0.1
+    _psize = 1448
     mintime = 2
     client_args = (
            "--test-server %d" % tester.EXIT_PORT,
            "buflo", "client",
            "127.0.0.1:%d" % tester.ENTRY_PORT,
            "--socks-shim %d,%d" % (tester.SHIM_PORT, tester.SOCKS_PORT),
-           "--period %s" % period,
-           "--psize %s" % psize,
+           "--_period %s" % _period,
+           "--_psize %s" % _psize,
            "--mintime %s" % mintime,
            "--dest 127.0.0.1:%d" % tester.SERVER_PORT,
            )
@@ -85,11 +85,11 @@ class BuFLOTests(TestSetUp, STTest):
         for wrapper in self.load_wrappers():
             for obsIat in wrapper:
                 print obsIat
-                self.assertAlmostEqual(self.period, obsIat,
+                self.assertAlmostEqual(self._period, obsIat,
                                        None,
-                                       "The observed period %s does not match"
-                                       " with the expected period %s"
-                                       % (obsIat, self.period),
+                                       "The observed _period %s does not match"
+                                       " with the expected _period %s"
+                                       % (obsIat, self._period),
                                        delta=0.05)
 
 

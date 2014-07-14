@@ -113,3 +113,8 @@ def hash_text(text, algo='sha1'):
     h = hashlib.new(algo)
     h.update(text)
     return h.hexdigest()
+
+
+def timestamp():
+    from time import time
+    return time.time()
