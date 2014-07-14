@@ -9,6 +9,7 @@ import unittest
 from time import sleep
 from os import listdir
 from os.path import join, isfile
+from obfsproxy.test.tester import TransportsSetUp, Obfsproxy, DirectTest
 
 
 DEBUG = False
@@ -21,24 +22,31 @@ if DEBUG:
     log.set_log_severity('debug')
 
 
-class TestSetUp(object):
+class TransportsSetUpTest(object):
+    def setUp(self):
+        self.obfs_client = Obfsproxy(self.client_args)
+
+    def tearDown(self):
+        self.obfs_client.stop()
+
+
+class TestSetUp(TransportsSetUp):
 
     def setUp(self):
+        super(TestSetUp, self).setUp()
         ut.createdir(const.TEST_SERVER_DIR)  # Create temp dir
-        self.obfs_client = tester.Obfsproxy(self.client_args)
-        sleep(0.2)
         self.input_chan = tester.connect_with_retry(("127.0.0.1",
                                                      tester.ENTRY_PORT))
         self.input_chan.settimeout(tester.SOCKET_TIMEOUT)
 
     def tearDown(self):
-        self.obfs_client.stop()
+        super(TestSetUp, self).tearDown()
         self.input_chan.close()
         ut.removedir(const.TEST_SERVER_DIR)  # Remove temp dir
 
     def send_data(self):
         self.input_chan.sendall(tester.TEST_FILE)
-        sleep(5)
+        sleep(2)
         self.input_chan.close()
 
     def load_wrappers(self):
@@ -48,41 +56,53 @@ class TestSetUp(object):
 
 
 #@unittest.skip("")
-class WFPadTests(TestSetUp, STTest):
+class WFPadTests(TestSetUp, unittest.TestCase):
     transport = "wfpad"
+    period = 0.1
+    client_args = ("--test-server=127.0.0.1:%d" % tester.EXIT_PORT,
+                   "wfpad", "client",
+                   "127.0.0.1:%d" % tester.ENTRY_PORT,
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+    server_args = ("wfpad", "server",
+                   "127.0.0.1:%d" % 6000,
+                   "--dest=127.0.0.1:%d" % 6001)
 
-    def setUp(self):
-        self.client_args = (
-               "--test-server=%d" % tester.EXIT_PORT,
-               "wfpad", "client",
-               "127.0.0.1:%d" % tester.ENTRY_PORT,
-               "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
-               )
-        super(WFPadTests, self).setUp()
+    def test_timing(self):
+        super(WFPadTests, self).send_data()
+        for wrapper in self.load_wrappers():
+            print wrapper
+            for length, obsIat in wrapper:
+                print obsIat
+                self.assertAlmostEqual(self.period, obsIat,
+                                       None,
+                                       "The observed period %s does not match"
+                                       " with the expected period %s"
+                                       % (obsIat, self.period),
+                                       delta=0.05)
 
-    def tearDown(self):
-        super(WFPadTests, self).tearDown()
-
-
+@unittest.skip("")
 class BuFLOTests(TestSetUp, STTest):
     transport = "buflo"
     period = 0.1
     psize = 1448
     mintime = 2
-    client_args = (
-           "--test-server=%s" % tester.EXIT_PORT,
-           "buflo", "client",
-           "127.0.0.1:%d" % tester.ENTRY_PORT,
-           "--socks-shim=%d,%d" % (tester.SHIM_PORT, tester.SOCKS_PORT),
-           "--period=%s" % period,
-           "--psize=%s" % psize,
-           "--mintime=%s" % mintime,
-           "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+    client_args = ("--test-server=127.0.0.1:%d" % tester.EXIT_PORT,
+                   "buflo", "client",
+                   "127.0.0.1:%d" % tester.ENTRY_PORT,
+                   "--socks-shim=%d,%d" % (tester.SHIM_PORT, tester.SOCKS_PORT),
+                   "--period=%d" % period,
+                   "--psize=%d" % psize,
+                   "--mintime=%d" % mintime,
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+    server_args = ("buflo", "server",
+           "127.0.0.1:%d" % 6000,
+           "--dest=127.0.0.1:%d" % 6001)
 
     def test_timing(self):
         self.send_data()
         for wrapper in self.load_wrappers():
-            for obsIat in wrapper:
+            print wrapper
+            for length, obsIat in wrapper:
                 print obsIat
                 self.assertAlmostEqual(self.period, obsIat,
                                        None,

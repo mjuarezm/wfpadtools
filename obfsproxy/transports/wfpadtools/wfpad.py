@@ -441,6 +441,7 @@ class WFPadTransport(BaseTransport):
 
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream."""
+        print "Up"
         if self._state is const.ST_CONNECTED:
             self.circuit.downstream.write(data.read())
         elif self._state == const.ST_PADDING:
@@ -452,6 +453,7 @@ class WFPadTransport(BaseTransport):
 
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
+        print "Down"
         if self._state is const.ST_CONNECTED:
             self.circuit.upstream.write(data.read())
         elif self._state == const.ST_PADDING:
@@ -472,6 +474,5 @@ class WFPadServer(WFPadTransport):
     """Extend the WFPad class."""
 
     def __init__(self):
-        print "Starting", id(self)
         """Initialize a WFPadServer object."""
         WFPadTransport.__init__(self)

@@ -56,6 +56,13 @@ class BuFLOTransport(WFPadTransport):
             self.sessionObserver = BuFLOShimObserver(self)
             shim.registerObserver(self.sessionObserver)
 
+    @classmethod
+    def setup(cls, transportConfig):
+        """Called once when obfsproxy starts."""
+        cls.weAreClient = transportConfig.weAreClient
+        cls.weAreServer = not cls.weAreClient
+        cls.weAreExternal = transportConfig.weAreExternal
+
     def circuitConnected(self):
         """Initiate handshake.
 

@@ -18,7 +18,7 @@ import obfsproxy.common.heartbeat as heartbeat
 import obfsproxy.common.transport_config as transport_config
 import obfsproxy.managed.server as managed_server
 import obfsproxy.managed.client as managed_client
-from obfsproxy.test.transports.wfpadtools import test_server
+from obfsproxy.transports.base import addrport
 from obfsproxy import __version__
 
 try:
@@ -56,8 +56,8 @@ def set_up_cli_parsing():
 
     parser.add_argument('--proxy', action='store', dest='proxy',
                         help='Outgoing proxy (<proxy_type>://[<user_name>][:<password>][@]<ip>:<port>)')
-    parser.add_argument('--test-server', action='store', dest='dest_port',
-                        help='--test-server dest_port')
+    parser.add_argument('--test-server', type=addrport, action='store', dest='server_dest',
+                        help='--test-server server_dest')
 
     # Managed mode is a subparser for now because there are no
     # optional subparsers: bugs.python.org/issue9253
@@ -173,7 +173,7 @@ def pyobfsproxy():
     l.start(3600.0, now=False) # do heartbeat every hour
 
     # Initiate the test server.
-    if args.dest_port:
+    if args.server_dest:
         pt_config = transport_config.TransportConfig()
         pt_config.setStateLocation(args.data_dir)
         pt_config.setListenerMode("server")
@@ -184,10 +184,10 @@ def pyobfsproxy():
             launch_transport.launch_transport_listener("testserver",
                                                        args.dest,
                                                        "server",
-                                                       args.dest_port,
-                                                       pt_config,)
-            log.info("Launched 'test-server' listener at '%s:%s'." %\
-                 (log.safe_addr_str(args.dest[0]), args.dest[1]))
+                                                       args.server_dest,
+                                                       pt_config)
+            log.info("Launched 'test-server' listener at '%s:%s' and destination '%s:%s'." %\
+                 (log.safe_addr_str(args.dest[0]), args.dest[1], log.safe_addr_str(args.server_dest[0]), args.server_dest[1]))
         except Exception as e:
             log.error('Failed to initialize the test server: %s', e)
             sys.exit(1)

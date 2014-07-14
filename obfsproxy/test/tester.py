@@ -59,7 +59,6 @@ class Obfsproxy(subprocess.Popen):
         else:
             argv.extend(args)
 
-        print "Command:", " ".join(argv)
         subprocess.Popen.__init__(self, argv,
                                   stdin=open("/dev/null", "r"),
                                   stdout=subprocess.PIPE,
@@ -325,6 +324,39 @@ class DirectWFPad(DirectTest, unittest.TestCase):
            "127.0.0.1:%d" % SERVER_PORT,
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = ("wfpad", "client",
+           "127.0.0.1:%d" % ENTRY_PORT,
+           "--dest=127.0.0.1:%d" % SERVER_PORT)
+
+class DirectWFPadTestServer(DirectTest, unittest.TestCase):
+    transport = "wfpad"
+    client_args = ("--test-server=127.0.0.1:%d" % EXIT_PORT,
+               "wfpad", "client",
+               "127.0.0.1:%d" % ENTRY_PORT,
+               "--dest=127.0.0.1:%d" % SERVER_PORT)
+    server_args = ("wfpad", "server",
+           "127.0.0.1:%d" % 6000,
+           "--dest=127.0.0.1:%d" % 6001)
+
+class DirectBuFLOTestServer(DirectTest, unittest.TestCase):
+    transport = "buflo"
+    client_args = ("--test-server=127.0.0.1:%d" % EXIT_PORT,
+                   "buflo", "client",
+                   "127.0.0.1:%d" % ENTRY_PORT,
+                   "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
+                   "--period=0.1",
+                   "--psize=1448",
+                   "--mintime=2",
+                   "--dest=127.0.0.1:%d" % SERVER_PORT)
+    server_args = ("buflo", "server",
+           "127.0.0.1:%d" % 6000,
+           "--dest=127.0.0.1:%d" % 6001)
+
+class DirectTestServer(DirectTest, unittest.TestCase):
+    transport = "testserver"
+    server_args = ("testserver", "server",
+           "127.0.0.1:%d" % SERVER_PORT,
+           "--dest=127.0.0.1:%d" % EXIT_PORT)
+    client_args = ("testserver", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
