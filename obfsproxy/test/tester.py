@@ -9,22 +9,23 @@ You need to be able to make connections to arbitrary high-numbered
 TCP ports on the loopback interface.
 """
 
+import Queue
 import difflib
 import errno
 import multiprocessing
-import Queue
+from os.path import join
 import re
+import shutil
 import signal
 import socket
 import struct
 import subprocess
+import sys, os
+import tempfile
 import time
 import traceback
 import unittest
-import sys,os
-import tempfile
-import shutil
-from os.path import join
+
 
 def diff(label, expected, received):
     """

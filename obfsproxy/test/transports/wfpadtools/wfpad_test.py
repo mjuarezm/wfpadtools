@@ -53,10 +53,10 @@ class WFPadTests(TestSetUp, STTest):
 
     def setUp(self):
         self.client_args = (
-               "--test-server %d" % tester.EXIT_PORT,
+               "--test-server=%d" % tester.EXIT_PORT,
                "wfpad", "client",
                "127.0.0.1:%d" % tester.ENTRY_PORT,
-               "--dest 127.0.0.1:%d" % tester.SERVER_PORT,
+               "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
                )
         super(WFPadTests, self).setUp()
 
@@ -66,30 +66,29 @@ class WFPadTests(TestSetUp, STTest):
 
 class BuFLOTests(TestSetUp, STTest):
     transport = "buflo"
-    _period = 0.1
-    _psize = 1448
+    period = 0.1
+    psize = 1448
     mintime = 2
     client_args = (
-           "--test-server %d" % tester.EXIT_PORT,
+           "--test-server=%s" % tester.EXIT_PORT,
            "buflo", "client",
            "127.0.0.1:%d" % tester.ENTRY_PORT,
-           "--socks-shim %d,%d" % (tester.SHIM_PORT, tester.SOCKS_PORT),
-           "--_period %s" % _period,
-           "--_psize %s" % _psize,
-           "--mintime %s" % mintime,
-           "--dest 127.0.0.1:%d" % tester.SERVER_PORT,
-           )
+           "--socks-shim=%d,%d" % (tester.SHIM_PORT, tester.SOCKS_PORT),
+           "--period=%s" % period,
+           "--psize=%s" % psize,
+           "--mintime=%s" % mintime,
+           "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
 
     def test_timing(self):
         self.send_data()
         for wrapper in self.load_wrappers():
             for obsIat in wrapper:
                 print obsIat
-                self.assertAlmostEqual(self._period, obsIat,
+                self.assertAlmostEqual(self.period, obsIat,
                                        None,
-                                       "The observed _period %s does not match"
-                                       " with the expected _period %s"
-                                       % (obsIat, self._period),
+                                       "The observed period %s does not match"
+                                       " with the expected period %s"
+                                       % (obsIat, self.period),
                                        delta=0.05)
 
 

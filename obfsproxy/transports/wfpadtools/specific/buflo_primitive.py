@@ -66,18 +66,18 @@ class BuFLOTransport(WFPadTransport):
     @classmethod
     def register_external_mode_cli(cls, subparser):
         """Register CLI arguments."""
-        subparser.add_argument("--_period",
+        subparser.add_argument("--period",
                                required=False,
                                type=float,
                                help="Time rate at which transport sends "
                                     "messages (Default: 1ms).",
-                               dest="_period")
-        subparser.add_argument("--_psize",
+                               dest="period")
+        subparser.add_argument("--psize",
                                required=False,
                                type=int,
                                help="Length of messages to be transmitted"
                                     " (Default: MTU).",
-                               dest="_psize")
+                               dest="psize")
         subparser.add_argument("--mintime",
                                required=False,
                                type=int,
@@ -90,8 +90,8 @@ class BuFLOTransport(WFPadTransport):
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables.
 
-        BuFLO pads at a constant rate `_period` and pads the packets to a
-        constant size `_psize`.
+        BuFLO pads at a constant rate `period` and pads the packets to a
+        constant size `psize`.
         """
         super(BuFLOTransport, cls).validate_external_mode_cli(args)
 
