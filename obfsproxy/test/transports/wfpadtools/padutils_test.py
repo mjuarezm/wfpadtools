@@ -14,10 +14,10 @@ class PeriodicTimerTest(STTest):
         t.start()
         with t.tick:
             t.tick.wait()
-        self.assertAlmostEqual(expected_elapsed, t.elapsed(), places=2,
+        self.assertAlmostEqual(expected_elapsed, t._elapsed(), places=2,
                                msg="Elapsed time (%s) does not match with"
-                               "expected elapsed time (%s)."
-                               % (t.elapsed(), expected_elapsed))
+                               "expected _elapsed time (%s)."
+                               % (t._elapsed(), expected_elapsed))
 
     def test_periodicity(self):
         interval = 1
@@ -32,10 +32,10 @@ class PeriodicTimerTest(STTest):
                 if periods == test_periods:
                     break
         expected_elapsed = interval * test_periods
-        self.assertAlmostEqual(expected_elapsed, t.elapsed(), places=2,
+        self.assertAlmostEqual(expected_elapsed, t._elapsed(), places=2,
                                msg="Elapsed time (%s) does not match with"
-                               "expected elapsed time (%s)."
-                               % (t.elapsed(), expected_elapsed))
+                               "expected _elapsed time (%s)."
+                               % (t._elapsed(), expected_elapsed))
 
 
 class PadUtilsTest(STTest):

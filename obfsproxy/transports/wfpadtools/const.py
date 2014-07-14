@@ -85,7 +85,7 @@ def get_args_len(self, opcode):
     return sum(map(len, ARGS_DICT[opcode]))
 
 ARGS_DICT = {OP_SEND_PADDING: [arg(1, ord, "num_padding_msgs"), arg(1, ord, "delay")],
-             OP_APP_HINT: [arg(1, str, "session_id"), arg(1, str, "status")]
+             OP_APP_HINT: [arg(1, str, "session_id"), arg(1, bool, "status")]
                 # TODO
             }
 
