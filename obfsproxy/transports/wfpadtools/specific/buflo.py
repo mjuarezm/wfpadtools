@@ -16,13 +16,15 @@ class BuFLOShimObserver(WFPadShimObserver):
 
     def onSessionStarts(self):
         """Do operations to be done when session starts."""
-        log.debug("A session has started.")
+        log.error("A session has started.")
+        print "XXXXXXXX START!"
         self.wfpad.startPadding()
+        self.wfpad.sendAppHintRequest()
         self.wfpad._visiting = True
 
     def onSessionEnds(self):
         """Do operations to be done when session ends."""
-        log.debug("A session has ended.")
+        log.error("A session has ended.")
         self.wfpad._visiting = False
 
 
@@ -46,9 +48,6 @@ class BuFLOTransport(WFPadTransport):
                                           lambda i, n, c: 1)
         self._lengthProbdist = probdist.new(lambda: self._psize,
                                            lambda i, n, c: 1)
-
-        # Flag indicating wheter we are in the middle of a visit or not
-        self._visiting = False
 
         # Register observer for shim events
         if self.weAreClient:
@@ -82,18 +81,18 @@ class BuFLOTransport(WFPadTransport):
     @classmethod
     def register_external_mode_cli(cls, subparser):
         """Register CLI arguments."""
-        subparser.add_argument("--_period",
+        subparser.add_argument("--period",
                                required=False,
                                type=float,
                                help="Time rate at which transport sends "
                                     "messages (Default: 1ms).",
-                               dest="_period")
-        subparser.add_argument("--_psize",
+                               dest="period")
+        subparser.add_argument("--psize",
                                required=False,
                                type=int,
                                help="Length of messages to be transmitted"
                                     " (Default: MTU).",
-                               dest="_psize")
+                               dest="psize")
         subparser.add_argument("--mintime",
                                required=False,
                                type=int,
@@ -106,17 +105,17 @@ class BuFLOTransport(WFPadTransport):
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables.
 
-        BuFLO pads at a constant rate `_period` and pads the packets to a
-        constant size `_psize`.
+        BuFLO pads at a constant rate `period` and pads the packets to a
+        constant size `psize`.
         """
         super(BuFLOTransport, cls).validate_external_mode_cli(args)
 
         if args.mintime:
             cls._mintime = int(args.mintime)
-        if args._period:
-            cls._period = args._period
-        if args._psize:
-            cls._psize = args._psize
+        if args.period:
+            cls._period = args.period
+        if args.psize:
+            cls._psize = args.psize
 
     def stopCondition(self):
         """Returns the evaluation of the condition to stop padding.

@@ -21,6 +21,7 @@ FINISH_BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done."
 
 # Times
 DEFAULT_TIME_PERIOD = 60
+GET_PAGE_TIMEOUT = 10
 
 # Protocol states
 ST_WAIT = 0
@@ -85,8 +86,13 @@ def get_args_len(self, opcode):
     return sum(map(len, ARGS_DICT[opcode]))
 
 ARGS_DICT = {OP_SEND_PADDING: [arg(1, ord, "num_padding_msgs"), arg(1, ord, "delay")],
-             OP_APP_HINT: [arg(1, str, "session_id"), arg(1, bool, "status")]
-                # TODO
+             OP_APP_HINT: [arg(1, str, "session_id"), arg(1, bool, "status")],
+             OP_BURST_HISTO: [arg(1, list, "histogram"), arg(1, list, "labels_ms"), arg(1, bool, "remove_toks")],
+             OP_GAP_HISTO: [arg(1, list, "histogram"), arg(1, list, "labels_ms"), arg(1, bool, "remove_toks")],
+             OP_INJECT_HISTO: [arg(1, list, "histogram"), arg(list, "labels_ms")],
+             OP_TOTAL_PAD: [],
+             OP_PAYLOAD_PAD: [arg(1, str, "session_id"), arg(1, int, "delay")],
+             OP_BATCH_PAD: [arg(1, str, "session_id"), arg(1, int, "L"), arg(1, int, "delay")],
             }
 
 # Header length

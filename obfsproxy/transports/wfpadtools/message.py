@@ -149,7 +149,8 @@ class WFPadMessageFactory(object):
                            flags=const.FLAG_DATA, opcode=None, args=None):
         return WFPadMessage(payload, paddingLen, flags, opcode, args)
 
-    def createWFPadMessages(self, data, flags=const.FLAG_DATA):
+    def createWFPadMessages(self, data,
+                            flags=const.FLAG_DATA, opcode=None, args=None):
         """Create protocol messages out of the given payload.
 
         The given `data` is turned into a list of protocol messages with the
@@ -160,11 +161,17 @@ class WFPadMessageFactory(object):
             msgLen = self.lenDist.randomSample()
             dataLen = len(data)
             if dataLen > msgLen:
-                messages.append(self.createWFPadMessage(data[:msgLen]))
+                messages.append(self.createWFPadMessage(data[:msgLen],
+                                                        flags=flags,
+                                                        opcode=opcode,
+                                                        args=args))
                 data = data[msgLen:]
             else:
                 messages.append(self.createWFPadMessage(data[:dataLen],
-                                             paddingLen=(msgLen - dataLen)))
+                                             paddingLen=(msgLen - dataLen),
+                                                        flags=flags,
+                                                        opcode=opcode,
+                                                        args=args))
                 data = data[dataLen:]
         log.debug("Created %d protocol messages." % len(messages))
         return messages
@@ -320,8 +327,10 @@ class WFPadMessageExtractor(object):
 
     def parseControlFields(self):
         """Extract control message fields."""
+        log.error("Parsing control fields")
         if self._opcode == None:
             return
+        log.error("Opcode: %s" % self._opcode)
         self._opcode = ord(self.getMessageField(const.CONTROL_POS,
                                          const.CONTROL_LEN))
         if not isOpCodeSane(self._opcode):
@@ -358,6 +367,7 @@ class WFPadMessageExtractor(object):
         self.recvBuf += data
         msgs = []
 
+        log.error("WORKING!!")
         # Keep trying to unpack as long as there is at least a header.
         while len(self.recvBuf) >= const.MIN_HDR_LEN:
             # Parse common header fields

@@ -35,11 +35,10 @@ class TestTransport(DummyTransport):
         """Dump downstream history to a temp file."""
         file_tranport = join(self._tempDir, str(id(self)))
         with open(file_tranport, "w") as f:
-            pickle.dump(self._history, f)
+            pickle.dump(self._history[1:], f)
 
     def receivedDownstream(self, data):
         """Got data from the client; save iat and length into history."""
-        print "Down"
         log.debug("Test server: downstream")
         rcvDownData = data.read()
         iat = self.getIat() if self._history else 0
@@ -49,7 +48,6 @@ class TestTransport(DummyTransport):
         self.circuit.upstream.write(rcvDownData)
 
     def receivedUpstream(self, data):
-        print "Up"
         log.debug("Test server: upstream")
         super(TestTransport, self).receivedUpstream(data)
 

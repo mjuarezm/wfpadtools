@@ -56,6 +56,7 @@ class Obfsproxy(subprocess.Popen):
             argv.extend(args[0])
         else:
             argv.extend(args)
+        print "COMMAND: ", " ".join(argv)
         subprocess.Popen.__init__(self, argv,
                                   stdin=open("/dev/null", "r"),
                                   stdout=subprocess.PIPE,

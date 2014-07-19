@@ -91,7 +91,7 @@ class WFPadTransport(BaseTransport):
         self._msgExtractor = message.WFPadMessageExtractor()
 
         # Initialize probability distributions
-        self._period = 0.1
+        self._period = 0.01
         self._delayProbdist = probdist.new(lambda: self._period,
                                             lambda i, n, c: 1)
         self._psize = const.MTU
@@ -158,9 +158,16 @@ class WFPadTransport(BaseTransport):
         log.debug("Processing %d bytes of outgoing data." % len(data))
         if self._state is const.ST_PADDING:
             self._paddingBuffer.write(data)
+        else:
+            self.sendMessages(data)
 
-    def sendMessage(self, length=None, opcode=None, args=None):
-        """Creates and injects WFPad messages in order to pad the link.
+    def sendMessages(self, data):
+        """Encapsulates `data` in messages and sends over the link."""
+        msgs = self._msgFactory.createWFPadMessages(data)
+        self.circuit.downstream.write("".join([str(msg) for msg in msgs]))
+
+    def encapsulateBufferData(self, length=None, opcode=None, args=None):
+        """Reads from buffer and creates messages to send them over the link.
 
         In case the buffer is not empty, the buffer is flushed and we send
         these data over the wire. Otherwise, we generate random padding
@@ -207,7 +214,7 @@ class WFPadTransport(BaseTransport):
             self.stopPadding()
             return
 
-        self.sendMessage(opcode=self._opcode)
+        self.encapsulateBufferData(opcode=self._opcode)
         self._opcode = None
 
         delay = self.drawFlushDelay()
@@ -217,26 +224,29 @@ class WFPadTransport(BaseTransport):
 
     def sendControlMessage(self, opcode, args=None, delay=0):
         """Send a message with a specific _opcode field."""
-        reactor.callLater(delay, self.sendMessage(opcode=opcode, args=args))
+        reactor.callLater(delay,
+                          self.encapsulateBufferData,
+                          opcode=opcode,
+                          args=args)
 
-    def sendStartPaddingRequest(self, delay=0):
+    def sendStartPaddingRequest(self):
         """Send a start padding as control message."""
-        self.sendControlMessage(opcode=const.OP_START, delay)
+        self.sendControlMessage(const.OP_START)
 
-    def sendStopPaddingRequest(self, delay=0):
+    def sendStopPaddingRequest(self):
         """Send a start padding as control message."""
-        self.sendControlMessage(opcode=const.OP_STOP, delay)
+        self.sendControlMessage(const.OP_STOP)
 
-    def sendIgnoreRequest(self, delay=0):
+    def sendIgnoreRequest(self):
         """Send an ignore request as control message."""
-        self.sendControlMessage(opcode=const.OP_IGNORE, delay)
+        self.sendControlMessage(const.OP_IGNORE)
 
-    def sendPaddingCellsRequest(self, N, t, delay=0):
+    def sendPaddingCellsRequest(self, N, t):
         """Send an ignore request as control message."""
-        self.sendControlMessage(opcode=const.OP_SEND_PADDING,
-                                args=[N, t], delay)
+        self.sendControlMessage(const.OP_SEND_PADDING,
+                                args=[N, t])
 
-    def sendAppHintRequest(self, status, delay=0):
+    def sendAppHintRequest(self, status=True):
         """Send an app hint request as control message.
 
         We hash the session number, the PT object id and a timestamp
@@ -247,21 +257,19 @@ class WFPadTransport(BaseTransport):
         status : boolean
                 indicates whether a session starts (True) or ends (False).
         """
-        sessId = ut.hash_text(self._sessionNumber + id(self) + ut.timestamp())
-        self.sendControlMessage(opcode=const.OP_APP_HINT,
-                                args=[sessId, status], delay)
+        sessId = ut.hash_text(str(self._sessionNumber) + str(id(self)) + str(ut.timestamp()))
+        self.sendControlMessage(const.OP_APP_HINT, args=[sessId, status])
 
     def sendBurstHistogram(self, histo, labels, remove_toks=False):
-        self.sendControlMessage(opcode=const.OP_BURST_HISTO,
+        self.sendControlMessage(const.OP_BURST_HISTO,
                                 args=[histo, labels, remove_toks])
 
     def sendGapHistogram(self, histo, labels, remove_toks=False):
-        self.sendControlMessage(opcode=const.OP_GAP_HISTO,
+        self.sendControlMessage(const.OP_GAP_HISTO,
                                 args=[histo, labels, remove_toks])
 
     def sendInjectHistogram(self, histo, labels):
-        self.sendControlMessage(opcode=const.OP_INJECT_HISTO,
-                                args=[histo, labels])
+        self.sendControlMessage(const.OP_INJECT_HISTO, args=[histo, labels])
 
     def sendTotalPadRequest(self):
         pass
@@ -328,6 +336,7 @@ class WFPadTransport(BaseTransport):
 
     def receivedControlMessage(self, opcode, args=None):
         """Do operation indicated by the _opcode."""
+        log.error("Received control message with opcode %d and args: %s" % (opcode, args))
         if opcode == const.OP_START:  # Generic primitives
             self.startPadding()
         elif opcode == const.OP_STOP:
@@ -356,11 +365,11 @@ class WFPadTransport(BaseTransport):
     def sendIgnore(self, N=1):
         """Reply with a padding message."""
         for _ in xrange(N):
-            reactor.callLater(0, self.sendMessage())
+            reactor.callLater(0, self.encapsulateBufferData)
 
     def sendPadding(self, N, t):
         """Reply with `N` padding messages delayed `t` ms."""
-        reactor.callLater(t, self.sendIgnore(N))
+        reactor.callLater(t, self.sendIgnore, N)
 
     def appHint(self, sessId, status):
         """Provides information to the server about the current session.
@@ -501,10 +510,7 @@ class WFPadTransport(BaseTransport):
 
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream."""
-        print "Up"
-        if self._state is const.ST_CONNECTED:
-            self.circuit.downstream.write(data.read())
-        elif self._state == const.ST_PADDING:
+        if self._state > const.ST_CONNECTED:
                 self.sendRemote(data.read())
         else:
             self._sendBuf += data.read()
@@ -513,10 +519,7 @@ class WFPadTransport(BaseTransport):
 
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
-        print "Down"
-        if self._state is const.ST_CONNECTED:
-            self.circuit.upstream.write(data.read())
-        elif self._state == const.ST_PADDING:
+        if self._state > const.ST_CONNECTED:
             self.processMessages(data.read())
         else:
             self.flushSendBuffer()

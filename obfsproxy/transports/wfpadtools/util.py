@@ -6,6 +6,8 @@ from random import choice
 import shutil
 import signal
 from time import sleep
+import requesocks as requests
+from obfsproxy.transports.wfpadtools import const
 
 
 LOWERCASE_CHARS = 'abcdefghijklmnopqrstuvwxyz'
@@ -117,4 +119,11 @@ def hash_text(text, algo='sha1'):
 
 def timestamp():
     from time import time
-    return time.time()
+    return time()
+
+
+def get_page(url, port, timeout=const.GET_PAGE_TIMEOUT):
+    session = requests.session()
+    session.proxies = {'http': 'socks5://127.0.0.1:{}'.format(port),
+                       'https': 'socks5://127.0.0.1:{}'.format(port)}
+    return session.get(url, timeout=timeout)
