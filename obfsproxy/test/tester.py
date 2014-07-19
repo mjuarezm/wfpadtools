@@ -224,6 +224,7 @@ class DirectTest(TransportsSetUp):
 
         self.input_chan.close()
 
+        print "OUPUT:", output
         report = diff("errors in transfer:", TEST_FILE, output)
 
         report += self.obfs_client.check_completion("obfsproxy client (%s)" % self.transport, report!="")
