@@ -56,7 +56,6 @@ class Obfsproxy(subprocess.Popen):
             argv.extend(args[0])
         else:
             argv.extend(args)
-        print "COMMAND: ", " ".join(argv)
         subprocess.Popen.__init__(self, argv,
                                   stdin=open("/dev/null", "r"),
                                   stdout=subprocess.PIPE,
@@ -224,7 +223,6 @@ class DirectTest(TransportsSetUp):
 
         self.input_chan.close()
 
-        print "OUPUT:", output
         report = diff("errors in transfer:", TEST_FILE, output)
 
         report += self.obfs_client.check_completion("obfsproxy client (%s)" % self.transport, report!="")
