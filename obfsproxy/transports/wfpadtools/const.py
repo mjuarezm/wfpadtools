@@ -67,7 +67,10 @@ FLAGS_LEN = 1
 CONTROL_POS = 5
 CONTROL_LEN = 1
 
-ARGS_POS = 6
+ARGSLENGTH_POS = 6
+ARGSLENGTH_LEN = 2
+
+ARGS_POS = 8
 
 
 # arguments specification [arg_1, arg_2, ...] where arg_i = (length, type)
@@ -85,19 +88,19 @@ class arg(object):
 def get_args_len(self, opcode):
     return sum(map(len, ARGS_DICT[opcode]))
 
-ARGS_DICT = {OP_SEND_PADDING: [arg(1, ord, "num_padding_msgs"), arg(1, ord, "delay")],
-             OP_APP_HINT: [arg(1, str, "session_id"), arg(1, bool, "status")],
-             OP_BURST_HISTO: [arg(1, list, "histogram"), arg(1, list, "labels_ms"), arg(1, bool, "remove_toks")],
-             OP_GAP_HISTO: [arg(1, list, "histogram"), arg(1, list, "labels_ms"), arg(1, bool, "remove_toks")],
-             OP_INJECT_HISTO: [arg(1, list, "histogram"), arg(list, "labels_ms")],
-             OP_TOTAL_PAD: [],
-             OP_PAYLOAD_PAD: [arg(1, str, "session_id"), arg(1, int, "delay")],
-             OP_BATCH_PAD: [arg(1, str, "session_id"), arg(1, int, "L"), arg(1, int, "delay")],
+ARGS_DICT = {OP_SEND_PADDING: [2, arg(ord, "num_padding_msgs"), arg(ord, "delay")],
+             OP_APP_HINT: [2, arg(str, "session_id"), arg(bool, "status")],
+             OP_BURST_HISTO: [3, arg((list, int), "histogram"), arg((list, int), "labels_ms"), arg(bool, "remove_toks")],
+             OP_GAP_HISTO: [3, arg((list, int), "histogram"), arg((list, int), "labels_ms"), arg(bool, "remove_toks")],
+             OP_INJECT_HISTO: [2, arg((list, int), "histogram"), arg((list, int), "labels_ms")],
+             OP_TOTAL_PAD: [0],
+             OP_PAYLOAD_PAD: [2, arg(str, "session_id"), arg(int, "delay")],
+             OP_BATCH_PAD: [3, arg(str, "session_id"), arg(int, "L"), arg(int, "delay")],
             }
 
 # Header length
 MIN_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
-CTRL_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN + CONTROL_LEN
+CTRL_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN + CONTROL_LEN + ARGSLENGTH_LEN
 
 # The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 1500

@@ -24,6 +24,9 @@ import tempfile
 import time
 import unittest
 
+import obfsproxy.common.log as logging
+
+log = logging.get_obfslogger()
 
 def diff(label, expected, received):
     """
@@ -56,6 +59,7 @@ class Obfsproxy(subprocess.Popen):
             argv.extend(args[0])
         else:
             argv.extend(args)
+        log.debug("COMMAND: %s" % " ".join(argv))
         subprocess.Popen.__init__(self, argv,
                                   stdin=open("/dev/null", "r"),
                                   stdout=subprocess.PIPE,

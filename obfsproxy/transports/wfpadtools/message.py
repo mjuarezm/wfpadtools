@@ -8,6 +8,7 @@ This module is basically the same as ScrambleSuit's message but modified to
 our protocol specification.
 """
 import random
+import json
 
 import obfsproxy.transports.base as base
 from obfsproxy.transports.scramblesuit import probdist
@@ -25,14 +26,14 @@ class WFPadMessage(object):
 
     The basic structure of a WFPad message is:
 
-   <-------------------------------  MTU  ------------------------------->
-    2 Bytes  2 Bytes  1 Byte      1 Byte     Variable <--- Up to MPU ---->
-  +--------+---------+-------+--------------+--------+----------+---------+
-  | Total  | Payload | Flags |    Opcode    |  Args  |  Payload | Padding |
-  | length | length  |       | (if CONTROL) |  (opt) |   (opt)  |  (opt)  |
-  +--------+---------+-------+--------------+--------+----------+---------+
+   <--------------------------------------  MTU  ------------------------------------->
+    2 Bytes  2 Bytes  1 Byte      1 Byte        2 Bytes   Variable <--- Up to MPU ---->
+  +--------+---------+-------+--------------+-------------+-------+----------+---------+
+  | Total  | Payload | Flags |    Opcode    | Args length | Args  |  Payload | Padding |
+  | length | length  |       | (if CONTROL) |    (opt)    | (opt) |   (opt)  |  (opt)  |
+  +--------+---------+-------+--------------+-------------+-------+----------+---------+
   <------- Min Header ------>
-  <-------------------  Header  --------------------> <------ Body ------>
+  <-------------------  Header  -------------------------> <---------- Body ---------->
 
       - Total length: message body length (payload length + padding length)
 
@@ -41,7 +42,7 @@ class WFPadMessage(object):
       - Flags: three possible flags so far:
           - DATA:     body payload contains Tor SOCKS data + padding
           - PADDING:  body only contains padding
-          - CONTROL:  body contains _opcode and arguments for control message
+          - CONTROL:  body contains opcode and arguments for control message
                       and piggybacks data in wfpad buffer that can be either
                       padding or Tor SOCKS data.
 
@@ -49,9 +50,14 @@ class WFPadMessage(object):
                                              the wfpad primitive to the
                                              endpoint.
 
+      - Args length (optional): length of the `Args` field. This is required
+                                for the message extractor to parse the args.
+                                It is optional, but must be specified if the
+                                `Args` field is not empty.
       - Args (optional): arguments for the wfpad primitive described by
-                         _opcode. Only specified if Flags=CONTROL but it is
-                         not mandatory.
+                         opcode. Only specified if Flags=CONTROL but it is
+                         not mandatory. Before each arg, we specify the length
+                         of it necessary for the parsing.
 
       - Payload (optional): contains Tor SOCKS data.
 
@@ -65,7 +71,7 @@ class WFPadMessage(object):
                          header.
     """
     def __init__(self, payload='', paddingLen=0, flags=const.FLAG_DATA,
-                        opcode=None, args=None):
+                        opcode=None, argsLen=0, args=""):
         """Create a new instance of `WFPadMessage`.
 
         Parameters
@@ -76,8 +82,10 @@ class WFPadMessage(object):
                      Length of the padding added at the end of the payload.
         flags : int
                 Flag indicating the type of message.
-        _opcode : int
+        opcode : int
                  Code of the operation, in case it is a control message.
+        argsTotalLen : int
+                  length of of all the arguments.
         args : list
                list that contains the arguments for the operations, in case
                it is a control message.
@@ -91,35 +99,35 @@ class WFPadMessage(object):
         self.payloadLen = payloadLen
         self.payload = payload
         self.flags = flags
-        self._opcode = opcode
+        self.opcode = opcode
         self.args = args
+        self.argsTotalLen = argsLen
+        self.argsLen = 0 if not args else len(self.args)
 
     def generatePadding(self):
         return (self.totalLen - self.payloadLen) * '\0'
 
     def __str__(self):
         """Return message as string."""
-        opCodeStr = argsStr = ''
+        opCodeStr = argsStr = argsLen = ""
 
         totalLenStr = pack.htons(self.totalLen)
         payloadLenStr = pack.htons(self.payloadLen)
         flagsStr = chr(self.flags)
         paddingStr = self.generatePadding()
 
-        if self._opcode:
-            opCodeStr = chr(self._opcode)
-        if self.args:
-            argsStr = ''.join(map(str, self.args))
-
-        header = totalLenStr + payloadLenStr + flagsStr + opCodeStr + argsStr
+        header = totalLenStr + payloadLenStr + flagsStr
+        if self.opcode:  # it's a control message
+            opCodeStr = chr(self.opcode)
+            argsLen = pack.htons(self.argsTotalLen)
+            header += opCodeStr + argsLen + self.args
 
         return header + self.payload + paddingStr
 
     def __len__(self):
         """Return the length of this protocol message."""
         if self.flags is const.FLAG_CONTROL:
-            argsLen = const.get_args_len(self._opcode)
-            return const.CTRL_HDR_LEN + argsLen + self.totalLen
+            return const.CTRL_HDR_LEN + self.argsLen + self.totalLen
         else:
             return const.MIN_HDR_LEN + self.totalLen
 
@@ -146,8 +154,27 @@ class WFPadMessageFactory(object):
         self.lenDist = newLenDist
 
     def createWFPadMessage(self, payload="", paddingLen=0,
-                           flags=const.FLAG_DATA, opcode=None, args=None):
-        return WFPadMessage(payload, paddingLen, flags, opcode, args)
+                           flags=const.FLAG_DATA, opcode=None,
+                           argsLen=0, args=None):
+        return WFPadMessage(payload, paddingLen, flags, opcode,
+                            argsLen, args)
+
+    def createWFPadControlMessages(self, opcode, args=None):
+        if not args:
+            return [self.createWFPadMessage(flags=const.FLAG_CONTROL,
+                                            opcode=opcode)]
+        messages = []
+        strArgs = json.dumps(args)
+        while len(strArgs) > 0:
+            argsLen = len(strArgs)
+            payloadLen = const.MPU_CTRL
+            # TODO: implement piggybacking
+            messages.append(self.createWFPadMessage(flags=const.FLAG_CONTROL,
+                                                    opcode=opcode,
+                                                    argsLen=argsLen,
+                                                    args=strArgs[:payloadLen]))
+            strArgs = strArgs[payloadLen:]
+        return messages
 
     def createWFPadMessages(self, data,
                             flags=const.FLAG_DATA, opcode=None, args=None):
@@ -158,20 +185,20 @@ class WFPadMessageFactory(object):
         """
         messages = []
         while len(data) > 0:
-            msgLen = self.lenDist.randomSample()
+            payloadLen = const.MPU
             dataLen = len(data)
-            if dataLen > msgLen:
-                messages.append(self.createWFPadMessage(data[:msgLen],
+            if dataLen > payloadLen:
+                messages.append(self.createWFPadMessage(data[:payloadLen],
                                                         flags=flags,
                                                         opcode=opcode,
                                                         args=args))
-                data = data[msgLen:]
+                data = data[payloadLen:]
             else:
                 messages.append(self.createWFPadMessage(data[:dataLen],
-                                             paddingLen=(msgLen - dataLen),
-                                                        flags=flags,
-                                                        opcode=opcode,
-                                                        args=args))
+                                             paddingLen=(payloadLen - dataLen),
+                                             flags=flags,
+                                             opcode=opcode,
+                                             args=args))
                 data = data[dataLen:]
         log.debug("Created %d protocol messages." % len(messages))
         return messages
@@ -194,9 +221,9 @@ def getFlagNames(flags):
 
 
 def getOpcodeNames(opcode):
-    """Return the _opcode encoded in the integer `_opcode` as string.
+    """Return the opcode encoded in the integer `opcode` as string.
 
-    This function is only useful for printing easy-to-read _opcode names in
+    This function is only useful for printing easy-to-read opcode names in
     debug log messages.
     """
     if opcode == const.OP_START:
@@ -249,16 +276,17 @@ def isSane(totalLen, payloadLen, flags):
            (flags in validFlags)
 
 
-def isOpCodeSane(opcode, args):
+def isOpCodeSane(opcode):
     """Verify the the extra control message fields are correct."""
 
-    log.debug("Control fields: _opcode=%d, args=%d"
-              % (opcode, args, getOpcodeNames(opcode)))
+    log.debug("Opcode: value=%s, name=%s"
+              % (opcode, getOpcodeNames(opcode)))
 
     validOpCodes = [
         const.OP_APP_HINT,
         const.OP_BATCH_PAD,
         const.OP_BURST_HISTO,
+        const.OP_GAP_HISTO,
         const.OP_IGNORE,
         const.OP_INJECT_HISTO,
         const.OP_PAYLOAD_PAD,
@@ -274,88 +302,122 @@ class WFPadMessageExtractor(object):
     """Extracts WFPad protocol messages out of the stream.
 
     We first parse all the fields up to the `flags` field. Then,
-    depending on the flag we continue parsing the _opcode, args and
-    payload.
+    depending on the flag we continue parsing the `opcode`, `args`
+    and `payload` fields.
     """
-    def __init__(self):
-        self.recvBuf = ""
-        self.totalLen = None
-        self.payloadLen = None
-        self.flags = None
 
-        self._opcode = None
-        self.args = []
-        self.ctrlHeaderLen = 0  #XZXZ Do we need this?
+    def __init__(self):
+        """Create a new WFPadMessageExtractor object."""
+        # Buffer data in stream
+        self.recvBuf    = ""
+
+        # Fields of WFPad message
+        self.totalLen       = None
+        self.payloadLen     = None
+        self.flags          = None
+        self.opcode         = None
+        self.argsTotalLen   = 0
+        self.ctrlHdrLen     = 0
+        self.argsParseLen   = 0
+        self.args           = ""
 
     def getMessageField(self, position, length):
-        """Return chunk in the buffer corresponding to a field."""
+        """Return chunk of `length` starting at `position` in the buffer."""
         return self.recvBuf[position:position + length]
+
+    def getFlags(self):
+        """Return `flags` field from buffer."""
+        return ord(self.getMessageField(const.FLAGS_POS,
+                                        const.FLAGS_LEN))
+
+    def getPayloadLen(self):
+        """Return `payloadLen` field from buffer."""
+        return pack.ntohs(self.getMessageField(const.PAYLOAD_POS,
+                                               const.PAYLOAD_LEN))
+
+    def getTotalLen(self):
+        """Return `totalLen` field from buffer."""
+        return pack.ntohs(self.getMessageField(const.TOTLENGTH_POS,
+                                               const.TOTLENGTH_LEN))
+
+    def getOpCode(self):
+        """Return `opcode` field from buffer."""
+        return ord(self.getMessageField(const.CONTROL_POS,
+                                        const.CONTROL_LEN))
+
+    def getArgsLen(self):
+        """Return `argsTotalLen` field from buffer."""
+        return pack.ntohs(self.getMessageField(const.ARGSLENGTH_POS,
+                                               const.ARGSLENGTH_LEN))
+
+    def getPayload(self, start):
+        """Return `payload` from buffer."""
+        totalPayload = self.getMessageField(start, self.totalLen)
+        return totalPayload[:self.payloadLen]  # Strip padding
 
     def reset(self):
         """Reset class properties to their initial value.
 
         We call this function whenever a new message has been processed
-        in order to reset the properties. We must store these values as
+        in order to reset its properties. We must store these values as
         class properties because we might not have the complete message
         in the buffer and we need to wait until we get more data.
         """
         # Remove part of the buffer that has already been processed
-        self.recvBuf = self.recvBuf[const.MIN_HDR_LEN + self.totalLen:]
+        if self.flags is const.FLAG_CONTROL:
+            self.recvBuf = self.recvBuf[const.CTRL_HDR_LEN + self.argsParseLen + self.totalLen:]
+        else:
+            self.recvBuf = self.recvBuf[const.MIN_HDR_LEN + self.totalLen:]
 
         # Set header fields to `None`
-        self.totalLen = self.payloadLen = self.flags = self._opcode = None
+        self.totalLen = self.payloadLen = self.flags = self.opcode = None
 
-        # Set args to empty list
-        self.args = []
+        # Set `args` to empty list
+        self.args = ""
+        self.argsTotalLen = 0
         self.ctrlHdrLen = 0
+        self.argsParseLen = 0
 
     def parseCommonHeaderFields(self):
         """Extract common header fields, if necessary."""
+        # Return if some of the fields has been already parsed
         if not self.totalLen == self.payloadLen == self.flags == None:
             return
-        self.totalLen = pack.ntohs(self.getMessageField(
-                                        const.TOTLENGTH_POS,
-                                        const.TOTLENGTH_LEN))
-        self.payloadLen = pack.ntohs(self.getMessageField(
-                                        const.PAYLOAD_POS,
-                                        const.PAYLOAD_LEN))
-        self.flags = ord(self.getMessageField(
-                                        const.FLAGS_POS,
-                                        const.FLAGS_LEN))
+
+        # Parse common header fields
+        self.totalLen   = self.getTotalLen()
+        self.payloadLen = self.getPayloadLen()
+        self.flags      = self.getFlags()
+
+        # Sanity check of the fields
         if not isSane(self.totalLen, self.payloadLen, self.flags):
             raise base.PluggableTransportError("Invalid header field.")
 
     def parseControlFields(self):
         """Extract control message fields."""
-        log.error("Parsing control fields")
-        if self._opcode == None:
-            return
-        log.error("Opcode: %s" % self._opcode)
-        self._opcode = ord(self.getMessageField(const.CONTROL_POS,
-                                         const.CONTROL_LEN))
-        if not isOpCodeSane(self._opcode):
+        # Parse `opcode`
+        if self.opcode == None:
+            self.opcode = self.getOpCode()
+
+        # Sanity check of the opcode
+        if not isOpCodeSane(self.opcode):
             raise base.PluggableTransportError("Invalid control "
-                                               "message _opcode.")
-        for arg in const.ARGS_DICT[self._opcode]:
-            try:
-                parsedArg = arg.type(self.getMessageField(
-                                            const.ARGS_POS,
-                                            len(arg)))
-            except:
-                raise base.PluggableTransportError("Invalid control message "
-                                                    "argument.")
-            self.args.append(parsedArg)
-        self.ctrlHdrLen = const.CTRL_HDR_LEN + const.get_args_len(self._opcode)
+                                               "message opcode.")
+
+        self.argsTotalLen = self.getArgsLen()
+
+        self.argsParseLen = const.MPU_CTRL if self.argsTotalLen > const.MPU_CTRL\
+                                        else self.argsTotalLen
+        self.args = self.getMessageField(const.ARGS_POS, self.argsParseLen)
+
+        self.ctrlHdrLen = const.CTRL_HDR_LEN + self.argsTotalLen
 
     def filterPaddingOut(self):
         """Filter padding messages out and remove data messages from buffer."""
-        if self.flags == const.FLAG_CONTROL:
-            # If it's a control message, extract payload for piggybacking
-            extracted = self.recvBuf[self.ctrlHdrLen:
-                     (self.totalLen + self.ctrlHdrLen)][:self.payloadLen]
-        else:
-            extracted = self.recvBuf[const.MIN_HDR_LEN:
-                     (self.totalLen + const.MIN_HDR_LEN)][:self.payloadLen]
+        # If it's a control message, extract payload for piggybacking
+        start = self.ctrlHdrLen if self.flags is const.FLAG_CONTROL \
+                else const.MIN_HDR_LEN
+        extracted = self.getPayload(start)
         return extracted
 
     def extract(self, data):
@@ -367,9 +429,9 @@ class WFPadMessageExtractor(object):
         self.recvBuf += data
         msgs = []
 
-        log.error("WORKING!!")
         # Keep trying to unpack as long as there is at least a header.
         while len(self.recvBuf) >= const.MIN_HDR_LEN:
+
             # Parse common header fields
             self.parseCommonHeaderFields()
 
@@ -378,15 +440,24 @@ class WFPadMessageExtractor(object):
                 break
 
             if self.flags is const.FLAG_CONTROL:
+
                 # Parse control message fields
                 self.parseControlFields()
+
                 if len(self.recvBuf) - self.ctrlHdrLen < self.totalLen:
                     break
 
+            # Extract data
             extracted = self.filterPaddingOut()
+
+            # Create WFPadMessage
             msgs.append(WFPadMessage(payload=extracted,
                                      flags=self.flags,
-                                     opcode=self._opcode,
+                                     opcode=self.opcode,
+                                     argsLen=self.argsTotalLen,
                                      args=self.args))
+
+            # Reset extractor attributes
             self.reset()
+
         return msgs

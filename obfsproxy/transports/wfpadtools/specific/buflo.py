@@ -16,15 +16,15 @@ class BuFLOShimObserver(WFPadShimObserver):
 
     def onSessionStarts(self):
         """Do operations to be done when session starts."""
-        log.error("A session has started.")
+        super(BuFLOShimObserver, self).onSessionStarts()
         print "XXXXXXXX START!"
         self.wfpad.startPadding()
-        self.wfpad.sendAppHintRequest()
+        self.wfpad.sendAppHintRequest(self.wfpad._sessionNumber)
         self.wfpad._visiting = True
 
     def onSessionEnds(self):
         """Do operations to be done when session ends."""
-        log.error("A session has ended.")
+        super(BuFLOShimObserver, self).onSessionEnds()
         self.wfpad._visiting = False
 
 
