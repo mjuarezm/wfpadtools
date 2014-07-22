@@ -179,6 +179,7 @@ class ReadWorker(object):
 
 SHIM_PORT  = 4997
 SOCKS_PORT  = 4998
+TESTSHIM_PORT = -1
 ENTRY_PORT  = 4999
 SERVER_PORT = 5000
 EXIT_PORT   = 5001
@@ -234,6 +235,17 @@ class DirectTest(TransportsSetUp):
 
         if report != "":
             self.fail("\n" + report)
+
+class DirectShimTest(DirectTest):
+
+        def setUp(self):
+            super(DirectShimTest, self).setUp()
+            self.shim_chan = connect_with_retry(("127.0.0.1", SHIM_PORT))
+            self.shim_chan.settimeout(SOCKET_TIMEOUT)
+
+        def tearDown(self):
+            self.shim_chan.close()
+            super(DirectShimTest, self).tearDown()
 
 #
 # Concrete test classes specialize the above base classes for each protocol.
@@ -319,14 +331,15 @@ class DirectScrambleSuit(DirectTest, unittest.TestCase):
         shutil.rmtree(self.tmpdir_srv)
         shutil.rmtree(self.tmpdir_cli)
 
-class DirectWFPad(DirectTest, unittest.TestCase):
+class DirectWFPad(DirectShimTest, unittest.TestCase):
     transport = "wfpad"
     server_args = ("wfpad", "server",
            "127.0.0.1:%d" % SERVER_PORT,
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = ("wfpad", "client",
-           "127.0.0.1:%d" % ENTRY_PORT,
-           "--dest=127.0.0.1:%d" % SERVER_PORT)
+            "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
+            "127.0.0.1:%d" % ENTRY_PORT,
+            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
 class DirectTestServer(DirectTest, unittest.TestCase):
     transport = "testserver"
@@ -337,7 +350,7 @@ class DirectTestServer(DirectTest, unittest.TestCase):
            "127.0.0.1:%d" % ENTRY_PORT,
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-class DirectBuFLO(DirectTest, unittest.TestCase):
+class DirectBuFLO(DirectShimTest, unittest.TestCase):
     transport = "buflo"
     server_args = ("buflo", "server",
            "127.0.0.1:%d" % SERVER_PORT,
@@ -347,7 +360,7 @@ class DirectBuFLO(DirectTest, unittest.TestCase):
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = ("buflo", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
-           "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
+           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
            "--period=0.1",
            "--psize=1448",
            "--mintime=2",
