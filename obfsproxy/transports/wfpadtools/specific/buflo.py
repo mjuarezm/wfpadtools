@@ -17,7 +17,7 @@ class BuFLOShimObserver(WFPadShimObserver):
         super(BuFLOShimObserver, self).onSessionStarts()
         log.debug("[buflo] observed the start of a new session.")
         self.wfpad.startPadding()
-        self.wfpad.sendAppHintRequest(self.wfpad._sessionNumber)
+        self.wfpad.sendAppHintRequest(self._sessId)
         self.wfpad._visiting = True
 
     def onSessionEnds(self):

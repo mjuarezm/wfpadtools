@@ -4,6 +4,31 @@ This module implements WFPadTools, a framework to develop link-padding-based
 WF countermeasures in Tor. It implements a faming layer for the Tor protocol
 that allows to introduce cover traffic and provides a set of primitives that
 can be used to implement more specific anti-website fingerprinting strategies.
+
+To use this framework, developers can extend the WFPadTransport, WFPadClient
+and WFPadServer classes and use their methods to implement the countermeasure.
+
+Note: this framework is intended for research purposes and it has the following
+limitations:
+
+- This module does not provide obfuscation of its protocol signature. That is
+  why it must be always combined with another transport that does provide it.
+  For example, the child transport that implements the final countermeasure
+  might take care of this.
+
+- It only pads until the bridge but in the typical website fingerprinting
+  scenario, the adversary might be sitting on the entry guard. Any final
+  website fingerprinting countermeasure should run padding until the middle
+  node in order to protect against this threat model.
+
+- For now we assume the user is browsing using a single tab. Right now the
+  SOCKS shim proxy (socks_shim.py module) cannot distinguish SOCKS requests
+  coming from different pages. In the future, in case these primitives are
+  ported to Tor, there might be easier ways to get this sort of information.
+
+- It provides tools for padding-based countermeasure. It shouldn't be used
+  for other type of strategies.
+
 """
 import json
 from sets import Set
@@ -24,55 +49,71 @@ log = logging.get_obfslogger()
 class WFPadShimObserver(object):
     """Observer class for the SOCKS's shim.
 
-    This class provides signaling to start and end of web page sessions.
-    We need to monitor how many sessions are currently pending by counting
-    connect/disconnect notifications.
+    This class provides methods to signal the start and end of web sessions.
+    It observes events from the proxy shim that indicate SOCKS requests from
+    FF, and it counts the alive connections to infer the life of a session.
+
+    `onSessionStarts()` and `onSessionEnds()` methods provide an interface for
+    transport classes implementing final WF countermeasures. These two methods
+    might be extended by the observers defined in these child transports.
     """
+    _sessId = 0
+    _sessions = {}
+
     def __init__(self, instanceWFPadTransport):
         """Instantiates a new `ShimObserver` object."""
-        self._connections = Set([])
         self.wfpad = instanceWFPadTransport
 
-    def getNumConnections(self):
-        """Return num of open connections."""
-        return len(self._connections)
+    def getNumConnections(self, sessId):
+        """Return the number of open connections for session `sessId`."""
+        if sessId not in self._sessions:
+            return 0
+        return len(self._sessions[sessId])
 
-    def onConnect(self, conn_id):
-        """A new connection starts."""
-        if self.getNumConnections() == 0:
-            self.onSessionStarts()
-        self._connections.add(conn_id)
+    def onConnect(self, connId):
+        """Add id of new connection to the set of open connections."""
+        if self.getNumConnections(self._sessId) == 0:
+            self._sessId += 1
+            self.onSessionStarts(connId)
+        if self._sessId in self._sessions:
+            self._sessions[self._sessId].add(connId)
+        else:
+            self._sessions[self._sessId] = Set([connId])
 
-    def onDisconnect(self, conn_id):
-        """An open connection finishes."""
-        if conn_id in self._connections:
-            self._connections.remove(conn_id)
-        if self.getNumConnections() == 0:
-            self.onSessionEnds()
+    def onDisconnect(self, connId):
+        """Remove id of connection to the set of open connections."""
+        if self._sessId in self._sessions and \
+            connId in self._sessions[self._sessId]:
+                self._sessions[self._sessId].remove(connId)
+        if self.getNumConnections(self._sessId) == 0:
+            self.onSessionEnds(connId)
+            if self._sessId in self._sessions:
+                del self._sessions[self._sessId]
 
-    def onSessionStarts(self):
-        """Do operations to be done when session starts."""
-        log.debug("[wfad] A session has started.")
-        self.wfpad._sessionNumber += 1
+    def onSessionStarts(self, connId):
+        """Sets wfpad's `_visiting` flag to `True`."""
+        log.debug("[wfad] Session %d begins." % connId)
         self.wfpad._visiting = True
 
-    def onSessionEnds(self):
-        """Do operations to be done when session ends."""
-        log.debug("[wfad] A session has ended.")
+    def onSessionEnds(self, connId):
+        """Sets wfpad's `_visiting` flag to `False`."""
+        log.debug("[wfad] Session %d ends." % connId)
         self.wfpad._visiting = False
 
 
 class WFPadTransport(BaseTransport):
-    """Implements the Tor WF framework to develop WF countermeasures.
+    """Implements the base class for the WFPadTools transport.
 
-    This class implements methods which implement primitives and protocols
-    specifications to further develop WF countermeasures.
+    This class provides the methods that implement primitives for
+    different existing website fingerprinting countermeasures, and
+    that can be used to generate even new ones that have not been
+    specified yet. This class also provides an interface for the
+    responses to these primitives of the other end.
     """
-    _sessionNumber = 0
-    _sendBuf = ""  # Buffer for outgoing data.
-    _elapsed = 0  # Count time spent on padding
-    _consecPaddingMsgs = 0  # Counter for padding messages
-    _visiting = False  # Indicates whether we are in the middle of a visit
+    _sendBuf = ""  # Buffer for outgoing data while transport is not connected.
+    _elapsed = 0  # Counts time spent on padding.
+    _consecPaddingMsgs = 0  # Counts number of consecutive padding messages.
+    _visiting = False  # Flags a visit to a page.
     _currentArgs = ""
 
     def __init__(self):
