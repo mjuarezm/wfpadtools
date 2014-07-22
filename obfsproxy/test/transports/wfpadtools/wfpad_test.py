@@ -1,15 +1,14 @@
-from os import listdir
-from os.path import join, isfile
-import pickle
-import time
-import unittest
-
 import obfsproxy.common.log as logging
 from obfsproxy.test import tester
-from obfsproxy.test.transports.wfpadtools.sttest import STTest
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools import util as ut
-from obfsproxy.test.transports.wfpadtools.webfp_tests import BuFLOTorTest
+from obfsproxy.test.transports.wfpadtools.sttest import STTest
+
+import time
+import pickle
+import unittest
+from os import listdir
+from os.path import join, isfile, exists
 
 DEBUG = False
 
@@ -22,6 +21,7 @@ if DEBUG:
 
 
 class TransportsSetUpTest(object):
+
     def setUp(self):
         self.obfs_client = tester.Obfsproxy(self.client_args)
 
@@ -32,19 +32,20 @@ class TransportsSetUpTest(object):
 class TestSetUp(TransportsSetUpTest):
 
     def setUp(self):
+        if exists(const.TEST_SERVER_DIR):
+            ut.removedir(const.TEST_SERVER_DIR)
+        ut.createdir(const.TEST_SERVER_DIR)
         super(TestSetUp, self).setUp()
-        self.output_reader = tester.ReadWorker(("127.0.0.1",
-                                                tester.EXIT_PORT))
-        ut.createdir(const.TEST_SERVER_DIR)  # Create temp dir
+        self.output_reader = tester.ReadWorker(("127.0.0.1", tester.EXIT_PORT))
         self.input_chan = tester.connect_with_retry(("127.0.0.1",
-                                                    tester.ENTRY_PORT))
+                                                     tester.ENTRY_PORT))
         self.input_chan.settimeout(tester.SOCKET_TIMEOUT)
 
     def tearDown(self):
-        super(TestSetUp, self).tearDown()
         self.output_reader.stop()
         self.input_chan.close()
-        ut.removedir(const.TEST_SERVER_DIR)  # Remove temp dir
+        super(TestSetUp, self).tearDown()
+        ut.removedir(const.TEST_SERVER_DIR)
 
     def direct_transfer(self):
         self.input_chan.sendall(tester.TEST_FILE)
@@ -85,26 +86,36 @@ class WFPadTests(TestSetUp, unittest.TestCase):
             for obsLength, _ in wrapper:
                 print obsLength
                 self.assertEqual(self.psize, obsLength,
-                                       "The observed period %s does not match"
-                                       " with the expected period %s"
+                                       "The observed size %s does not match"
+                                       " with the expected size %s"
                                        % (obsLength, self.psize))
 
 
-#@unittest.skip("")
+# @unittest.skip("")
 class BuFLOTests(TestSetUp, STTest):
     transport = "buflo"
-    period = 0.1
+    period = 1
     psize = 1448
     mintime = 2
     client_args = ("--test-server=127.0.0.1:%d" % tester.EXIT_PORT,
                    "buflo", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (tester.SHIM_PORT,
-                                           tester.SOCKS_PORT),
+                                           tester.TESTSHIM_PORT),
                    "--period=%d" % period,
                    "--psize=%d" % psize,
                    "--mintime=%d" % mintime,
                    "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+
+    def setUp(self):
+        super(BuFLOTests, self).setUp()
+        self.shim_chan = tester.connect_with_retry(("127.0.0.1",
+                                                    tester.SHIM_PORT))
+        self.shim_chan.settimeout(tester.SOCKET_TIMEOUT)
+
+    def tearDown(self):
+        self.shim_chan.close()
+        super(BuFLOTests, self).tearDown()
 
     def test_timing(self):
         super(BuFLOTests, self).direct_transfer()
@@ -123,20 +134,16 @@ class BuFLOTests(TestSetUp, STTest):
             for length, iat in wrapper:
                 print length, iat
                 self.assertEqual(self.psize, length,
-                                       "The observed period %s does not match"
-                                       " with the expected period %s"
+                                       "The observed size %s does not match"
+                                       " with the expected size %s"
                                        % (length, self.psize))
 
+    @unittest.skip("")
     def test_pad_when_visiting(self):
-        ut.get_page(url="http://127.0.0.1", port=tester.SHIM_PORT)
-#         shim_chan = tester.connect_with_retry(("127.0.0.1",
-#                                                     tester.SHIM_PORT))
-#         shim_chan.settimeout(tester.SOCKET_TIMEOUT)
         wrapper = self.load_wrappers()
         self.test_sizes()
         self.assertTrue(wrapper, "The number of messages received is not"
                         "sufficient: %d messages" % len(wrapper))
-#         shim_chan.close()
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

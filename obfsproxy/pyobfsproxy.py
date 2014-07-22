@@ -180,7 +180,6 @@ def pyobfsproxy():
         pt_config.setObfsproxyMode("external")
         try:
             # Run test server listening at the client's destination port
-            run_transport_setup(pt_config)
             launch_transport.launch_transport_listener("testserver",
                                                        args.dest,
                                                        "server",
