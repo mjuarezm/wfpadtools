@@ -52,13 +52,13 @@ class WFPadShimObserver(object):
 
     def onSessionStarts(self):
         """Do operations to be done when session starts."""
-        log.debug("A session has started.")
+        log.debug("[wfad] A session has started.")
         self.wfpad._sessionNumber += 1
         self.wfpad._visiting = True
 
     def onSessionEnds(self):
         """Do operations to be done when session ends."""
-        log.debug("A session has ended.")
+        log.debug("[wfad] A session has ended.")
         self.wfpad._visiting = False
 
 
@@ -77,7 +77,7 @@ class WFPadTransport(BaseTransport):
 
     def __init__(self):
         """Initialize a WFPadTransport object."""
-        log.debug("Initializing %s." % const.TRANSPORT_NAME)
+        log.debug("[wfad] Initializing %s." % const.TRANSPORT_NAME)
 
         super(WFPadTransport, self).__init__()
 
@@ -146,8 +146,6 @@ class WFPadTransport(BaseTransport):
         """
         self._state = const.ST_CONNECTED
         self.flushSendBuffer()
-        # Start padding link
-        #self.startPadding()
 
     def sendRemote(self, data, flags=const.FLAG_DATA):
         """Send data to the remote end once the connection is established.
@@ -156,7 +154,7 @@ class WFPadTransport(BaseTransport):
         protocol message(s) are sent over the wire.  The argument `flags'
         specifies the protocol message flags.
         """
-        log.debug("Processing %d bytes of outgoing data." % len(data))
+        log.debug("[wfad] Processing %d bytes of outgoing data." % len(data))
         if self._state is const.ST_PADDING:
             self._paddingBuffer.write(data)
         else:
@@ -185,15 +183,15 @@ class WFPadTransport(BaseTransport):
         payloadLen = msgTotalLen - const.MIN_HDR_LEN
         dataLen = len(self._paddingBuffer)
         if dataLen > 0:
-            log.debug("Data found in buffer. Flush buffer.")
+            log.debug("[wfad] Data found in buffer. Flush buffer.")
             if dataLen > payloadLen:
-                log.debug("Message with no padding.")
+                log.debug("[wfad] Message with no padding.")
                 data = self._paddingBuffer.read(payloadLen)
                 msg = self._msgFactory.createWFPadMessage(data,
                                                          opcode=opcode,
                                                          args=args)
             else:
-                log.debug("Message with padding.")
+                log.debug("[wfad] Message with padding.")
                 data = self._paddingBuffer.read()
                 paddingLen = payloadLen - dataLen
                 msg = self._msgFactory.createWFPadMessage(data,
@@ -201,7 +199,7 @@ class WFPadTransport(BaseTransport):
                                                          opcode=opcode,
                                                          args=args)
         else:
-            log.debug("Generate padding")
+            log.debug("[wfad] Generate padding")
             self._consecPaddingMsgs += 1
             msg = self._msgFactory.createWFPadMessage("",
                                                      payloadLen,
@@ -252,7 +250,7 @@ class WFPadTransport(BaseTransport):
         Data is written to the local application and padding messages are
         filtered out from the stream.
         """
-        log.debug("I'm going to parse protocol messages from data.")
+        log.debug("[wfad] I'm going to parse protocol messages from data.")
         if (data is None) or (len(data) == 0):
             return
 
@@ -263,14 +261,14 @@ class WFPadTransport(BaseTransport):
                 return
             # Forward data to the application.
             if msg.flags == const.FLAG_DATA:
-                log.debug("Data flag detected, relaying to data stream")
+                log.debug("[wfad] Data flag detected, relaying to data stream")
                 self.circuit.upstream.write(msg.payload)
             # Filter padding messages out.
             elif msg.flags == const.FLAG_PADDING:
-                log.debug("Padding message ignored.")
+                log.debug("[wfad] Padding message ignored.")
             elif msg.flags == const.FLAG_CONTROL:
                 print "MESSAGE CONTROL"
-                log.debug("Message with control data received.")
+                log.debug("[wfad] Message with control data received.")
                 self._currentArgs += msg.args
                 if not msg.argsTotalLen > len(self._currentArgs):
                     args = json.loads(self._currentArgs)
@@ -321,11 +319,11 @@ class WFPadTransport(BaseTransport):
         queued in the meanwhile in `self._sendBuf'.
         """
         if len(self._sendBuf) == 0:
-            log.debug("Send buffer is empty; nothing to flush.")
+            log.debug("[wfad] Send buffer is empty; nothing to flush.")
             return
 
         # Flush the buffered data, the application is so eager to send.
-        log.debug("Flushing %d bytes of buffered application data." %
+        log.debug("[wfad] Flushing %d bytes of buffered application data." %
                   len(self._sendBuf))
 
         self.sendRemote(self._sendBuf)
@@ -348,7 +346,7 @@ class WFPadTransport(BaseTransport):
             self.sendRemote(data.read())
         else:
             self._sendBuf += data.read()
-            log.debug("Buffered %d bytes of outgoing data." %
+            log.debug("[wfad] Buffered %d bytes of outgoing data." %
                       len(self._sendBuf))
 
     def receivedDownstream(self, data):

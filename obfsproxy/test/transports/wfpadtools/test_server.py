@@ -3,10 +3,10 @@ The test_server module implements a transport placed in between the
 transport client and transport server that dumps the state and messages
 received into a temporal file in order to be processed by the test module.
 """
-from obfsproxy.transports.dummy import DummyTransport
-from obfsproxy.transports.wfpadtools import const
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.util as ut
+from obfsproxy.transports.wfpadtools import const
+from obfsproxy.transports.dummy import DummyTransport
 
 import pickle
 from time import time
@@ -17,12 +17,10 @@ log = logging.get_obfslogger()
 
 class TestTransport(DummyTransport):
     _history = []
-    _circuitAlive = False
     _currentStartTime = 0
 
     def __init__(self):
         log.debug("Creating new instance of test server..")
-        self._circuitAlive = True
         self._tempDir = const.TEST_SERVER_DIR
         ut.createdir(self._tempDir)
         super(TestTransport, self).__init__()
@@ -50,13 +48,6 @@ class TestTransport(DummyTransport):
     def receivedUpstream(self, data):
         log.debug("Test server: upstream")
         super(TestTransport, self).receivedUpstream(data)
-
-    def circuitDestroyed(self, reason, side):
-        """Dump history to file if circuit is alive."""
-        if self._circuitAlive:
-            self.tempDump()
-            self._circuitAlive = False
-        super(TestTransport, self).circuitDestroyed(reason, side)
 
 
 class TestClient(TestTransport):
