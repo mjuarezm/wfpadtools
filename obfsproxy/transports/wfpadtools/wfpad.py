@@ -1,8 +1,9 @@
-"""The wfpad module implements the Tor WF framework to develop WF defenses.
+"""The wfpad module implements the WFPadTools pluggable transport.
 
-This module allows the development of various WF countermeasures based on
-link-padding. It implements a faming layer to introduce dummy messages into
-the stream and discard them at the other end.
+This module implements WFPadTools, a framework to develop link-padding-based
+WF countermeasures in Tor. It implements a faming layer for the Tor protocol
+that allows to introduce cover traffic and provides a set of primitives that
+can be used to implement more specific anti-website fingerprinting strategies.
 """
 import json
 from sets import Set
@@ -16,7 +17,6 @@ from obfsproxy.transports.wfpadtools import message, socks_shim
 from obfsproxy.transports.wfpadtools import util as ut
 import obfsproxy.transports.wfpadtools.const as const
 from obfsproxy.transports.wfpadtools.message import WFPadMessage
-
 
 log = logging.get_obfslogger()
 
