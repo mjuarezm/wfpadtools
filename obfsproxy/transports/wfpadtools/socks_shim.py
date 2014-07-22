@@ -102,6 +102,27 @@ class _ShimServerFactory(Factory):
     def buildProtocol(self, addr):
         return _ShimServerProtocol(self, self._shim, self._socks_port)
 
+class _ShimTestServerProtocol(Protocol):
+    _shim = None
+
+    def __init__(self, factory, shim):
+        self._shim = shim
+
+    def connectionMade(self):
+        self._id = self._shim.notifyConnect()
+
+    def connectionLost(self, reason):
+        self._shim.notifyDisconnect(self._id)
+
+class _ShimTestFactory(Factory):
+    _shim = None
+
+    def __init__(self, shim):
+        self._shim = shim
+
+    def buildProtocol(self, addr):
+        return _ShimTestServerProtocol(self, self._shim)
+
 class SocksShim(object):
     _observers = None
     _id = None
@@ -110,7 +131,10 @@ class SocksShim(object):
         self._observers = []
         self._id = 0
         ep = TCP4ServerEndpoint(reactor, shim_port, interface='127.0.0.1')
-        ep.listen(_ShimServerFactory(self, socks_port))
+        if socks_port == -1:
+            ep.listen(_ShimTestFactory(self))
+        else:
+            ep.listen(_ShimServerFactory(self, socks_port))
 
     def registerObserver(self, observer):
         self._observers.append(observer)
