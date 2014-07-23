@@ -56,8 +56,8 @@ def set_up_cli_parsing():
 
     parser.add_argument('--proxy', action='store', dest='proxy',
                         help='Outgoing proxy (<proxy_type>://[<user_name>][:<password>][@]<ip>:<port>)')
-    parser.add_argument('--test-server', type=addrport, action='store', dest='server_dest',
-                        help='--test-server server_dest')
+    parser.add_argument('--test-server', action='store', dest='testserv_arg',
+                        help='--test-server testserv_arg')
 
     # Managed mode is a subparser for now because there are no
     # optional subparsers: bugs.python.org/issue9253
@@ -170,23 +170,25 @@ def pyobfsproxy():
 
     # Fire up our heartbeat.
     l = task.LoopingCall(heartbeat.heartbeat.talk)
-    l.start(3600.0, now=False) # do heartbeat every hour
+    l.start(3600.0, now=False)  # do heartbeat every hour
 
     # Initiate the test server.
-    if args.server_dest:
+    if args.testserv_arg:
+        test_transp, server_dest = args.testserv_arg.split(",")
+        print test_transp, server_dest, args.testserv_arg
         pt_config = transport_config.TransportConfig()
         pt_config.setStateLocation(args.data_dir)
         pt_config.setListenerMode("server")
         pt_config.setObfsproxyMode("external")
         try:
             # Run test server listening at the client's destination port
-            launch_transport.launch_transport_listener("testserver",
+            launch_transport.launch_transport_listener(test_transp,
                                                        args.dest,
                                                        "server",
-                                                       args.server_dest,
+                                                       server_dest,
                                                        pt_config)
             log.info("Launched 'test-server' listener at '%s:%s' and destination '%s:%s'." %\
-                 (log.safe_addr_str(args.dest[0]), args.dest[1], log.safe_addr_str(args.server_dest[0]), args.server_dest[1]))
+                 (log.safe_addr_str(args.dest[0]), args.dest[1], log.safe_addr_str(server_dest[0]), server_dest[1]))
         except Exception as e:
             log.error('Failed to initialize the test server: %s', e)
             sys.exit(1)

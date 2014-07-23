@@ -63,6 +63,8 @@ class WFPadShimObserver(object):
     def __init__(self, instanceWFPadTransport):
         """Instantiates a new `ShimObserver` object."""
         self.wfpad = instanceWFPadTransport
+        self._sessions = {}
+        self._sessId = 0
 
     def getNumConnections(self, sessId):
         """Return the number of open connections for session `sessId`."""
@@ -162,9 +164,11 @@ class WFPadTransport(BaseTransport):
         """Validates the arguments calling the parent's method."""
         parentalApproval = super(
             WFPadTransport, cls).validate_external_mode_cli(args)
+
         if not parentalApproval:
             raise PluggableTransportError(
                 "Pluggable Transport args invalid: %s" % args)
+
         cls.shim_args = None
         if args.shim:
             cls.shim_args = args.shim.split(',')
@@ -296,7 +300,7 @@ class WFPadTransport(BaseTransport):
                                                      args=args)
         self.sendMessagesDownstream([msg])
 
-        # Compute the delay for the next message. 
+        # Compute the delay for the next message.
         delay = self.drawFlushDelay()
         self._elapsed += delay
         reactor.callLater(delay, self.flushPaddingBuffer)
@@ -320,7 +324,13 @@ class WFPadTransport(BaseTransport):
             log.exception("[wfpad] Exception extracting "
                           "messages from stream: %s" % str(e))
 
+        msgsDicts = []
         for msg in msgs:
+            msgDict = {"opcode": msg.opcode,
+                        "payload": msg.payload,
+                        "args": msg.args,
+                        "flags": msg.flags}
+
             if (msgs is None) or (len(msgs) == 0):
                 return
 
@@ -332,24 +342,25 @@ class WFPadTransport(BaseTransport):
             # Filter padding messages out.
             elif msg.flags == const.FLAG_PADDING:
                 log.debug("[wfad] Padding message ignored.")
+                pass
 
             # Process control messages
             elif msg.flags == const.FLAG_CONTROL:
                 log.debug("[wfad] Message with control data received.")
                 self._currentArgs += msg.args
+                continue
 
-                # We need to wait until we have all the args 
+                # We need to wait until we have all the args
                 if not msg.argsTotalLen > len(self._currentArgs):
                     args = json.loads(self._currentArgs)
                     self.circuit.upstream.write(msg.payload)
                     self.receiveControlMessage(msg.opcode, args)
+                    msgDict["args"] = self._currentArgs
                     self._currentArgs = ""
 
             # Otherwise, flag not recognized
             else:
                 log.warning("Invalid message flags: %d." % msg.flags)
-
-        return msgs
 
     def drawMessageLength(self):
         """Return length for a specific message.

@@ -61,15 +61,6 @@ class BuFLOTransport(WFPadTransport):
         cls.weAreServer = not cls.weAreClient
         cls.weAreExternal = transportConfig.weAreExternal
 
-    def circuitConnected(self):
-        """Initiate handshake.
-
-        This method is only relevant for clients since servers never initiate
-        handshakes.
-        """
-        self._state = const.ST_CONNECTED
-        self.flushSendBuffer()
-
     def circuitDestroyed(self, reason, side):
         """Unregister shim observers."""
         if self.weAreClient:
@@ -79,7 +70,7 @@ class BuFLOTransport(WFPadTransport):
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
-        """Register CLI arguments."""
+        """Register CLI arguments for BuFLO parameters."""
         subparser.add_argument("--period",
                                required=False,
                                type=float,

@@ -17,7 +17,8 @@ transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyCl
                'obfs3' : {'base': obfs3.Obfs3Transport, 'client' : obfs3.Obfs3Client, 'server' : obfs3.Obfs3Server },
                'wfpad': {'base': wfpad.WFPadTransport, 'client': wfpad.WFPadClient, 'server': wfpad.WFPadServer},
                'buflo': {'base': buflo.BuFLOTransport, 'client': buflo.BuFLOClient, 'server': buflo.BuFLOServer},
-               'testserver': {'base': test_serv.TestTransport, 'client': test_serv.TestClient, 'server': test_serv.TestServer} }
+               'wfpadtest': {'base': test_serv.WFPadTestTransport, 'client': test_serv.WFPadTestClient, 'server': test_serv.WFPadTestServer},
+               'dummytest': {'base': test_serv.DummyTestTransport, 'client': test_serv.DummyTestClient, 'server': test_serv.DummyTestServer} }
 
 def get_transport_class(name, role):
     # Rewrite equivalent roles.

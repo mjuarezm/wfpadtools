@@ -212,7 +212,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             log.debug("No session ticket to redeem.  Running UniformDH.")
             self.circuit.downstream.write(self.uniformdh.createHandshake())
 
-    def sendRemote( self, data, flags=const.FLAG_PAYLOAD ):
+    def pushData( self, data, flags=const.FLAG_PAYLOAD ):
         """
         Send data to the remote end after a connection was established.
 
@@ -347,7 +347,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         log.debug("Flushing %d bytes of buffered application data." %
                   len(self._sendBuf))
 
-        self.sendRemote(self._sendBuf)
+        self.pushData(self._sendBuf)
         self._sendBuf = ""
 
     def receiveTicket( self, data ):
@@ -425,7 +425,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         """
 
         if self.protoState == const.ST_CONNECTED:
-            self.sendRemote(data.read())
+            self.pushData(data.read())
 
         # Buffer data we are not ready to transmit yet.
         else:
@@ -444,9 +444,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
         log.debug("Sending a new session ticket and the PRNG seed to the " \
                   "client.")
 
-        self.sendRemote(ticket.issueTicketAndKey(self.srvState),
+        self.pushData(ticket.issueTicketAndKey(self.srvState),
                         flags=const.FLAG_NEW_TICKET)
-        self.sendRemote(self.srvState.prngSeed,
+        self.pushData(self.srvState.prngSeed,
                         flags=const.FLAG_PRNG_SEED)
         self.flushSendBuffer()
 
