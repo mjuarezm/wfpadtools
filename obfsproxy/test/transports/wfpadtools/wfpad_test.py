@@ -13,7 +13,7 @@ from os import listdir
 from os.path import join, isfile, exists
 from obfsproxy.common import transport_config
 
-DEBUG = False
+DEBUG = True
 
 # Logging settings:
 log = logging.get_obfslogger()
@@ -48,7 +48,7 @@ class TestSetUp(TransportsSetUpTest):
         self.output_reader.stop()
         self.input_chan.close()
         super(TestSetUp, self).tearDown()
-        ut.removedir(const.TEST_SERVER_DIR)
+        #ut.removedir(const.TEST_SERVER_DIR)
 
     def direct_transfer(self):
         self.input_chan.sendall(tester.TEST_FILE)
@@ -61,7 +61,7 @@ class TestSetUp(TransportsSetUpTest):
                         if isfile(join(const.TEST_SERVER_DIR, f))]
 
 
-@unittest.skip("")
+#@unittest.skip("")
 class WFPadTests(TestSetUp, unittest.TestCase):
     transport = "wfpad"
     period = 0.1
@@ -74,9 +74,11 @@ class WFPadTests(TestSetUp, unittest.TestCase):
     def test_timing(self):
         super(WFPadTests, self).direct_transfer()
         for wrapper in self.load_wrappers():
+            print wrapper
             for _, obsIat in wrapper:
                 print obsIat
-                self.assertAlmostEqual(self.period, obsIat,
+                self.assertAlmostEqual(self.period,
+                                       obsIat,
                                        None,
                                        "The observed period %s does not match"
                                        " with the expected period %s"
@@ -86,15 +88,17 @@ class WFPadTests(TestSetUp, unittest.TestCase):
     def test_sizes(self):
         super(WFPadTests, self).direct_transfer()
         for wrapper in self.load_wrappers():
+            print wrapper
             for obsLength, _ in wrapper:
                 print obsLength
-                self.assertEqual(self.psize, obsLength,
-                                       "The observed size %s does not match"
-                                       " with the expected size %s"
-                                       % (obsLength, self.psize))
+                self.assertEqual(self.psize,
+                                 obsLength,
+                                 "The observed size %s does not match"
+                                 " with the expected size %s"
+                                 % (obsLength, self.psize))
 
 
-# @unittest.skip("")
+@unittest.skip("")
 class BuFLOTests(TestSetUp, STTest):
     transport = "buflo"
     period = 1
@@ -112,6 +116,7 @@ class BuFLOTests(TestSetUp, STTest):
 
     def setUp(self):
         super(BuFLOTests, self).setUp()
+        # Make request to shim
         self.shim_chan = tester.connect_with_retry(("127.0.0.1",
                                                     tester.SHIM_PORT))
         self.shim_chan.settimeout(tester.SOCKET_TIMEOUT)
@@ -123,6 +128,7 @@ class BuFLOTests(TestSetUp, STTest):
     def test_timing(self):
         super(BuFLOTests, self).direct_transfer()
         for wrapper in self.load_wrappers():
+            print wrapper
             for _, obsIat in wrapper:
                 self.assertAlmostEqual(self.period, obsIat,
                                        None,
@@ -134,6 +140,7 @@ class BuFLOTests(TestSetUp, STTest):
     def test_sizes(self):
         super(BuFLOTests, self).direct_transfer()
         for wrapper in self.load_wrappers():
+            print wrapper
             for length, iat in wrapper:
                 print length, iat
                 self.assertEqual(self.psize, length,

@@ -175,7 +175,6 @@ def pyobfsproxy():
     # Initiate the test server.
     if args.testserv_arg:
         test_transp, server_dest = args.testserv_arg.split(",")
-        print test_transp, server_dest, args.testserv_arg
         pt_config = transport_config.TransportConfig()
         pt_config.setStateLocation(args.data_dir)
         pt_config.setListenerMode("server")

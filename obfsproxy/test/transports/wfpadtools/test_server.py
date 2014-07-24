@@ -17,16 +17,11 @@ log = logging.get_obfslogger()
 
 
 class DumpingInterface(object):
-    _currentStartTime = 0
+    _history = []
     _tempDir = const.TEST_SERVER_DIR
-    _currentIat = 0
 
     def __init__(self):
         ut.createdir(self._tempDir)
-
-    def getIat(self):
-        """Return inter-arrival time."""
-        self._currentIat = time() - self._currentStartTime
 
     def parseData(self, data):
         """Interface to parse data."""
@@ -35,33 +30,27 @@ class DumpingInterface(object):
     def tempDump(self, obj):
         """Dump data to temp file."""
         parsed = self.parseData(obj)
-
-        file_tranport = join(self._tempDir, \
-                 "%s_%s" % (str(id(self)), str(id(obj))))
-
-        with open(file_tranport, "w") as f:
-            pickle.dump(parsed, f)
-
-    def setStartTime(self, t=None):
-        if time:
-            self._currentStartTime = t
+        if type(parsed) is list:
+            dumpObj = self._history + parsed
         else:
-            self._currentStartTime = time()
+            dumpObj = self._history.append(parsed)
+        file_tranport = join(self._tempDir, str(id(self)))
+        with open(file_tranport, "w") as f:
+            pickle.dump(dumpObj, f)
 
 
 class WFPadTestTransport(WFPadTransport, DumpingInterface):
 
     def __init__(self):
-        super(WFPadTestTransport, self).__init__()
-        pass
+        DumpingInterface.__init__(self)
 
     def msg2dict(self, msg):
-        """Return dictionary representation of a wfpad message."""
+        """Return a dictionary representation of a wfpad message."""
         return {"opcode": msg.opcode,
                 "payload": msg.payload,
                 "args": msg.args,
                 "flags": msg.flags,
-                "iat": self._currentIat,
+                "time": time(),
                 }
 
     def parseData(self, data):
@@ -74,7 +63,6 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
 
     def receivedDownstream(self, data):
         super(WFPadTestTransport, self).receivedDownstream(data)
-        self.setStartTime()
 
 
 class WFPadTestClient(WFPadTestTransport):
@@ -87,12 +75,14 @@ class WFPadTestServer(WFPadTestTransport, DumpingInterface):
 
 class DummyTestTransport(DummyTransport, DumpingInterface):
 
+    def __init__(self):
+        DumpingInterface.__init__(self)
+
     def parseData(self, data):
-        return (self._currentIat, len(data))
+        return (time(), len(data))
 
     def receivedDownstream(self, data):
         super(DummyTestTransport, self).receivedDownstream(data)
-        self.setStartTime()
         self.tempDump(data)
 
 

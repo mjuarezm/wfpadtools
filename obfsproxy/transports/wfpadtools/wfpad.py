@@ -191,7 +191,8 @@ class WFPadTransport(BaseTransport):
         """Initiate handshake.
 
         This method is only relevant for clients since servers never initiate
-        handshakes. (TODO)
+        handshakes.
+        # TODO: implement handshake
         """
         # Change state to ST_CONNECTED
         self._state = const.ST_CONNECTED
