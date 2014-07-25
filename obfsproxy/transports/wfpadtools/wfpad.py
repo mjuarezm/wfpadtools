@@ -121,7 +121,6 @@ class WFPadTransport(BaseTransport):
     def __init__(self):
         """Initialize a WFPadTransport object."""
         log.debug("[wfad] Initializing %s." % const.TRANSPORT_NAME)
-
         super(WFPadTransport, self).__init__()
 
         # Initialize the protocol's state machine.
@@ -241,6 +240,13 @@ class WFPadTransport(BaseTransport):
                                             args=args)
             self.sendMessagesDownstream(msgs)
 
+    def sendMessage(self, payload="", paddingLen=0, flags=const.FLAG_DATA):
+        """Send message over the wire."""
+        msg = self._msgFactory.createWFPadMessage(payload,
+                                                   paddingLen,
+                                                   flags)
+        self.sendMessagesDownstream([msg])
+
     def sendControlMessages(self, opcode, args):
         """Send control messages."""
         msgs = self._msgFactory.createWFPadControlMessages(opcode, args)
@@ -319,18 +325,18 @@ class WFPadTransport(BaseTransport):
             return
 
         # Try to extract protocol messages.
+        msgs = []
+        print "XXX TRY...."
         try:
             msgs = self._msgExtractor.extract(data)
+            print "XXX MSGS1:", msgs
         except Exception, e:
+            print str(e)
             log.exception("[wfpad] Exception extracting "
                           "messages from stream: %s" % str(e))
 
-        msgsDicts = []
+        print "XXX MSGS", msgs
         for msg in msgs:
-            msgDict = {"opcode": msg.opcode,
-                        "payload": msg.payload,
-                        "args": msg.args,
-                        "flags": msg.flags}
 
             if (msgs is None) or (len(msgs) == 0):
                 return
@@ -347,17 +353,22 @@ class WFPadTransport(BaseTransport):
 
             # Process control messages
             elif msg.flags == const.FLAG_CONTROL:
-                log.debug("[wfad] Message with control data received.")
-                self._currentArgs += msg.args
-                continue
+                print "XXX OPCODE:", msg.opcode
 
-                # We need to wait until we have all the args
-                if not msg.argsTotalLen > len(self._currentArgs):
-                    args = json.loads(self._currentArgs)
-                    self.circuit.upstream.write(msg.payload)
-                    self.receiveControlMessage(msg.opcode, args)
-                    msgDict["args"] = self._currentArgs
-                    self._currentArgs = ""
+                if msg.args:
+                    print "XXX ARGS"
+                    log.debug("[wfad] Message with control data received.")
+                    self._currentArgs += msg.args
+                    continue
+
+                    # We need to wait until we have all the args
+                    if not msg.argsTotalLen > len(self._currentArgs):
+                        args = json.loads(self._currentArgs)
+                        self.circuit.upstream.write(msg.payload)
+                        self.receiveControlMessage(msg.opcode, args)
+                        self._currentArgs = ""
+                else:
+                    self.receiveControlMessage(msg.opcode)
 
             # Otherwise, flag not recognized
             else:
@@ -416,26 +427,32 @@ class WFPadTransport(BaseTransport):
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream.
 
-        Whenever data from the other end arrives, push it if we
-        are already connected, or buffer it meanwhile otherwise.
+        Whenever data from Tor arrives, push it if we are already
+        connected, or buffer it meanwhile otherwise.
         """
+        d = data.read()
+        print "UP"
         if self._state >= const.ST_CONNECTED:
-            self.pushData(data.read())
+            self.pushData(d)
         else:
-            self._sendBuf += data.read()
+            self._sendBuf += d
             log.debug("[wfad] Buffered %d bytes of outgoing data." %
                       len(self._sendBuf))
 
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
+        d = data.read()
+        print "DOWN", d
         if self._state >= const.ST_CONNECTED:
-            self.processMessages(data.read())
+            self.processMessages(d)
 
     #==========================================================================
     # Methods to deal with control messages
     #==========================================================================
     def receiveControlMessage(self, opcode, args=None):
         """Do operation indicated by the _opcode."""
+        print "RCVD CTRL", opcode
+
         log.error("Received control message with opcode %d and args: %s"
                   % (opcode, args))
         if opcode == const.OP_START:
@@ -474,11 +491,15 @@ class WFPadTransport(BaseTransport):
     def sendIgnore(self, N=1):
         """Reply with a padding message."""
         for _ in xrange(N):
-            reactor.callLater(0, self.flushPaddingBuffer)
+            reactor.callLater(0, self.sendMessage,
+                              payload="",
+                              paddingLen=const.MPU,
+                              flags=const.FLAG_PADDING)
 
     def sendPadding(self, N, t):
         """Reply with `N` padding messages delayed `t` ms."""
-        reactor.callLater(t, self.sendIgnore, N)
+        print "XXX SENDIGNORE"
+        self.sendIgnore(N)
 
     def appHint(self, sessId, status):
         """Provides information to the server about the current session.
@@ -562,6 +583,7 @@ class WFPadTransport(BaseTransport):
     #==========================================================================
     def sendControlMessage(self, opcode, args=None, delay=0):
         """Send a message with a specific _opcode field."""
+        print "XXX SNDCTRL", opcode
         reactor.callLater(delay,
                           self.sendControlMessages,
                           opcode=opcode,

@@ -25,6 +25,7 @@ import time
 import unittest
 
 import obfsproxy.common.log as logging
+from obfsproxy.transports.wfpadtools import const
 
 log = logging.get_obfslogger()
 
@@ -348,6 +349,7 @@ class DirectWFPad(DirectShimTest, unittest.TestCase):
             "127.0.0.1:%d" % ENTRY_PORT,
             "--dest=127.0.0.1:%d" % SERVER_PORT)
 
+#@unittest.skip("")
 class DirectWFpadTestServer(DirectTest, unittest.TestCase):
     transport = "wfpadtest"
     server_args = ("wfpadtest", "server",
@@ -356,6 +358,17 @@ class DirectWFpadTestServer(DirectTest, unittest.TestCase):
     client_args = ("wfpadtest", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
            "--dest=127.0.0.1:%d" % SERVER_PORT)
+
+@unittest.skip("It fails, though still helpful.")
+class DirectWFpadTestServerExternal(DirectTest, unittest.TestCase):
+    transport = "wfpad"
+    server_args = ("wfpadtest", "server",
+           "127.0.0.1:%d" % 5555,
+           "--dest=127.0.0.1:%d" % 6666)
+    client_args = ("--test-server=wfpadtest,127.0.0.1:%d" % EXIT_PORT,
+                   "wfpad", "client",
+                   "127.0.0.1:%d" % ENTRY_PORT,
+                   "--dest=127.0.0.1:%d" % SERVER_PORT)
 
 @unittest.skip("")
 class DirectDummyTestServer(DirectTest, unittest.TestCase):
@@ -384,46 +397,8 @@ class DirectBuFLO(DirectShimTest, unittest.TestCase):
            "--mintime=2",
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-TEST_FILE = """\
-THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
-THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
-THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
-THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
+TEST_FILE = "TEST:" + str(const.OP_IGNORE) + ";"
 
-"Can entropy ever be reversed?"
-"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
-"Can entropy ever be reversed?"
-"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
-"Can entropy ever be reversed?"
-"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
-"Can entropy ever be reversed?"
-"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
-"Can entropy ever be reversed?"
-"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
-"Can entropy ever be reversed?"
-"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
-"Can entropy ever be reversed?"
-"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
-"Can entropy ever be reversed?"
-"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
-
-    In obfuscatory age geeky warfare did I wage
-      For hiding bits from nasty censors' sight
-    I was hacker to my set in that dim dark age of net
-      And I hacked from noon till three or four at night
-
-    Then a rival from Helsinki said my protocol was dinky
-      So I flamed him with a condescending laugh,
-    Saying his designs for stego might as well be made of lego
-      And that my bikeshed was prettier by half.
-
-    But Claude Shannon saw my shame. From his noiseless channel came
-       A message sent with not a wasted byte
-    "There are nine and sixty ways to disguise communiques
-       And RATHER MORE THAN ONE OF THEM IS RIGHT"
-
-		    (apologies to Rudyard Kipling.)
-"""
 
 if __name__ == '__main__':
     unittest.main()

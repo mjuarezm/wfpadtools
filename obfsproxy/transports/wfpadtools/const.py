@@ -88,7 +88,11 @@ class arg(object):
 def get_args_len(self, opcode):
     return sum(map(len, ARGS_DICT[opcode]))
 
-ARGS_DICT = {OP_SEND_PADDING: [2, arg(ord, "num_padding_msgs"), arg(ord, "delay")],
+ARGS_DICT = {
+             OP_START: [0],
+             OP_STOP: [0],
+             OP_IGNORE: [0],
+             OP_SEND_PADDING: [2, arg(ord, "num_padding_msgs"), arg(ord, "delay")],
              OP_APP_HINT: [2, arg(str, "session_id"), arg(bool, "status")],
              OP_BURST_HISTO: [3, arg((list, int), "histogram"), arg((list, int), "labels_ms"), arg(bool, "remove_toks")],
              OP_GAP_HISTO: [3, arg((list, int), "histogram"), arg((list, int), "labels_ms"), arg(bool, "remove_toks")],
@@ -100,7 +104,7 @@ ARGS_DICT = {OP_SEND_PADDING: [2, arg(ord, "num_padding_msgs"), arg(ord, "delay"
 
 # Header length
 MIN_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
-CTRL_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN + CONTROL_LEN + ARGSLENGTH_LEN
+CTRL_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN + CONTROL_LEN
 
 # The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 1500

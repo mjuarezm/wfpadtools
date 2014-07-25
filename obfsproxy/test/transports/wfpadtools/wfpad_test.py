@@ -12,6 +12,8 @@ from sets import Set
 from os import listdir
 from os.path import join, isfile, exists
 from obfsproxy.common import transport_config
+from time import sleep
+from obfsproxy.test.tester import TransportsSetUp
 
 DEBUG = True
 
@@ -23,16 +25,7 @@ if DEBUG:
     log.set_log_severity('debug')
 
 
-class TransportsSetUpTest(object):
-
-    def setUp(self):
-        self.obfs_client = tester.Obfsproxy(self.client_args)
-
-    def tearDown(self):
-        self.obfs_client.stop()
-
-
-class TestSetUp(TransportsSetUpTest):
+class TestSetUp(TransportsSetUp):
 
     def setUp(self):
         if exists(const.TEST_SERVER_DIR):
@@ -50,10 +43,13 @@ class TestSetUp(TransportsSetUpTest):
         super(TestSetUp, self).tearDown()
         #ut.removedir(const.TEST_SERVER_DIR)
 
-    def direct_transfer(self):
-        self.input_chan.sendall(tester.TEST_FILE)
-        time.sleep(2)
+    def send_to_transport(self, data):
+        self.input_chan.sendall(data)
+        time.sleep(5)
         self.input_chan.close()
+
+    def direct_transfer(self):
+        self.send_to_transport(tester.TEST_FILE)
 
     def load_wrappers(self):
         return [pickle.load(open(join(const.TEST_SERVER_DIR, f)))
@@ -62,50 +58,42 @@ class TestSetUp(TransportsSetUpTest):
 
 
 #@unittest.skip("")
-class WFPadTests(TestSetUp, unittest.TestCase):
-    transport = "wfpad"
-    period = 0.1
-    psize = 1448
-    client_args = ("--test-server=wfpadtest,127.0.0.1:%d" % tester.EXIT_PORT,
-                   "wfpad", "client",
-                   "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+class WFPadTests(TestSetUp, STTest):
+    transport = "wfpadtest"
+    server_args = ("wfpadtest", "server",
+           "127.0.0.1:%d" % tester.SERVER_PORT,
+           "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
+    client_args = ("wfpadtest", "client",
+           "127.0.0.1:%d" % tester.ENTRY_PORT,
+           "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
 
-    def test_timing(self):
-        super(WFPadTests, self).direct_transfer()
-        for wrapper in self.load_wrappers():
-            print wrapper
-            for _, obsIat in wrapper:
-                print obsIat
-                self.assertAlmostEqual(self.period,
-                                       obsIat,
-                                       None,
-                                       "The observed period %s does not match"
-                                       " with the expected period %s"
-                                       % (obsIat, self.period),
-                                       delta=0.05)
-
-    def test_sizes(self):
-        super(WFPadTests, self).direct_transfer()
-        for wrapper in self.load_wrappers():
-            print wrapper
-            for obsLength, _ in wrapper:
-                print obsLength
-                self.assertEqual(self.psize,
-                                 obsLength,
-                                 "The observed size %s does not match"
-                                 " with the expected size %s"
-                                 % (obsLength, self.psize))
+    def test_send_ignore_message(self):
+        self.send_to_transport("TEST:" + str(const.OP_IGNORE) + ";")
+        time.sleep(2)
+        wrappers = self.load_wrappers()
+        print wrappers
+        for wrapper in wrappers:
+            print "XX", wrapper, wrapper[0]['opcode']
+            print "XXX", [msg['opcode']
+                            for msg in wrapper]
+#                             if msg['opcode'] == const.OP_IGNORE]
+            self.assertTrue([msg['opcode']
+                            for msg in wrapper
+                            if msg['opcode'] and msg['opcode'] == const.OP_IGNORE],
+                            "Server did not receive the control message"
+                            " with opcode: %s" % const.OP_IGNORE)
 
 
 @unittest.skip("")
-class BuFLOTests(TestSetUp, STTest):
+class ExternalBuFLOTests(TestSetUp, STTest):
     transport = "buflo"
     period = 1
     psize = 1448
     mintime = 2
-    client_args = ("--test-server=wfpadtest,127.0.0.1:%d" % tester.EXIT_PORT,
-                   "buflo", "client",
+    server_args = ("dummytest", "server",
+                   "127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
+    client_args = ("buflo", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (tester.SHIM_PORT,
                                            tester.TESTSHIM_PORT),
@@ -115,22 +103,26 @@ class BuFLOTests(TestSetUp, STTest):
                    "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
 
     def setUp(self):
-        super(BuFLOTests, self).setUp()
+        super(ExternalBuFLOTests, self).setUp()
         # Make request to shim
         self.shim_chan = tester.connect_with_retry(("127.0.0.1",
                                                     tester.SHIM_PORT))
         self.shim_chan.settimeout(tester.SOCKET_TIMEOUT)
+        sleep(2)
 
     def tearDown(self):
         self.shim_chan.close()
-        super(BuFLOTests, self).tearDown()
+        super(ExternalBuFLOTests, self).tearDown()
 
     def test_timing(self):
-        super(BuFLOTests, self).direct_transfer()
+        super(ExternalBuFLOTests, self).direct_transfer()
         for wrapper in self.load_wrappers():
             print wrapper
-            for _, obsIat in wrapper:
-                self.assertAlmostEqual(self.period, obsIat,
+            if len(wrapper) > 2:
+                iats = [wrapper[i + 1][1] - wrapper[i][1]
+                            for i in range(len(wrapper[1:]))]
+                for obsIat in iats:
+                    self.assertAlmostEqual(self.period, obsIat,
                                        None,
                                        "The observed period %s does not match"
                                        " with the expected period %s"
@@ -138,7 +130,7 @@ class BuFLOTests(TestSetUp, STTest):
                                        delta=0.05)
 
     def test_sizes(self):
-        super(BuFLOTests, self).direct_transfer()
+        super(ExternalBuFLOTests, self).direct_transfer()
         for wrapper in self.load_wrappers():
             print wrapper
             for length, iat in wrapper:
@@ -148,14 +140,28 @@ class BuFLOTests(TestSetUp, STTest):
                                        " with the expected size %s"
                                        % (length, self.psize))
 
-    #@unittest.skip("")
+    @unittest.skip("")
     def test_pad_when_visiting(self):
         wrapper = self.load_wrappers()
         self.test_sizes()
         self.assertTrue(wrapper, "The number of messages received is not"
                         "sufficient: %d messages" % len(wrapper))
 
+@unittest.skip("")
+class WFPadProtocolTest(STTest):
 
+    def setUp(self):
+        # Initialize transport object
+        pt_config = transport_config.TransportConfig()
+        pt_config.setListenerMode("server")
+        pt_config.setObfsproxyMode("external")
+        wfpad.WFPadClient.setup(pt_config)
+        wfpadClient = wfpad.WFPadClient()
+
+    def test_control_message(self):
+        pass
+
+@unittest.skip("")
 class WFPadShimObserver(STTest):
 
     def setUp(self):

@@ -109,7 +109,7 @@ class WFPadMessage(object):
 
     def __str__(self):
         """Return message as string."""
-        opCodeStr = argsStr = argsLen = ""
+        opCodeStr = argsLen = ""
 
         totalLenStr = pack.htons(self.totalLen)
         payloadLenStr = pack.htons(self.payloadLen)
@@ -119,8 +119,10 @@ class WFPadMessage(object):
         header = totalLenStr + payloadLenStr + flagsStr
         if self.opcode:  # it's a control message
             opCodeStr = chr(self.opcode)
-            argsLen = pack.htons(self.argsTotalLen)
-            header += opCodeStr + argsLen + self.args
+            header += opCodeStr
+            if self.args:
+                argsLen = pack.htons(self.argsTotalLen)
+                header += argsLen + self.args
 
         return header + self.payload + paddingStr
 
@@ -399,18 +401,24 @@ class WFPadMessageExtractor(object):
         if self.opcode == None:
             self.opcode = self.getOpCode()
 
+        print "XX", self.opcode
+
         # Sanity check of the opcode
         if not isOpCodeSane(self.opcode):
             raise base.PluggableTransportError("Invalid control "
                                                "message opcode.")
 
-        self.argsTotalLen = self.getArgsLen()
+        self.ctrlHdrLen = const.CTRL_HDR_LEN
 
-        self.argsParseLen = const.MPU_CTRL if self.argsTotalLen > const.MPU_CTRL\
-                                        else self.argsTotalLen
-        self.args = self.getMessageField(const.ARGS_POS, self.argsParseLen)
+        # If the opcode requires args
+        if const.ARGS_DICT[self.opcode][0] > 0:
+            self.argsTotalLen = self.getArgsLen()
 
-        self.ctrlHdrLen = const.CTRL_HDR_LEN + self.argsTotalLen
+            self.argsParseLen = const.MPU_CTRL \
+                                    if self.argsTotalLen > const.MPU_CTRL\
+                                    else self.argsTotalLen
+            self.args = self.getMessageField(const.ARGS_POS, self.argsParseLen)
+            self.ctrlHdrLen += self.argsTotalLen
 
     def filterPaddingOut(self):
         """Filter padding messages out and remove data messages from buffer."""
@@ -438,12 +446,16 @@ class WFPadMessageExtractor(object):
             # Parts of the message are still on the wire; waiting.
             if len(self.recvBuf) - const.MIN_HDR_LEN < self.totalLen:
                 break
+            print "XXX EXTRACT", self.flags
 
             if self.flags is const.FLAG_CONTROL:
-
+                print "XXX HI"
                 # Parse control message fields
                 self.parseControlFields()
 
+                print "XXX EXTRACT", self.opcode
+                print "XXX DATA:",  self.totalLen, self.argsParseLen, self.flags, self.opcode, self.args, self.argsTotalLen
+                print "XXX BREAK", const.CTRL_HDR_LEN, len(self.recvBuf), self.ctrlHdrLen, self.totalLen
                 if len(self.recvBuf) - self.ctrlHdrLen < self.totalLen:
                     break
 
@@ -457,7 +469,8 @@ class WFPadMessageExtractor(object):
                                      argsLen=self.argsTotalLen,
                                      args=self.args))
 
+            print "XXX OK", msgs, self.flags, self.opcode, self.argsTotalLen, self.args
             # Reset extractor attributes
             self.reset()
-
+        print "XXXXXX", msgs
         return msgs

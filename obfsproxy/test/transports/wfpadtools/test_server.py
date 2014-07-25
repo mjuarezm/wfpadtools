@@ -12,6 +12,7 @@ from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 import pickle
 from time import time
 from os.path import join
+import json
 
 log = logging.get_obfslogger()
 
@@ -20,9 +21,6 @@ class DumpingInterface(object):
     _history = []
     _tempDir = const.TEST_SERVER_DIR
 
-    def __init__(self):
-        ut.createdir(self._tempDir)
-
     def parseData(self, data):
         """Interface to parse data."""
         pass
@@ -30,19 +28,21 @@ class DumpingInterface(object):
     def tempDump(self, obj):
         """Dump data to temp file."""
         parsed = self.parseData(obj)
+        if not parsed:
+            return
         if type(parsed) is list:
-            dumpObj = self._history + parsed
+            self._history = self._history + parsed
         else:
-            dumpObj = self._history.append(parsed)
-        file_tranport = join(self._tempDir, str(id(self)))
-        with open(file_tranport, "w") as f:
-            pickle.dump(dumpObj, f)
+            self._history.append(parsed)
+        file_transport = join(self._tempDir, str(id(self)))
+        with open(file_transport, "w") as f:
+            pickle.dump(self._history, f)
 
 
 class WFPadTestTransport(WFPadTransport, DumpingInterface):
 
     def __init__(self):
-        DumpingInterface.__init__(self)
+        WFPadTransport.__init__(self)
 
     def msg2dict(self, msg):
         """Return a dictionary representation of a wfpad message."""
@@ -51,18 +51,46 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 "args": msg.args,
                 "flags": msg.flags,
                 "time": time(),
+                "client": self.weAreClient,
                 }
 
+    def parseControl(self, data):
+        if ":" in data:
+            op, payload = data.split(":")
+            if op == "TEST":
+                opcode, args_str = payload.split(";")
+                opcode = int(opcode)
+                args = None
+                if args_str:
+                    args = json.loads(args_str)
+                WFPadTransport.sendControlMessage(self, opcode, args)
+            return True
+        else:
+            return False
+
     def parseData(self, data):
+        print "XXX PARSEDATA"
         msgs = self._msgExtractor.extract(data)
-        return [self.msg2dict(msg) for msg in msgs if msg]
+        parsed = [self.msg2dict(msg) for msg in msgs if msg]
+        return parsed
+
+    def receivedUpstream(self, data):
+        d = data.read()
+        print "XXX UP"
+        isControl = self.parseControl(d)
+        if isControl:
+            return
+        if self._state >= const.ST_CONNECTED:
+            self.pushData(d)
+            self.tempDump(d)
+        else:
+            self._sendBuf += d
+            log.debug("[wfad] Buffered %d bytes of outgoing data." %
+                      len(self._sendBuf))
 
     def processMessages(self, data):
         super(WFPadTestTransport, self).processMessages(data)
         self.tempDump(data)
-
-    def receivedDownstream(self, data):
-        super(WFPadTestTransport, self).receivedDownstream(data)
 
 
 class WFPadTestClient(WFPadTestTransport):
@@ -76,14 +104,15 @@ class WFPadTestServer(WFPadTestTransport, DumpingInterface):
 class DummyTestTransport(DummyTransport, DumpingInterface):
 
     def __init__(self):
-        DumpingInterface.__init__(self)
+        DummyTransport.__init__(self)
 
     def parseData(self, data):
-        return (time(), len(data))
+        return (len(data), time())
 
     def receivedDownstream(self, data):
-        super(DummyTestTransport, self).receivedDownstream(data)
-        self.tempDump(data)
+        d = data.read()
+        self.circuit.upstream.write(d)
+        self.tempDump(d)
 
 
 class DummyTestClient(DummyTestTransport):
