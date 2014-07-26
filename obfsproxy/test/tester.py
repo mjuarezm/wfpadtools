@@ -18,14 +18,12 @@ import re
 import shutil
 import signal
 import socket
-import struct
 import subprocess
 import tempfile
 import time
 import unittest
 
 import obfsproxy.common.log as logging
-from obfsproxy.transports.wfpadtools import const
 
 log = logging.get_obfslogger()
 
@@ -251,7 +249,6 @@ class DirectShimTest(DirectTest):
 #
 # Concrete test classes specialize the above base classes for each protocol.
 #
-@unittest.skip("")
 class DirectDummy(DirectTest, unittest.TestCase):
     transport = "dummy"
     server_args = ("dummy", "server",
@@ -261,7 +258,6 @@ class DirectDummy(DirectTest, unittest.TestCase):
                    "127.0.0.1:%d" % ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectObfs2(DirectTest, unittest.TestCase):
     transport = "obfs2"
     server_args = ("obfs2", "server",
@@ -271,7 +267,6 @@ class DirectObfs2(DirectTest, unittest.TestCase):
                    "127.0.0.1:%d" % ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectObfs2_ss(DirectTest, unittest.TestCase):
     transport = "obfs2"
     server_args = ("obfs2", "server",
@@ -285,7 +280,6 @@ class DirectObfs2_ss(DirectTest, unittest.TestCase):
                    "--ss-hash-iterations=50",
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectB64(DirectTest, unittest.TestCase):
     transport = "b64"
     server_args = ("b64", "server",
@@ -295,7 +289,6 @@ class DirectB64(DirectTest, unittest.TestCase):
                    "127.0.0.1:%d" % ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectObfs3(DirectTest, unittest.TestCase):
     transport = "obfs3"
     server_args = ("obfs3", "server",
@@ -305,7 +298,6 @@ class DirectObfs3(DirectTest, unittest.TestCase):
                    "127.0.0.1:%d" % ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectScrambleSuit(DirectTest, unittest.TestCase):
     transport = "scramblesuit"
 
@@ -338,7 +330,6 @@ class DirectScrambleSuit(DirectTest, unittest.TestCase):
         shutil.rmtree(self.tmpdir_srv)
         shutil.rmtree(self.tmpdir_cli)
 
-@unittest.skip("")
 class DirectWFPad(DirectShimTest, unittest.TestCase):
     transport = "wfpad"
     server_args = ("wfpad", "server",
@@ -349,7 +340,6 @@ class DirectWFPad(DirectShimTest, unittest.TestCase):
             "127.0.0.1:%d" % ENTRY_PORT,
             "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-#@unittest.skip("")
 class DirectWFpadTestServer(DirectTest, unittest.TestCase):
     transport = "wfpadtest"
     server_args = ("wfpadtest", "server",
@@ -359,18 +349,6 @@ class DirectWFpadTestServer(DirectTest, unittest.TestCase):
            "127.0.0.1:%d" % ENTRY_PORT,
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("It fails, though still helpful.")
-class DirectWFpadTestServerExternal(DirectTest, unittest.TestCase):
-    transport = "wfpad"
-    server_args = ("wfpadtest", "server",
-           "127.0.0.1:%d" % 5555,
-           "--dest=127.0.0.1:%d" % 6666)
-    client_args = ("--test-server=wfpadtest,127.0.0.1:%d" % EXIT_PORT,
-                   "wfpad", "client",
-                   "127.0.0.1:%d" % ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % SERVER_PORT)
-
-@unittest.skip("")
 class DirectDummyTestServer(DirectTest, unittest.TestCase):
     transport = "dummytest"
     server_args = ("dummytest", "server",
@@ -380,7 +358,6 @@ class DirectDummyTestServer(DirectTest, unittest.TestCase):
            "127.0.0.1:%d" % ENTRY_PORT,
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-@unittest.skip("")
 class DirectBuFLO(DirectShimTest, unittest.TestCase):
     transport = "buflo"
     server_args = ("buflo", "server",
@@ -397,7 +374,46 @@ class DirectBuFLO(DirectShimTest, unittest.TestCase):
            "--mintime=2",
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-TEST_FILE = "TEST:" + str(const.OP_IGNORE) + ";"
+TEST_FILE = """\
+THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
+THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
+THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
+THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
+
+"Can entropy ever be reversed?"
+"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
+"Can entropy ever be reversed?"
+"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
+"Can entropy ever be reversed?"
+"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
+"Can entropy ever be reversed?"
+"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
+"Can entropy ever be reversed?"
+"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
+"Can entropy ever be reversed?"
+"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
+"Can entropy ever be reversed?"
+"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
+"Can entropy ever be reversed?"
+"THERE IS AS YET INSUFFICIENT DATA FOR A MEANINGFUL ANSWER."
+
+    In obfuscatory age geeky warfare did I wage
+      For hiding bits from nasty censors' sight
+    I was hacker to my set in that dim dark age of net
+      And I hacked from noon till three or four at night
+
+    Then a rival from Helsinki said my protocol was dinky
+      So I flamed him with a condescending laugh,
+    Saying his designs for stego might as well be made of lego
+      And that my bikeshed was prettier by half.
+
+    But Claude Shannon saw my shame. From his noiseless channel came
+       A message sent with not a wasted byte
+    "There are nine and sixty ways to disguise communiques
+       And RATHER MORE THAN ONE OF THEM IS RIGHT"
+
+            (apologies to Rudyard Kipling.)
+"""
 
 
 if __name__ == '__main__':
