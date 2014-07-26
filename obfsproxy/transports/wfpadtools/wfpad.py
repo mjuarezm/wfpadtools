@@ -356,7 +356,7 @@ class WFPadTransport(BaseTransport):
                 print "XXX OPCODE:", msg.opcode
 
                 if msg.args:
-                    print "XXX ARGS"
+                    print "XXX ARGS", msg.args
                     log.debug("[wfad] Message with control data received.")
                     self._currentArgs += msg.args
                     continue
@@ -373,6 +373,8 @@ class WFPadTransport(BaseTransport):
             # Otherwise, flag not recognized
             else:
                 log.warning("Invalid message flags: %d." % msg.flags)
+
+        return msgs
 
     def drawMessageLength(self):
         """Return length for a specific message.

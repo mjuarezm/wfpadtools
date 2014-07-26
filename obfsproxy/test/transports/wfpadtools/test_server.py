@@ -4,7 +4,6 @@ transport client and transport server that dump the state and messages
 received into a temporal file in order to be processed by the test module.
 """
 import obfsproxy.common.log as logging
-import obfsproxy.transports.wfpadtools.util as ut
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.dummy import DummyTransport
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
@@ -68,10 +67,10 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
         else:
             return False
 
-    def parseData(self, data):
+    def parseData(self, msgs):
         print "XXX PARSEDATA"
-        msgs = self._msgExtractor.extract(data)
         parsed = [self.msg2dict(msg) for msg in msgs if msg]
+        print "XXX PARSED", parsed
         return parsed
 
     def receivedUpstream(self, data):
@@ -89,8 +88,8 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                       len(self._sendBuf))
 
     def processMessages(self, data):
-        super(WFPadTestTransport, self).processMessages(data)
-        self.tempDump(data)
+        msgs = super(WFPadTestTransport, self).processMessages(data)
+        self.tempDump(msgs)
 
 
 class WFPadTestClient(WFPadTestTransport):

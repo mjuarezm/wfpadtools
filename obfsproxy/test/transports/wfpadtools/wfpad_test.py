@@ -13,7 +13,8 @@ from os import listdir
 from os.path import join, isfile, exists
 from obfsproxy.common import transport_config
 from time import sleep
-from obfsproxy.test.tester import TransportsSetUp
+from obfsproxy.test.tester import TransportsSetUp, TEST_FILE
+import json
 
 DEBUG = True
 
@@ -45,20 +46,18 @@ class TestSetUp(TransportsSetUp):
 
     def send_to_transport(self, data):
         self.input_chan.sendall(data)
-        time.sleep(5)
-        self.input_chan.close()
+        time.sleep(2)
 
     def direct_transfer(self):
         self.send_to_transport(tester.TEST_FILE)
 
-    def load_wrappers(self):
-        return [pickle.load(open(join(const.TEST_SERVER_DIR, f)))
+    def load_wrapper(self):
+        return sum([pickle.load(open(join(const.TEST_SERVER_DIR, f)))
                     for f in listdir(const.TEST_SERVER_DIR)
-                        if isfile(join(const.TEST_SERVER_DIR, f))]
+                        if isfile(join(const.TEST_SERVER_DIR, f))], [])
 
 
-#@unittest.skip("")
-class WFPadTests(TestSetUp, STTest):
+class ControlMessageCommTest(TestSetUp):
     transport = "wfpadtest"
     server_args = ("wfpadtest", "server",
            "127.0.0.1:%d" % tester.SERVER_PORT,
@@ -67,21 +66,101 @@ class WFPadTests(TestSetUp, STTest):
            "127.0.0.1:%d" % tester.ENTRY_PORT,
            "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
 
-    def test_send_ignore_message(self):
-        self.send_to_transport("TEST:" + str(const.OP_IGNORE) + ";")
-        time.sleep(2)
-        wrappers = self.load_wrappers()
-        print wrappers
-        for wrapper in wrappers:
-            print "XX", wrapper, wrapper[0]['opcode']
-            print "XXX", [msg['opcode']
-                            for msg in wrapper]
-#                             if msg['opcode'] == const.OP_IGNORE]
-            self.assertTrue([msg['opcode']
-                            for msg in wrapper
-                            if msg['opcode'] and msg['opcode'] == const.OP_IGNORE],
-                            "Server did not receive the control message"
-                            " with opcode: %s" % const.OP_IGNORE)
+    def send_control_msg_test(self, opcode, args=None):
+        msgControl = "TEST:{};".format(str(self.opcode))
+        if args:
+            msgControl += args
+        self.send_to_transport(msgControl)
+
+    def test_control_msg_communication(self):
+        self.send_control_msg_test(self.opcode, self.args)
+        wrapper = self.load_wrapper()
+        print wrapper
+        # Filter messages with the `opcode`
+        opcodeMsgs = [msg['opcode'] for msg in wrapper
+                        if msg['opcode'] == self.opcode]
+
+        if not opcodeMsgs and DEBUG:
+            report = ""
+            report += self.obfs_client.check_completion("obfsproxy client (%s)" % self.transport, report!="")
+            report += self.obfs_server.check_completion("obfsproxy server (%s)" % self.transport, report!="")
+
+            if report != "":
+                self.fail("\n" + report)
+        self.assertTrue(opcodeMsgs,
+                        "Server did not receive the control message"
+                        " with opcode: %s" % self.opcode)
+
+# @unittest.skip("")
+class StartPaddingTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_START
+    args = None
+
+# @unittest.skip("")
+class StopPaddingTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_STOP
+    args = None
+
+# @unittest.skip("")
+class SendIgnoreTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_IGNORE
+    args = None
+
+# @unittest.skip("")
+class SendPaddingTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_SEND_PADDING
+    N = 5
+    args = json.dumps(N)
+
+# @unittest.skip("")
+class AppHintTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_APP_HINT
+    sessId = "id123"
+    status = True
+    args = json.dumps([sessId, status])
+
+# @unittest.skip("")
+class BurstHistoTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_BURST_HISTO
+    histo = [1, 2, 3]
+    labels_ms = [1, 2, 3]
+    removeTokens = False
+    args = json.dumps([histo, labels_ms, removeTokens])
+
+# @unittest.skip("")
+class GapHistoTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_GAP_HISTO
+    histo = [1, 2, 3]
+    labels_ms = [1, 2, 3]
+    removeTokens = False
+    args = json.dumps([histo, labels_ms, removeTokens])
+
+# @unittest.skip("")
+class InjectHistoTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_INJECT_HISTO
+    histo = [1, 2, 3]
+    labels_ms = [1, 2, 3]
+    args = json.dumps([histo, labels_ms])
+
+# @unittest.skip("")
+class TotalPadTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_TOTAL_PAD
+    args = None
+
+# @unittest.skip("")
+class PayloadPadTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_PAYLOAD_PAD
+    sessId = "id123"
+    delay = 1
+    args = json.dumps([sessId, delay])
+
+# @unittest.skip("")
+class BatchPadTest(ControlMessageCommTest, STTest):
+    opcode = const.OP_BATCH_PAD
+    sessId = "id123"
+    L = 3
+    delay = 1
+    args = json.dumps([sessId, L, delay])
 
 
 @unittest.skip("")
@@ -116,7 +195,7 @@ class ExternalBuFLOTests(TestSetUp, STTest):
 
     def test_timing(self):
         super(ExternalBuFLOTests, self).direct_transfer()
-        for wrapper in self.load_wrappers():
+        for wrapper in self.load_wrapper():
             print wrapper
             if len(wrapper) > 2:
                 iats = [wrapper[i + 1][1] - wrapper[i][1]
@@ -131,7 +210,7 @@ class ExternalBuFLOTests(TestSetUp, STTest):
 
     def test_sizes(self):
         super(ExternalBuFLOTests, self).direct_transfer()
-        for wrapper in self.load_wrappers():
+        for wrapper in self.load_wrapper():
             print wrapper
             for length, iat in wrapper:
                 print length, iat
@@ -142,24 +221,11 @@ class ExternalBuFLOTests(TestSetUp, STTest):
 
     @unittest.skip("")
     def test_pad_when_visiting(self):
-        wrapper = self.load_wrappers()
+        wrapper = self.load_wrapper()
         self.test_sizes()
         self.assertTrue(wrapper, "The number of messages received is not"
                         "sufficient: %d messages" % len(wrapper))
 
-@unittest.skip("")
-class WFPadProtocolTest(STTest):
-
-    def setUp(self):
-        # Initialize transport object
-        pt_config = transport_config.TransportConfig()
-        pt_config.setListenerMode("server")
-        pt_config.setObfsproxyMode("external")
-        wfpad.WFPadClient.setup(pt_config)
-        wfpadClient = wfpad.WFPadClient()
-
-    def test_control_message(self):
-        pass
 
 @unittest.skip("")
 class WFPadShimObserver(STTest):
@@ -268,12 +334,6 @@ class WFPadShimObserver(STTest):
                          "The session has not started."
                          "The wfpad's `_visiting` flag is `False`.")
 
-
-#@unittest.skip("")
-class WFPadControlMessagesTest(STTest):
-
-    def setUp(self):
-        pass
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
