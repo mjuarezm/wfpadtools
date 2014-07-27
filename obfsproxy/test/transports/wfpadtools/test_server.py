@@ -27,8 +27,6 @@ class DumpingInterface(object):
     def tempDump(self, obj):
         """Dump data to temp file."""
         parsed = self.parseData(obj)
-        if not parsed:
-            return
         if type(parsed) is list:
             self._history = self._history + parsed
         else:
@@ -51,6 +49,10 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 "flags": msg.flags,
                 "time": time(),
                 "client": self.weAreClient,
+                "visiting": self._visiting,
+                "sessid": self._sessId,
+                "ctrlId": msg.ctrlId,
+                "totalArgsLen": msg.totalArgsLen,
                 }
 
     def parseControl(self, data):
@@ -67,15 +69,23 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
         else:
             return False
 
+    def concatControlMsg(self, msgs):
+        ctrlMsgs = [msg for msg in msgs if msg['flags'] == const.FLAG_CONTROL]
+        noCtrlMsgs = [msg for msg in msgs if msg['flags'] != const.FLAG_CONTROL]
+        if not ctrlMsgs:
+            return noCtrlMsgs
+        finalMsg = ctrlMsgs[0]
+        for msg in ctrlMsgs[1:]:
+            finalMsg["args"] += msg["args"]
+        return [finalMsg] + noCtrlMsgs
+
     def parseData(self, msgs):
-        print "XXX PARSEDATA"
         parsed = [self.msg2dict(msg) for msg in msgs if msg]
-        print "XXX PARSED", parsed
-        return parsed
+        ctrlConcat = self.concatControlMsg(parsed)
+        return ctrlConcat
 
     def receivedUpstream(self, data):
         d = data.read()
-        print "XXX UP"
         isControl = self.parseControl(d)
         if isControl:
             return
@@ -84,8 +94,6 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
             self.tempDump(d)
         else:
             self._sendBuf += d
-            log.debug("[wfad] Buffered %d bytes of outgoing data." %
-                      len(self._sendBuf))
 
     def processMessages(self, data):
         msgs = super(WFPadTestTransport, self).processMessages(data)

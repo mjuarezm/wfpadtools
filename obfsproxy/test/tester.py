@@ -24,6 +24,7 @@ import time
 import unittest
 
 import obfsproxy.common.log as logging
+from time import sleep
 
 log = logging.get_obfslogger()
 
@@ -51,7 +52,7 @@ class Obfsproxy(subprocess.Popen):
     """
     def __init__(self, *args, **kwargs):
         """Spawns obfsproxy with 'args'"""
-        logfile = join("/tmp", "obfsproxy_tester.log")
+        logfile = join("/tmp", "obfsproxy_tester_{}.log".format(args[0][1]))
         argv = ["/bin/obfsproxy", "--log-file", logfile, "--log-min-severity", "debug",]
         if len(args) == 1 and (isinstance(args[0], list) or
                                isinstance(args[0], tuple)):
@@ -194,7 +195,7 @@ class TransportsSetUp(object):
 
     def setUp(self):
         self.obfs_server = Obfsproxy(self.server_args)
-        time.sleep(0.1)
+        time.sleep(0.2)
         self.obfs_client = Obfsproxy(self.client_args)
 
     def tearDown(self):
@@ -339,15 +340,6 @@ class DirectWFPad(DirectShimTest, unittest.TestCase):
             "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
             "127.0.0.1:%d" % ENTRY_PORT,
             "--dest=127.0.0.1:%d" % SERVER_PORT)
-
-class DirectWFpadTestServer(DirectTest, unittest.TestCase):
-    transport = "wfpadtest"
-    server_args = ("wfpadtest", "server",
-           "127.0.0.1:%d" % SERVER_PORT,
-           "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = ("wfpadtest", "client",
-           "127.0.0.1:%d" % ENTRY_PORT,
-           "--dest=127.0.0.1:%d" % SERVER_PORT)
 
 class DirectDummyTestServer(DirectTest, unittest.TestCase):
     transport = "dummytest"

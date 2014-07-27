@@ -8,8 +8,22 @@ can be used to implement more specific anti-website fingerprinting strategies.
 To use this framework, developers can extend the WFPadTransport, WFPadClient
 and WFPadServer classes and use their methods to implement the countermeasure.
 
-Note: this framework is intended for research purposes and it has the following
-limitations:
+
+Possible primitives WFPadTools allows for:
+
+- Since each end runs a transport itself, it allows to implement strategies
+  that treat incoming and outgoing traffic independently.
+
+- It allows to choose the inter-arrival time as a constant or to specify a
+  probability distribution to draw values from it for each individual message.
+  By default, the size of the packets are always padded to the MTU but one
+  could also specify a different value or specify a probability distribution
+  to draw packet lengths to pad to at each message.
+
+- 
+
+Important note: this framework is intended for research purposes and it has the
+following limitations:
 
 - This module does not provide obfuscation of its protocol signature. That is
   why it must be always combined with another transport that does provide it.
@@ -28,6 +42,12 @@ limitations:
 
 - It provides tools for padding-based countermeasure. It shouldn't be used
   for other type of strategies.
+
+- Because of obfsproxy design, a new WFPadTools PT instance is created for
+  each new TPC connection. Right now, this a big limitation because it
+  the transport is generating cover traffic for each TCP connection
+  independently, instead of multiplexing and padding one single stream of
+  traffic.
 
 """
 import json
@@ -96,6 +116,7 @@ class WFPadShimObserver(object):
         """Sets wfpad's `_visiting` flag to `True`."""
         log.debug("[wfad] Session %d begins." % connId)
         self.wfpad._visiting = True
+        self.wfpad._numMessages = 0
 
     def onSessionEnds(self, connId):
         """Sets wfpad's `_visiting` flag to `False`."""
@@ -112,11 +133,13 @@ class WFPadTransport(BaseTransport):
     specified yet. This class also provides an interface for the
     responses to these primitives of the other end.
     """
+    _sessId = 0
     _sendBuf = ""  # Buffer for outgoing data while transport is not connected.
     _elapsed = 0  # Counts time spent on padding.
     _consecPaddingMsgs = 0  # Counts number of consecutive padding messages.
     _visiting = False  # Flags a visit to a page.
     _currentArgs = ""  # Arguments of the current control message.
+    _numMessages = 0
 
     def __init__(self):
         """Initialize a WFPadTransport object."""
@@ -140,6 +163,12 @@ class WFPadTransport(BaseTransport):
         self._psize = const.MTU
         self._lengthProbdist = probdist.new(lambda: self._psize,
                                              lambda i, n, c: 1)
+
+        # Run this method to evaluate the stop condition
+        # The default condition is to pad continuously while the state of the
+        # protocol is ST_PADDING. More sophisticated defenses would reduce the
+        # overhead by setting more sophisticated stopping conditions.
+        self.stopCondition = lambda self: self._state is not const.ST_PADDING 
 
         # Get global shim object.
         if self.weAreClient and self.shim_args and not socks_shim.get():
@@ -222,7 +251,8 @@ class WFPadTransport(BaseTransport):
 
         Cast messages to str, concatenate them and write them to downstream.
         """
-        self.circuit.downstream.write("".join([str(msg) for msg in messages]))
+        msgsStr = "".join([str(msg) for msg in messages])
+        self.circuit.downstream.write(msgsStr)
 
     def pushData(self, data, opcode=None, args=None):
         """Push `data` forward either to a buffer or to the other end.
@@ -242,9 +272,7 @@ class WFPadTransport(BaseTransport):
 
     def sendMessage(self, payload="", paddingLen=0, flags=const.FLAG_DATA):
         """Send message over the wire."""
-        msg = self._msgFactory.createWFPadMessage(payload,
-                                                   paddingLen,
-                                                   flags)
+        msg = self._msgFactory.createWFPadMessage(payload, paddingLen, flags)
         self.sendMessagesDownstream([msg])
 
     def sendControlMessages(self, opcode, args):
@@ -263,7 +291,7 @@ class WFPadTransport(BaseTransport):
         from the time probability distribution.
         """
         # Return if the stopping condition is satisfied.
-        if self.stopCondition():
+        if self.stopCondition(self):
             self.stopPadding()
             return
 
@@ -271,9 +299,10 @@ class WFPadTransport(BaseTransport):
         msgTotalLen = length if length else self.drawMessageLength()
         payloadLen = msgTotalLen - const.MIN_HDR_LEN
         dataLen = len(self._paddingBuffer)
-
+        self._numMessages += 1
         # If there is data in buffer, encapsulate and send them.
         if dataLen > 0:
+            self._consecPaddingMsgs = 0
             log.debug("[wfad] Data found in buffer. Flush buffer.")
 
             # If data in buffer fills the specified length, we just
@@ -282,8 +311,8 @@ class WFPadTransport(BaseTransport):
                 log.debug("[wfad] Message with no padding.")
                 data = self._paddingBuffer.read(payloadLen)
                 msg = self._msgFactory.createWFPadMessage(data,
-                                                         opcode=opcode,
-                                                         args=args)
+                                                          opcode=opcode,
+                                                          args=args)
 
             # If data in buffer does not fill the message's payload,
             # pad so that it reaches the specified length.
@@ -292,19 +321,19 @@ class WFPadTransport(BaseTransport):
                 data = self._paddingBuffer.read()
                 paddingLen = payloadLen - dataLen
                 msg = self._msgFactory.createWFPadMessage(data,
-                                                         paddingLen,
-                                                         opcode=opcode,
-                                                         args=args)
+                                                          paddingLen,
+                                                          opcode=opcode,
+                                                          args=args)
 
         # If buffer is empty, generate padding messages.
         else:
             log.debug("[wfad] Generate padding message.")
             self._consecPaddingMsgs += 1
             msg = self._msgFactory.createWFPadMessage("",
-                                                     payloadLen,
-                                                     flags=const.FLAG_PADDING,
-                                                     opcode=opcode,
-                                                     args=args)
+                                                      payloadLen,
+                                                      flags=const.FLAG_PADDING,
+                                                      opcode=opcode,
+                                                      args=args)
         self.sendMessagesDownstream([msg])
 
         # Compute the delay for the next message.
@@ -326,16 +355,13 @@ class WFPadTransport(BaseTransport):
 
         # Try to extract protocol messages.
         msgs = []
-        print "XXX TRY...."
         try:
             msgs = self._msgExtractor.extract(data)
-            print "XXX MSGS1:", msgs
         except Exception, e:
             print str(e)
             log.exception("[wfpad] Exception extracting "
                           "messages from stream: %s" % str(e))
 
-        print "XXX MSGS", msgs
         for msg in msgs:
 
             if (msgs is None) or (len(msgs) == 0):
@@ -353,16 +379,12 @@ class WFPadTransport(BaseTransport):
 
             # Process control messages
             elif msg.flags == const.FLAG_CONTROL:
-                print "XXX OPCODE:", msg.opcode
 
                 if msg.args:
-                    print "XXX ARGS", msg.args
                     log.debug("[wfad] Message with control data received.")
                     self._currentArgs += msg.args
-                    continue
-
                     # We need to wait until we have all the args
-                    if not msg.argsTotalLen > len(self._currentArgs):
+                    if msg.totalArgsLen == len(self._currentArgs):
                         args = json.loads(self._currentArgs)
                         self.circuit.upstream.write(msg.payload)
                         self.receiveControlMessage(msg.opcode, args)
@@ -414,17 +436,8 @@ class WFPadTransport(BaseTransport):
 
     def stopPadding(self):
         """Changes protocol's state to ST_CONNECTED and stops timer."""
-        self._state = const.ST_CONNECTED
-        self.flushPaddingBuffer()
-
-    def stopCondition(self):
-        """Return the evaluation of the stopping condition.
-
-        We assume that the most general scheme is to be continuously padding.
-        More sophisticated defenses try to reduce the overhead by setting a
-        stopping condition.
-        """
-        return False
+        if self._state is const.ST_PADDING:
+            self._state = const.ST_CONNECTED
 
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream.
@@ -435,6 +448,7 @@ class WFPadTransport(BaseTransport):
         d = data.read()
         print "UP"
         if self._state >= const.ST_CONNECTED:
+            self.flushSendBuffer()
             self.pushData(d)
         else:
             self._sendBuf += d
@@ -444,7 +458,6 @@ class WFPadTransport(BaseTransport):
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
         d = data.read()
-        print "DOWN", d
         if self._state >= const.ST_CONNECTED:
             self.processMessages(d)
 
@@ -453,8 +466,6 @@ class WFPadTransport(BaseTransport):
     #==========================================================================
     def receiveControlMessage(self, opcode, args=None):
         """Do operation indicated by the _opcode."""
-        print "RCVD CTRL", opcode
-
         log.error("Received control message with opcode %d and args: %s"
                   % (opcode, args))
         if opcode == const.OP_START:
@@ -482,7 +493,7 @@ class WFPadTransport(BaseTransport):
         elif opcode == const.OP_TOTAL_PAD:
             self.totalPad(*args)
         elif opcode == const.OP_PAYLOAD_PAD:
-            self.payloadPad(*args)
+            self.payloadPad()
 
         # Tamaraw primitives
         elif opcode == const.OP_BATCH_PAD:
@@ -500,15 +511,11 @@ class WFPadTransport(BaseTransport):
 
     def sendPadding(self, N, t):
         """Reply with `N` padding messages delayed `t` ms."""
-        print "XXX SENDIGNORE"
-        self.sendIgnore(N)
+        reactor.callLater(t, self.sendIgnore, N=N)
 
     def appHint(self, sessId, status):
-        """Provides information to the server about the current session.
-
-        Limitation: we assume the user is browsing in a single tab.
-        """
-        print "APP HINT RECEIVED: ", sessId, status
+        """Provides information to the server about the current session."""
+        self._sessId = sessId
         self._visiting = status
 
     def burstHistogram(self, histo, labels, remove_toks=False):
@@ -561,15 +568,20 @@ class WFPadTransport(BaseTransport):
         """
         pass
 
-    def totalPad(self):
-        pass
-
-    def payloadPad(self, sess_id, t):
+    def totalPad(self, sess_id, t):
         """Pad all batches to 2^K cells total.
 
         Pad all batches to 2^K cells total within `t` microseconds,
         or until APP_HINT(session_id, stop).
         """
+        # TODO: draw value from exponential distribution
+        self._period = t
+        self.stopCondition = lambda self: self._numMessages >= 128 \
+                                            or not self._visiting
+        if self._state == const.ST_CONNECTED:
+            self.startPadding()
+
+    def payloadPad(self):
         pass
 
     def batchPad(self, sess_id, L, t):
@@ -578,14 +590,17 @@ class WFPadTransport(BaseTransport):
         Pad all batches to `L` cells total within `t` microseconds,
         or until APP_HINT(session_id, stop).
         """
-        pass
+        self._period = t
+        self.stopCondition = lambda self: self._numMessages >= L \
+                                            or not self._visiting
+        if self._state == const.ST_CONNECTED:
+            self.startPadding()
 
     #==========================================================================
     # Methods to send control messages
     #==========================================================================
     def sendControlMessage(self, opcode, args=None, delay=0):
         """Send a message with a specific _opcode field."""
-        print "XXX SNDCTRL", opcode
         reactor.callLater(delay,
                           self.sendControlMessages,
                           opcode=opcode,
@@ -637,19 +652,17 @@ class WFPadTransport(BaseTransport):
     def sendInjectHistogram(self, histo, labels):
         self.sendControlMessage(const.OP_INJECT_HISTO, args=[histo, labels])
 
-    def sendTotalPadRequest(self):
-        pass
+    def sendTotalPadRequest(self, sess_id, t):
+        """Send request to pad all batches to 2^K cells total."""
+        self.sendControlMessage(const.OP_TOTAL_PAD, args=[sess_id, t])
 
-    def sendPayloadPadRequest(self, sess_id, t):
-        """Pad all batches to 2^K cells total.
-
-        Pad all batches to 2^K cells total within `t` microseconds,
-        or until APP_HINT(session_id, stop).
-        """
-        pass
+    def sendPayloadPadRequest(self):
+        """TODO: not clear whether this primitive is useful for Tor."""
+        self.sendControlMessage(const.OP_PAYLOAD_PAD)
 
     def sendBatchPadRequest(self, sess_id, L, t):
-        pass
+        """Send request to pad batches to L cells."""
+        self.sendControlMessage(const.OP_BATCH_PAD, args=[sess_id, L, t])
 
 
 class WFPadClient(WFPadTransport):
