@@ -67,10 +67,13 @@ FLAGS_LEN = 1
 CONTROL_POS = 5
 CONTROL_LEN = 1
 
-ARGSLENGTH_POS = 6
-ARGSLENGTH_LEN = 2
+ARGS_TOTAL_LENGTH_POS = 6
+ARGS_TOTAL_LENGTH_LEN = 2
 
-ARGS_POS = 8
+CTRL_ID_POS = 8
+CTRL_ID_LEN = 1
+
+ARGS_POS = 9
 
 
 # arguments specification [arg_1, arg_2, ...] where arg_i = (length, type)
@@ -97,14 +100,14 @@ ARGS_DICT = {
              OP_BURST_HISTO: [3, arg((list, int), "histogram"), arg((list, int), "labels_ms"), arg(bool, "remove_toks")],
              OP_GAP_HISTO: [3, arg((list, int), "histogram"), arg((list, int), "labels_ms"), arg(bool, "remove_toks")],
              OP_INJECT_HISTO: [2, arg((list, int), "histogram"), arg((list, int), "labels_ms")],
-             OP_TOTAL_PAD: [0],
-             OP_PAYLOAD_PAD: [2, arg(str, "session_id"), arg(int, "delay")],
+             OP_TOTAL_PAD: [2, arg(str, "session_id"), arg(int, "delay")],
+             OP_PAYLOAD_PAD: [0],
              OP_BATCH_PAD: [3, arg(str, "session_id"), arg(int, "L"), arg(int, "delay")],
             }
 
 # Header length
 MIN_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
-CTRL_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN + CONTROL_LEN
+CTRL_HDR_LEN = MIN_HDR_LEN + CONTROL_LEN
 
 # The maximum amount of padding to be appended to handshake data.
 MAX_PADDING_LENGTH = 1500
@@ -116,3 +119,4 @@ MTU = 1448
 # Maximum payload unit of a WFPad message in bytes.
 MPU = MTU - MIN_HDR_LEN
 MPU_CTRL = MTU - CTRL_HDR_LEN
+MPTU_CTRL_ARGS = MPU_CTRL - ARGS_TOTAL_LENGTH_LEN - CTRL_ID_LEN

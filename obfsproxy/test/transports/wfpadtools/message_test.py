@@ -1,7 +1,7 @@
-import obfsproxy.transports.wfpadtools.message as msg
 import unittest
+
+import obfsproxy.transports.wfpadtools.message as msg
 from obfsproxy.transports.wfpadtools import const
-from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 
 
 class WFPadMessageFactoryTest(unittest.TestCase):
