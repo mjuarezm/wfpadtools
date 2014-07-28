@@ -171,7 +171,7 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
 class AppHintTest(ControlMessageCommunicationTest, STTest):
     """Test server sends a hint to client."""
     opcode = const.OP_APP_HINT
-    sessId, status = "id123", True
+    sessId,  status = "id123", True
     args = [sessId, status]
     tag = True
 
@@ -216,8 +216,8 @@ class InjectHistoTest(ControlMessageCommunicationTest, STTest):
 
 class TotalPadTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_TOTAL_PAD
-    sessId, delay = "id123", 1
-    args = [sessId, delay]
+    sessId, K, delay = "id123", 4, 1
+    args = [sessId, K, delay]
 
 
 class PayloadPadTest(ControlMessageCommunicationTest, STTest):

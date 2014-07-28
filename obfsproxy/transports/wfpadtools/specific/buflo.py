@@ -12,19 +12,11 @@ log = logging.get_obfslogger()
 
 class BuFLOShimObserver(WFPadShimObserver):
 
-    def onSessionStarts(self):
+    def onSessionStarts(self, connId):
         """Do operations to be done when session starts."""
-        super(BuFLOShimObserver, self).onSessionStarts()
-        log.debug("[buflo] observed the start of a new session.")
+        super(BuFLOShimObserver, self).onSessionStarts(connId)
         self.wfpad.startPadding()
         self.wfpad.sendAppHintRequest(self._sessId)
-        self.wfpad._visiting = True
-
-    def onSessionEnds(self):
-        """Do operations to be done when session ends."""
-        log.debug("[buflo] observed the end of a session.")
-        super(BuFLOShimObserver, self).onSessionEnds()
-        self.wfpad._visiting = False
 
 
 class BuFLOTransport(WFPadTransport):
@@ -47,6 +39,12 @@ class BuFLOTransport(WFPadTransport):
                                           lambda i, n, c: 1)
         self._lengthProbdist = probdist.new(lambda: self._psize,
                                            lambda i, n, c: 1)
+
+        # The stop condition in BuFLO:
+        # BuFLO stops padding if the visit has finished and the elapsed time has
+        # exceeded the minimum padding time.
+        self.stopCondition = lambda self: self.getElapsed() > self._mintime \
+                                            and self._state is self._visiting
 
         # Register observer for shim events
         if self.weAreClient:
@@ -106,15 +104,6 @@ class BuFLOTransport(WFPadTransport):
             cls._period = args.period
         if args.psize:
             cls._psize = args.psize
-
-    def stopCondition(self):
-        """Returns the evaluation of the condition to stop padding.
-
-        BuFLO stops padding if the visit has finished and the elapsed time has
-        exceeded the minimum padding time.
-        """
-        return self.getElapsed() > self._mintime \
-                and self._state is self._visiting
 
 
 class BuFLOClient(BuFLOTransport):

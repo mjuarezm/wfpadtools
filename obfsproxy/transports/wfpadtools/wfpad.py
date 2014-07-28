@@ -157,7 +157,7 @@ class WFPadTransport(BaseTransport):
         self._msgExtractor = message.WFPadMessageExtractor()
 
         # Initialize probability distributions
-        self._period = 0.01
+        self._period = 0.1
         self._delayProbdist = probdist.new(lambda: self._period,
                                             lambda i, n, c: 1)
         self._psize = const.MTU
@@ -168,7 +168,7 @@ class WFPadTransport(BaseTransport):
         # The default condition is to pad continuously while the state of the
         # protocol is ST_PADDING. More sophisticated defenses would reduce the
         # overhead by setting more sophisticated stopping conditions.
-        self.stopCondition = lambda self: self._state is not const.ST_PADDING 
+        self.stopCondition = lambda self: self._state is not const.ST_PADDING
 
         # Get global shim object.
         if self.weAreClient and self.shim_args and not socks_shim.get():
@@ -446,7 +446,6 @@ class WFPadTransport(BaseTransport):
         connected, or buffer it meanwhile otherwise.
         """
         d = data.read()
-        print "UP"
         if self._state >= const.ST_CONNECTED:
             self.flushSendBuffer()
             self.pushData(d)
@@ -633,7 +632,6 @@ class WFPadTransport(BaseTransport):
         sessId = ut.hash_text(str(sessNumber)
                                + str(id(self))
                                + str(ut.timestamp()))
-        print "SEND HINT!"
         self.sendControlMessage(const.OP_APP_HINT, args=[sessId, status])
 
     def sendBurstHistogram(self, histo, labels, remove_toks=False):
