@@ -11,7 +11,7 @@ from time import sleep
 
 # Test config
 WATCHDOG_TIMEOUT = 180
-DEBUG = True
+DEBUG = False
 
 # Switch to leave Tor running and speed-up tests
 LEAVE_TOR_RUNNING = False
@@ -141,8 +141,8 @@ class UnmanagedTorTest(tester.TransportsSetUp):
                     .format(self.transport, client_port),
              "--SOCKSPort", socksport])
 
-    def get_page(self, url, port=tester.SOCKS_PORT):
-        ut.get_page(url, port=port)
+    def get_page(self, url, port=tester.SHIM_PORT):
+        return ut.get_page(url, port=port)
 
     def test_tor(self):
         sleep(5)
