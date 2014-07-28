@@ -568,18 +568,13 @@ class WFPadTransport(BaseTransport):
         """
         pass
 
-    def totalPad(self, sess_id, t):
+    def totalPad(self, sess_id, K, t):
         """Pad all batches to 2^K cells total.
 
         Pad all batches to 2^K cells total within `t` microseconds,
         or until APP_HINT(session_id, stop).
         """
-        # TODO: draw value from exponential distribution
-        self._period = t
-        self.stopCondition = lambda self: self._numMessages >= 128 \
-                                            or not self._visiting
-        if self._state == const.ST_CONNECTED:
-            self.startPadding()
+        self.batchPad(sess_id, 1 << K, t)
 
     def payloadPad(self):
         pass
@@ -652,9 +647,9 @@ class WFPadTransport(BaseTransport):
     def sendInjectHistogram(self, histo, labels):
         self.sendControlMessage(const.OP_INJECT_HISTO, args=[histo, labels])
 
-    def sendTotalPadRequest(self, sess_id, t):
+    def sendTotalPadRequest(self, sess_id, K, t):
         """Send request to pad all batches to 2^K cells total."""
-        self.sendControlMessage(const.OP_TOTAL_PAD, args=[sess_id, t])
+        self.sendControlMessage(const.OP_TOTAL_PAD, args=[sess_id, K, t])
 
     def sendPayloadPadRequest(self):
         """TODO: not clear whether this primitive is useful for Tor."""
