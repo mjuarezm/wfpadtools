@@ -290,11 +290,6 @@ class WFPadTransport(BaseTransport):
         The function is called again after a certain delay, which is sampled
         from the time probability distribution.
         """
-        # Return if the stopping condition is satisfied.
-        if self.stopCondition(self):
-            self.stopPadding()
-            return
-
         msg = WFPadMessage()
         msgTotalLen = length if length else self.drawMessageLength()
         payloadLen = msgTotalLen - const.MIN_HDR_LEN
@@ -339,6 +334,11 @@ class WFPadTransport(BaseTransport):
         # Compute the delay for the next message.
         delay = self.drawFlushDelay()
         self._elapsed += delay
+
+        # Return if the stopping condition is satisfied.
+        if self.stopCondition(self):
+            self.stopPadding()
+            return
         reactor.callLater(delay, self.flushPaddingBuffer)
 
     def processMessages(self, data):
