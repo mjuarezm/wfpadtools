@@ -201,17 +201,10 @@ class BurstHistoTest(ControlMessageCommunicationTest, STTest):
     args = [histo, labels_ms, removeTokens]
 
 
-
 class GapHistoTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_GAP_HISTO
     histo, labels_ms, removeTokens = range(3), range(3), False
     args = [histo, labels_ms, removeTokens]
-
-
-class InjectHistoTest(ControlMessageCommunicationTest, STTest):
-    opcode = const.OP_INJECT_HISTO
-    histo, labels_ms = range(3), range(3)
-    args = [histo, labels_ms]
 
 
 class TotalPadTest(ControlMessageCommunicationTest, STTest):
