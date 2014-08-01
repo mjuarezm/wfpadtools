@@ -13,6 +13,7 @@ import obfsproxy.common.log as logging
 
 log = logging.get_obfslogger()
 
+VERBOSE = False
 
 class RandProbDist:
 
@@ -75,14 +76,14 @@ class RandProbDist:
 
         Only probabilities > 0.01 are dumped.
         """
+        if VERBOSE:
+            log.debug("Dumping probability distribution.")
 
-        log.debug("Dumping probability distribution.")
-
-        for singleton in self.dist.iterkeys():
-            # We are not interested in tiny probabilities.
-            if self.dist[singleton] > 0.01:
-                log.debug("P(%s) = %.3f" %
-                          (str(singleton), self.dist[singleton]))
+            for singleton in self.dist.iterkeys():
+                # We are not interested in tiny probabilities.
+                if self.dist[singleton] > 0.01:
+                    log.debug("P(%s) = %.3f" %
+                              (str(singleton), self.dist[singleton]))
 
     def randomSample( self ):
         """
