@@ -485,8 +485,6 @@ class WFPadTransport(BaseTransport):
             self.burstHistogram(*args)
         elif opcode == const.OP_GAP_HISTO:
             self.gapHistogram(*args)
-        elif opcode == const.OP_INJECT_HISTO:
-            self.injectHistogram(*args)
 
         # CS-BuFLO primitives
         elif opcode == const.OP_TOTAL_PAD:
@@ -499,6 +497,11 @@ class WFPadTransport(BaseTransport):
             self.batchPad(*args)
         else:
             log.error("The received operation code is not recognized.")
+
+#==============================================================================
+# WFPad Primitives proposed by Mike Perry
+# (https://lists.torproject.org/pipermail/tor-dev/2014-July/007246.html)
+#==============================================================================
 
     def sendIgnore(self, N=1):
         """Reply with a padding message."""
@@ -548,22 +551,6 @@ class WFPadTransport(BaseTransport):
         remove_toks : bool
                       if true, follow Adaptive Padding token removal rules.
                       If false, histograms are immutable.
-        """
-        pass
-
-    def injectHistogram(self, histo, labels):
-        """Replies to an inject_histogram request.
-
-        Parameters
-        ----------
-        histo : list
-                contains probability distribution of sending an IGNORE packet
-                if the wire was completely silent for that amount of time.
-        labels_ms : list
-                    millisecond labels for the bins
-
-        Note: This is not an Adaptive Padding primitive, but it seems
-        useful to model push-based protocols (like XMPP).
         """
         pass
 
@@ -641,9 +628,6 @@ class WFPadTransport(BaseTransport):
     def sendGapHistogram(self, histo, labels, remove_toks=False):
         self.sendControlMessage(const.OP_GAP_HISTO,
                                 args=[histo, labels, remove_toks])
-
-    def sendInjectHistogram(self, histo, labels):
-        self.sendControlMessage(const.OP_INJECT_HISTO, args=[histo, labels])
 
     def sendTotalPadRequest(self, sess_id, K, t):
         """Send request to pad all batches to 2^K cells total."""
