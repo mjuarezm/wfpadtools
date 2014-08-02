@@ -117,6 +117,7 @@ class WFPadTestServer(WFPadTestTransport, DumpingInterface):
 class DummyTestTransport(DummyTransport, DumpingInterface):
 
     def __init__(self):
+        DumpingInterface.__init__(self)
         DummyTransport.__init__(self)
 
     def parseData(self, data):

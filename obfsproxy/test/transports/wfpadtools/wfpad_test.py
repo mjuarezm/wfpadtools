@@ -141,13 +141,21 @@ class ControlMessageCommunicationTest(TestSetUp):
         self.specific_tests()
 
 
-#@unittest.skip("Not an important primitive. We may remove in the future.")
+class PostPrimitiveTest(ControlMessageCommunicationTest):
+
+    def spectest_run(self):
+        """Run tests that start with `posttest`."""
+        specTests = [testMethod for testMethod in dir(self)
+                     if testMethod.startswith('posttest')]
+        for specTest in specTests:
+            getattr(self, specTest)()
+
+
 class StartPaddingTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_START
     args = None
 
 
-#@unittest.skip("Not an important primitive. We may remove in the future.")
 class StopPaddingTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_STOP
     args = None
@@ -190,7 +198,7 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
         expectedDelay = self.t
         observedDelay = firstPaddingMsg['time'] - controlMsg['time']
         self.assertAlmostEqual(observedDelay, expectedDelay,
-                               msg="The expected delay %s does not"
+                               msg="The observed delay %s does not"
                                " match with the expected delay: %s"
                                % (observedDelay, expectedDelay),
                                delta=0.05)
@@ -235,29 +243,65 @@ class GapHistoTest(ControlMessageCommunicationTest, STTest):
     args = [histo, labels_ms, removeTokens]
 
 
-class TotalPadTest(ControlMessageCommunicationTest, STTest):
+class TotalPadTest(PostPrimitiveTest, STTest):
     opcode = const.OP_TOTAL_PAD
-    sessId, K, delay = "id123", 4, 1
+    sessId, K, delay = "id123", 3, 1
     args = [sessId, K, delay]
 
-
-class PayloadPadTest(ControlMessageCommunicationTest, STTest):
-    opcode = const.OP_PAYLOAD_PAD
-    args = None
-
-
-class BatchPadTest(ControlMessageCommunicationTest, STTest):
-    opcode = const.OP_BATCH_PAD
-    sessId, L, delay = "id123", 3, 1
-    args = [sessId, L, delay]
-
-    def spectest_num_messages(self):
+    def spectest_run(self):
         self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
         self.send_instruction(const.OP_START)
         self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
-        wrapper_after_stop = self.load_wrapper()
-        clientDumps = [msg for msg in wrapper_after_stop if msg['client']]
-        clientPaddingMsgs = [msg for msg in clientDumps
+        sleep((1 << self.K) * self.delay)
+        self.postWrapper = self.load_wrapper()
+        self.postClientDumps = [msg for msg in self.postWrapper
+                                if msg['client']]
+        self.postServerDumps = [msg for msg in self.postWrapper
+                                if not msg['client']]
+        PostPrimitiveTest.spectest_run(self)
+
+    def posttest_num_messages(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        obsNumMessages = len(clientPaddingMsgs)
+        expNumMessages = 1 << self.K
+        self.assertEqual(obsNumMessages, expNumMessages,
+                         "The observed number of padding messages (%s) "
+                         "does not match the expected one (%s)"
+                         % (obsNumMessages, expNumMessages))
+
+    def posttest_period(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
+            observedPeriod = msg2["time"] - msg1["time"]
+            expectedPeriod = self.delay
+            self.assertAlmostEqual(observedPeriod, expectedPeriod,
+                               msg="The observed period %s does not"
+                               " match with the expected period: %s"
+                               % (observedPeriod, expectedPeriod),
+                               delta=0.05)
+
+
+class BatchPadTest(PostPrimitiveTest, STTest):
+    opcode = const.OP_BATCH_PAD
+    sessId, L, delay = "id123", 5, 1
+    args = [sessId, L, delay]
+
+    def spectest_run(self):
+        self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
+        self.send_instruction(const.OP_START)
+        self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
+        sleep(self.L * self.delay)
+        self.postWrapper = self.load_wrapper()
+        self.postClientDumps = [msg for msg in self.postWrapper
+                                if msg['client']]
+        self.postServerDumps = [msg for msg in self.postWrapper
+                                if not msg['client']]
+        PostPrimitiveTest.spectest_run(self)
+
+    def posttest_num_messages(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
                              if msg['flags'] == const.FLAG_PADDING]
         obsNumMessages = len(clientPaddingMsgs)
         expNumMessages = self.L
@@ -265,6 +309,18 @@ class BatchPadTest(ControlMessageCommunicationTest, STTest):
                          "The observed number of padding messages (%s) "
                          "does not match the expected one (%s)"
                          % (obsNumMessages, expNumMessages))
+
+    def posttest_period(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
+            observedPeriod = msg2["time"] - msg1["time"]
+            expectedPeriod = self.delay
+            self.assertAlmostEqual(observedPeriod, expectedPeriod,
+                               msg="The observed period %s does not"
+                               " match with the expected period: %s"
+                               % (observedPeriod, expectedPeriod),
+                               delta=0.05)
 
 
 @unittest.skip("")
@@ -291,7 +347,6 @@ class ExternalBuFLOTests(TestSetUp, STTest):
         self.shim_chan = tester.connect_with_retry(("127.0.0.1",
                                                     tester.SHIM_PORT))
         self.shim_chan.settimeout(tester.SOCKET_TIMEOUT)
-        sleep(2)
 
     def tearDown(self):
         self.shim_chan.close()

@@ -32,7 +32,6 @@ class BuFLOTransport(WFPadTransport):
     _mintime = -1
 
     def __init__(self):
-        print "XXX INIT buflo ", id(self)
         log.debug("[wfad] Initializing %s (id=%s)." % (const.TRANSPORT_NAME,
                                                        str(id(self))))
         super(BuFLOTransport, self).__init__()
