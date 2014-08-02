@@ -15,8 +15,10 @@ from os import listdir
 from os.path import join, isfile, exists
 from obfsproxy.common import transport_config
 from obfsproxy.test.tester import TransportsSetUp
+import socket
+import multiprocessing
 
-DEBUG = False
+DEBUG = True
 
 # Logging settings:
 log = logging.get_obfslogger()
@@ -26,6 +28,33 @@ if DEBUG:
     log.set_log_severity('debug')
 
 
+class DummyReadWorker(object):
+
+    @staticmethod
+    def work(host, port):
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind((host, port))
+        listener.listen(1)
+        (conn, _) = listener.accept()
+        listener.close()
+        try:
+            while True:
+                conn.recv(4096)
+        except Exception, e:
+            print "Exception %s" % str(e)
+        conn.close()
+
+    def __init__(self, address):
+        self.worker = multiprocessing.Process(target=self.work,
+                                              args=(address))
+        self.worker.start()
+
+    def stop(self):
+        if self.worker.is_alive():
+            self.worker.terminate()
+
+
 class TestSetUp(TransportsSetUp):
 
     def setUp(self):
@@ -33,7 +62,7 @@ class TestSetUp(TransportsSetUp):
             ut.removedir(const.TEST_SERVER_DIR)
         ut.createdir(const.TEST_SERVER_DIR)
         super(TestSetUp, self).setUp()
-        self.output_reader = tester.ReadWorker(("127.0.0.1", tester.EXIT_PORT))
+        self.output_reader = DummyReadWorker(("127.0.0.1", tester.EXIT_PORT))
         self.input_chan = tester.connect_with_retry(("127.0.0.1",
                                                      tester.ENTRY_PORT))
         self.input_chan.settimeout(tester.SOCKET_TIMEOUT)
@@ -75,7 +104,7 @@ class ControlMessageCommunicationTest(TestSetUp):
 
     def send_instruction(self, opcode, args=None):
         """Send instruction to wfpadtest client."""
-        instrMsg = "TEST:{};".format(str(self.opcode))
+        instrMsg = "TEST:{};".format(str(opcode))
         if args:
             instrMsg += json.dumps(args)
         self.send_to_transport(instrMsg)
@@ -112,14 +141,13 @@ class ControlMessageCommunicationTest(TestSetUp):
         self.specific_tests()
 
 
-@unittest.skip("Found error at closing socket in obfsproxy_tester.log."
-               "We skip for now because this is not an important primitive.")
-class SatartPaddingTest(ControlMessageCommunicationTest, STTest):
+#@unittest.skip("Not an important primitive. We may remove in the future.")
+class StartPaddingTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_START
     args = None
 
 
-@unittest.skip("Not an important primitive. We may remove in the future.")
+#@unittest.skip("Not an important primitive. We may remove in the future.")
 class StopPaddingTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_STOP
     args = None
@@ -222,6 +250,21 @@ class BatchPadTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_BATCH_PAD
     sessId, L, delay = "id123", 3, 1
     args = [sessId, L, delay]
+
+    def spectest_num_messages(self):
+        self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
+        self.send_instruction(const.OP_START)
+        self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
+        wrapper_after_stop = self.load_wrapper()
+        clientDumps = [msg for msg in wrapper_after_stop if msg['client']]
+        clientPaddingMsgs = [msg for msg in clientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        obsNumMessages = len(clientPaddingMsgs)
+        expNumMessages = self.L
+        self.assertEqual(obsNumMessages, expNumMessages,
+                         "The observed number of padding messages (%s) "
+                         "does not match the expected one (%s)"
+                         % (obsNumMessages, expNumMessages))
 
 
 @unittest.skip("")

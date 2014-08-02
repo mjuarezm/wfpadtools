@@ -11,7 +11,7 @@ from time import sleep
 
 # Test config
 WATCHDOG_TIMEOUT = 180
-DEBUG = False
+DEBUG = True
 
 # Switch to leave Tor running and speed-up tests
 LEAVE_TOR_RUNNING = False
@@ -146,7 +146,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
 
     def test_tor(self):
         sleep(5)
-        resp = self.get_page("http://torcheck.xenobite.eu/", self.entry_port)
+        resp = self.get_page("https://www.google.com/", self.entry_port)
         self.assertEqual(resp.status_code, 200,
                          "The status code (%s) is not OK."
                          % resp.status_code)

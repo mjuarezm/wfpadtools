@@ -32,6 +32,9 @@ class BuFLOTransport(WFPadTransport):
     _mintime = -1
 
     def __init__(self):
+        print "XXX INIT buflo ", id(self)
+        log.debug("[wfad] Initializing %s (id=%s)." % (const.TRANSPORT_NAME,
+                                                       str(id(self))))
         super(BuFLOTransport, self).__init__()
 
         # Initialize minimum time for padding at each visit to a web page.
@@ -41,10 +44,10 @@ class BuFLOTransport(WFPadTransport):
                                            lambda i, n, c: 1)
 
         # The stop condition in BuFLO:
-        # BuFLO stops padding if the visit has finished and the elapsed time has
-        # exceeded the minimum padding time.
-        self.stopCondition = lambda self: self.getElapsed() > self._mintime \
-                                            and self._state is self._visiting
+        # BuFLO stops padding if the visit has finished and the
+        # elapsed time has exceeded the minimum padding time.
+        self.stopCondition = lambda s: self.getElapsed() > self._mintime \
+                                                    and not self._visiting
 
         # Register observer for shim events
         if self.weAreClient:

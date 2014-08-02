@@ -4,6 +4,7 @@ transport client and transport server that dump the state and messages
 received into a temporal file in order to be processed by the test module.
 """
 import obfsproxy.common.log as logging
+import obfsproxy.transports.wfpadtools.util as ut
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.dummy import DummyTransport
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
@@ -19,6 +20,9 @@ log = logging.get_obfslogger()
 class DumpingInterface(object):
     _history = []
     _tempDir = const.TEST_SERVER_DIR
+
+    def __init__(self):
+        ut.createdir(self._tempDir)
 
     def parseData(self, data):
         """Interface to parse data."""
@@ -39,6 +43,7 @@ class DumpingInterface(object):
 class WFPadTestTransport(WFPadTransport, DumpingInterface):
 
     def __init__(self):
+        DumpingInterface.__init__(self)
         WFPadTransport.__init__(self)
 
     def msg2dict(self, msg):
@@ -53,6 +58,7 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 "sessid": self._sessId,
                 "ctrlId": msg.ctrlId,
                 "totalArgsLen": msg.totalArgsLen,
+                "numMessages": self._numMessages
                 }
 
     def parseControl(self, data):
@@ -62,7 +68,7 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 opcode, args_str = payload.split(";")
                 opcode = int(opcode)
                 args = None
-                if args_str:
+                if args_str != "":
                     args = json.loads(args_str)
                 WFPadTransport.sendControlMessage(self, opcode, args)
             return True
