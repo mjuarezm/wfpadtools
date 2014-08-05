@@ -233,14 +233,30 @@ class AppHintTest(ControlMessageCommunicationTest, STTest):
 
 class BurstHistoTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_BURST_HISTO
-    histo, labels_ms, removeTokens = range(200), range(200), False
-    args = [histo, labels_ms, removeTokens]
+    histo = [23, 10, 9, 7, 9, 8, 3, 7, 3, 10, 5, 2, 1, 2, 0, 1, 0]
+    labels_ms = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096,
+                 8192, 16384, 32768, 65536, -1]
+    removeTokens = False
+    interpolate = True
+    when = "rcv"
+    args = [histo, labels_ms, removeTokens, interpolate, when]
+
+    def spectest_receive(self):
+        pass
 
 
 class GapHistoTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_GAP_HISTO
-    histo, labels_ms, removeTokens = range(3), range(3), False
-    args = [histo, labels_ms, removeTokens]
+    histo = [23, 10, 9, 7, 9, 8, 3, 7, 3, 10, 5, 2, 1, 2, 0, 1, 0]
+    labels_ms = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096,
+                 8192, 16384, 32768, 65536, -1]
+    removeTokens = False
+    interpolate = True
+    when = "rcv"
+    args = [histo, labels_ms, removeTokens, interpolate, when]
+
+    def spectest_receive(self):
+        pass
 
 
 class TotalPadTest(PostPrimitiveTest, STTest):
