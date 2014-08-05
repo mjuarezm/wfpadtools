@@ -21,7 +21,7 @@ class RandProbDist:
     Provides code to generate, sample and dump probability distributions.
     """
 
-    def __init__( self, genSingleton, genProbSignleton=None, seed=None ):
+    def __init__( self, genSingleton, genProbSignleton=None, seed=None, bins=None):
         """
         Initialise a discrete probability distribution.
 
@@ -34,39 +34,38 @@ class RandProbDist:
         self.prng = random if (seed is None) else random.Random(seed)
 
         self.sampleList = []
-        self.dist = self.genDistribution(genSingleton, genProbSignleton)
+        self.dist = self.genDistribution(genSingleton, genProbSignleton, bins)
         self.dumpDistribution()
 
-    def genDistribution( self, genSingleton, genProbSignleton ):
+    def genDistribution( self, genSingleton, genProbSignleton, bins=None):
         """
         Generate a discrete probability distribution.
 
         The parameter `genSingleton` is a function which is used to generate
         singletons for the probability distribution. `genProbSignleton`
-        returns the probabilities for the singletons returned by
-        `genSingleton`.
+        returns the probabilities for singletons returned by `genSingleton`.
         """
-
         dist = {}
 
         # Amount of distinct bins, i.e., packet lengths or inter arrival times.
-        bins = self.prng.randint(const.MIN_BINS, const.MAX_BINS)
+        if not bins:
+            bins = self.prng.randint(const.MIN_BINS, const.MAX_BINS) + 1
 
         # Cumulative probability of all bins.
         cumulProb = 0
 
-        for index in xrange(bins):
+        for index in xrange(bins - 1):
             if genProbSignleton:
                 prob = genProbSignleton(index, bins, cumulProb)
             else:
                 prob = self.prng.uniform(0, (1 - cumulProb))
             cumulProb += prob
 
-            singleton = genSingleton()
+            singleton = genSingleton(index, bins, cumulProb)
             dist[singleton] = prob
             self.sampleList.append((cumulProb, singleton,))
 
-        dist[genSingleton()] = (1 - cumulProb)
+        dist[genSingleton(index, bins, cumulProb)] = (1 - cumulProb)
 
         return dist
 

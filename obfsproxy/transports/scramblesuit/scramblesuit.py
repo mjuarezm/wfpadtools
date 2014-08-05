@@ -73,7 +73,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Inter-arrival time morpher to obfuscate inter arrival times.
         self.iatMorpher = self.srvState.iatDist if self.weAreServer else \
-                          probdist.new(lambda: random.random() %
+                          probdist.new(lambda i, n, c: random.random() %
                                        const.MAX_PACKET_DELAY)
 
         # Used to extract protocol messages from encrypted data.
@@ -319,11 +319,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 assert len(msg.payload) == const.PRNG_SEED_LENGTH
                 log.debug("Obtained PRNG seed.")
                 prng = random.Random(msg.payload)
-                pktDist = probdist.new(lambda: prng.randint(const.MIN_HDR_LEN,
+                pktDist = probdist.new(lambda i, n, c: prng.randint(const.MIN_HDR_LEN,
                                                             const.MTU),
                                        seed=msg.payload)
                 self.pktMorpher = packetmorpher.new(pktDist)
-                self.iatMorpher = probdist.new(lambda: prng.random() %
+                self.iatMorpher = probdist.new(lambda i, n, c: prng.random() %
                                                const.MAX_PACKET_DELAY,
                                                seed=msg.payload)
 
