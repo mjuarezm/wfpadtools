@@ -36,9 +36,9 @@ class BuFLOTransport(WFPadTransport):
         super(BuFLOTransport, self).__init__()
 
         # Initialize minimum time for padding at each visit to a web page.
-        self._delayProbdist = probdist.new(lambda: self._period,
+        self._delayProbdist = probdist.new(lambda i, n, c: self._period,
                                           lambda i, n, c: 1)
-        self._lengthProbdist = probdist.new(lambda: self._psize,
+        self._lengthProbdist = probdist.new(lambda i, n, c: self._psize,
                                            lambda i, n, c: 1)
 
         # Register observer for shim events

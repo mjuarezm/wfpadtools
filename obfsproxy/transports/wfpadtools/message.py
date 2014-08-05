@@ -165,24 +165,6 @@ class WFPadMessage(object):
 class WFPadMessageFactory(object):
     """Creates WFPad's protocol messages."""
 
-    def __init__(self, len_dist=None):
-        """Initialize the WFPadMessageFactory with the distribution `lenDist`.
-
-        If `lenDist` is `None`, a new discrete probability distribution is
-        generated randomly.
-        """
-        if len_dist:
-            self.lenDist = len_dist
-        else:
-            self.lenDist = probdist.new(lambda: random.randint(
-                                                const.MIN_HDR_LEN,
-                                                const.MTU),
-                                         lambda i, n, c: 1)
-
-    def setLenDistribution(self, newLenDist):
-        """Set a new length probability distribution."""
-        self.lenDist = newLenDist
-
     def createWFPadMessage(self, payload="", paddingLen=0,
                            flags=const.FLAG_DATA, opcode=None,
                            totalArgsLen=0, ctrlId=0, args=None):
@@ -260,25 +242,25 @@ def getOpcodeNames(opcode):
     debug log messages.
     """
     if opcode == const.OP_START:
-        return "START PADDING"
+        return "START_PADDING"
     elif opcode == const.OP_STOP:
-        return "STOP PADDING"
+        return "STOP_PADDING"
     elif opcode == const.OP_IGNORE:
-        return "ONE PADDING MESSAGE REQUEST"
+        return "RELAY_IGNORE"
     elif opcode == const.OP_SEND_PADDING:
-        return "PADDING REQUEST"
+        return "RELAY_SEND_PADDING"
     elif opcode == const.OP_APP_HINT:
-        return "APPLICATION HINT"
+        return "RELAY_SEND_PADDING"
     elif opcode == const.OP_BURST_HISTO:
-        return "BURST HISTOGRAM"
-    elif opcode == const.OP_INJECT_HISTO:
-        return "INJECT HISTOGRAM"
+        return "RELAY_BURST_HISTOGRAM"
+    elif opcode == const.OP_GAP_HISTO:
+        return "RELAY_GAP_HISTOGRAM"
     elif opcode == const.OP_TOTAL_PAD:
-        return "TOTAL PADDING"
+        return "RELAY_TOTAL_PAD"
     elif opcode == const.OP_PAYLOAD_PAD:
-        return "PAYLOAD PADDING"
+        return "RELAY_PAYLOAD_PAD"
     elif opcode == const.OP_BATCH_PAD:
-        return "BATCH PADDING"
+        return "RELAY_BATCH_PAD"
     else:
         return "Undefined"
 
