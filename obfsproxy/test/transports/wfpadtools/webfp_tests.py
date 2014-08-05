@@ -146,7 +146,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
 
     def test_tor(self):
         sleep(5)
-        resp = self.get_page("https://www.google.com/", self.entry_port)
+        resp = self.get_page("http://torcheck.xenobite.eu/", self.entry_port)
         self.assertEqual(resp.status_code, 200,
                          "The status code (%s) is not OK."
                          % resp.status_code)
