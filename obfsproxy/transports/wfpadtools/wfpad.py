@@ -48,6 +48,7 @@ following limitations:
 
 """
 import json
+import random
 from sets import Set
 from twisted.internet import reactor
 
@@ -137,6 +138,8 @@ class WFPadTransport(BaseTransport):
     _visiting = False  # Flags a visit to a page.
     _currentArgs = ""  # Arguments of the current control message.
     _numMessages = [0, 0]  # Count total number of messages (snt, rcv)
+    _burstHisto = {'rcv': None, 'snd': None}
+    _gapHisto = {'rcv': None, 'snd': None}
 
     def __init__(self):
         """Initialize a WFPadTransport object."""
@@ -156,10 +159,10 @@ class WFPadTransport(BaseTransport):
 
         # Initialize probability distributions
         self._period = 0.1
-        self._delayProbdist = probdist.new(lambda: self._period,
+        self._delayProbdist = probdist.new(lambda i, n, c: self._period,
                                             lambda i, n, c: 1)
         self._psize = const.MTU
-        self._lengthProbdist = probdist.new(lambda: self._psize,
+        self._lengthProbdist = probdist.new(lambda i, n, c: self._psize,
                                              lambda i, n, c: 1)
 
         # Run this method to evaluate the stop condition
@@ -576,7 +579,18 @@ class WFPadTransport(BaseTransport):
             arrives from upstream (the middle node). In both cases, the
             padding packet is sent in the direction of the client.
         """
-        pass
+        def genSingletonBurst(index, bins, accumProb):
+            if interpolate and index < bins - 1:
+                    return random.choice(xrange(labels[index],
+                                                labels[index + 1]))
+            return labels[index]
+
+        def genProbSignletonBurst(index, bins, accumProb):
+            return histo[index]
+
+        self._burstHisto[when] = probdist.new(genSingletonBurst,
+                                              genProbSignletonBurst,
+                                              bins=len(histo) - 1)
 
     def gapHistogram(self, histo, labels, removeToks=False,
                             interpolate=True, when="rcv"):
@@ -612,7 +626,18 @@ class WFPadTransport(BaseTransport):
             BURST_HISTOGRAM initiated padding into GAP_HISTOGRAM initiated
             padding.
         """
-        pass
+        def genSingletonGap(index, bins, accumProb):
+            if interpolate and index < bins - 1:
+                return random.choice(xrange(labels[index],
+                                            labels[index + 1]))
+            return labels[index]
+
+        def genProbSignletonGap(index, bins, accumProb):
+            return histo[index]
+
+        self._gapHisto[when] = probdist.new(genSingletonGap,
+                                            genProbSignletonGap,
+                                            bins=len(histo) - 1)
 
     def relayTotalPad(self, sessId, t):
         """Pad all batches to nearest 2^K cells total or until session ends.
@@ -630,7 +655,7 @@ class WFPadTransport(BaseTransport):
         """
         self._period = t
         self._sessId = sessId
-        self._delayProbdist = probdist.new(lambda: self._period,
+        self._delayProbdist = probdist.new(lambda i, n, c: self._period,
                                             lambda i, n, c: 1)
         # Set the stop condition to satisfy that the number of messages
         # sent within the session is a power of 2 (otherwise it'll continue
@@ -660,7 +685,7 @@ class WFPadTransport(BaseTransport):
         """
         self._period = t
         self._sessId = sessId
-        self._delayProbdist = probdist.new(lambda: self._period,
+        self._delayProbdist = probdist.new(lambda i, n, c: self._period,
                                             lambda i, n, c: 1)
         # Set the stop condition to satisfy that the number of messages
         # sent within the session is a multiple of parameter `L` and the
