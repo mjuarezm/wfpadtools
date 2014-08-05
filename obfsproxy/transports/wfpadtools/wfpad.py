@@ -58,7 +58,7 @@ from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message, socks_shim
 from obfsproxy.transports.wfpadtools import util as ut
 import obfsproxy.transports.wfpadtools.const as const
-from obfsproxy.transports.wfpadtools.message import WFPadMessage
+from obfsproxy.transports.wfpadtools.message import WFPadMessage, getOpcodeNames
 
 log = logging.get_obfslogger()
 
@@ -474,27 +474,27 @@ class WFPadTransport(BaseTransport):
 
         # Generic primitives
         if opcode == const.OP_IGNORE:
-            self.sendIgnore()
+            self.relayIgnore()
         elif opcode == const.OP_SEND_PADDING:
-            self.sendPadding(*args)
+            self.relaySendPadding(*args)
         elif opcode == const.OP_APP_HINT:
-            self.appHint(*args)
+            self.relayAppHint(*args)
 
         # Adaptive padding primitives
         elif opcode == const.OP_BURST_HISTO:
-            self.burstHistogram(*args)
+            self.relayBurstHistogram(*args)
         elif opcode == const.OP_GAP_HISTO:
             self.gapHistogram(*args)
 
         # CS-BuFLO primitives
         elif opcode == const.OP_TOTAL_PAD:
-            self.totalPad(*args)
+            self.relayTotalPad(*args)
         elif opcode == const.OP_PAYLOAD_PAD:
-            self.payloadPad()
+            self.relayPayloadPad()
 
         # Tamaraw primitives
         elif opcode == const.OP_BATCH_PAD:
-            self.batchPad(*args)
+            self.relayBatchPad(*args)
         else:
             log.error("The received operation code is not recognized.")
 
@@ -503,80 +503,169 @@ class WFPadTransport(BaseTransport):
 # (https://lists.torproject.org/pipermail/tor-dev/2014-July/007246.html)
 #==============================================================================
 
-    def sendIgnore(self, N=1):
-        """Reply with a padding message."""
-        log.debug("[wfpad] - Sending IGNORE cell.")
+    def relayIgnore(self):
+        """Simple fixed-length (CELL_SIZE) padding cell."""
+        log.debug("[wfpad] - Sending padding cell in response to an "
+                  " %s control message." % getOpcodeNames(const.OP_IGNORE))
+        reactor.callLater(0,
+                          self.sendMessage,
+                          payload="",
+                          paddingLen=const.MPU,
+                          flags=const.FLAG_PADDING)
+
+    def relaySendPadding(self, N, t):
+        """Send the requested number of padding cells in response.
+
+        Parameters
+        ----------
+        N : int
+            Number of padding cells to send in response to this cell.
+        t : int
+            Number of microseconds delay before sending.
+        """
+        log.debug("[wfpad] - Sending %s padding cells after %t delay in "
+                  "response to a %s control message."
+                  % (N, t, getOpcodeNames(const.OP_SEND_PADDING)))
         for _ in xrange(N):
-            reactor.callLater(0, self.sendMessage,
-                              payload="",
-                              paddingLen=const.MPU,
-                              flags=const.FLAG_PADDING)
+            reactor.callLater(t, self.relayIgnore, N=N)
 
-    def sendPadding(self, N, t):
-        """Reply with `N` padding messages delayed `t` ms."""
-        reactor.callLater(t, self.sendIgnore, N=N)
+    def relayAppHint(self, sessId, status):
+        """A hint from the application layer for session start/end.
 
-    def appHint(self, sessId, status):
-        """Provides information to the server about the current session."""
+        Parameters
+        ----------
+        sessId : str
+                 Identifies the session (e.g., keyed hash of URL bar domain).
+        status : bool
+                 True or False, indicating session start and end respectively.
+        """
+        log.debug("[wfpad] - Setting sessId to %s and visiting to %s "
+                  "in response to a %s control message."
+                  % (sessId, status, getOpcodeNames(const.OP_SEND_PADDING)))
         self._sessId = sessId
         self._visiting = status
 
-    def burstHistogram(self, histo, labels, remove_toks=False):
-        """Replies to a burst_histo request.
+    def relayBurstHistogram(self, histo, labels, removeToks=False,
+                            interpolate=True, when="rcv"):
+        """Specify histogram encoding the delay distribution.
+
+        The delay distribution represents the probability of sending a single
+        padding packet after a given delay in response to either an upstream
+        cell, or a client-originating cell.
 
         Parameters
         ----------
         histo : list
-                contains delay distribution of sending an IGNORE packet after
-                sending an *real* packet (with "Infinity" bin to indicate run
-                termination probability).
-        labels_ms : list
-                    millisecond labels for the bins
-        remove_toks : bool
-                      if true, follow Adaptive Padding token removal rules.
-                      If false, histograms are immutable.
+            Contains delay distribution of sending an IGNORE cell after
+            sending an IGNORE cell.
+        labels : list
+            Millisecond labels for the bins (with "infinity" bin to allow
+            encoding the probability of not sending any padding packet in
+            response to this packet).
+        removeToks : bool
+            If True, follow Adaptive Padding token removal rules.
+            If False, histograms are immutable.
+        interpolate : bool
+            If True, randomize the delay uniformly between bin labels
+            If False, use bin labels as exact delay values.
+        when : str
+            If set to "rcv", this histogram governs the probability of
+            sending a padding packet after some delay in response to a packet
+            originating from the client. If set to "snd", this histogram
+            governs padding packets that are transmitted after a packet
+            arrives from upstream (the middle node). In both cases, the
+            padding packet is sent in the direction of the client.
         """
         pass
 
-    def gapHistogram(self, histo, labels, remove_toks=False):
-        """Replies to a gap_histo request.
+    def gapHistogram(self, histo, labels, removeToks=False,
+                            interpolate=True, when="rcv"):
+        """Specify histogram that encodes the delay distribution
+
+        The delay distribution represents the probability of sending a
+        single additional padding packet after a given delay following
+        a padding packet that originated at this hop. In both cases, the
+        padding packet is sent in the direction of the client.
 
         Parameters
         ----------
         histo : list
-                contains delay distribution of sending an IGNORE packet after
-                sending an IGNORE packet (with "Infinity" bin to indicate run
-                termination probability).
-        labels_ms : list
-                    millisecond labels for the bins
-        remove_toks : bool
-                      if true, follow Adaptive Padding token removal rules.
-                      If false, histograms are immutable.
+            Contains delay distribution of sending an IGNORE cell after
+            sending an IGNORE cell.
+        labels : list
+            Millisecond labels for the bins (with "infinity" bin to allow
+            encoding the probability of not sending any padding packet in
+            response to this packet).
+        removeToks : bool
+            If True, follow Adaptive Padding token removal rules.
+            If False, histograms are immutable.
+        interpolate : bool
+            If True, randomize the delay uniformly between bin labels
+            If False, use bin labels as exact delay values.
+        when : str
+            If "rcv", this histogram applies to locally-inserted padding
+            packets that were initially sent in response to client-originated
+            data.  If "snd", this histogram applies to packets sent in response
+            to locally-inserted padding packets sent in response to upstream
+            data. Note that this means that implementations must maintain this
+            metadata as internal state as the system transitions from
+            BURST_HISTOGRAM initiated padding into GAP_HISTOGRAM initiated
+            padding.
         """
         pass
 
-    def totalPad(self, sess_id, K, t):
-        """Pad all batches to 2^K cells total.
+    def relayTotalPad(self, sessId, t):
+        """Pad all batches to nearest 2^K cells total or until session ends.
 
-        Pad all batches to 2^K cells total within `t` microseconds,
-        or until APP_HINT(session_id, stop).
-        """
-        self.batchPad(sess_id, 1 << K, t)
+        Pads all batches to nearest 2^K cells total or until it receives a
+        relayAppHint(sessId, False).
 
-    def payloadPad(self):
-        pass
-
-    def batchPad(self, sess_id, L, t):
-        """Pad all batches to L cells total.
-
-        Pad all batches to `L` cells total within `t` microseconds,
-        or until APP_HINT(session_id, stop).
+        Parameters
+        ----------
+        sessId : str
+            The session ID from relayAppHint().
+        t : int
+            The number of microseconds to wait between cells to consider them
+            part of the same batch.
         """
         self._period = t
-        self._sessId = sess_id
+        self._sessId = sessId
         self._delayProbdist = probdist.new(lambda: self._period,
                                             lambda i, n, c: 1)
-        self.stopCondition = lambda self: self._numMessages[0] >= L \
+        # Set the stop condition to satisfy that the number of messages
+        # sent within the session is a power of 2 (otherwise it'll continue
+        # padding until the closest one) and that the session has finished.
+        self.stopCondition = lambda self: \
+                (self._numMessages[0] & (self._numMessages[0] - 1)) == 0 \
+                and not self._visiting
+
+    def relayPayloadPad(self):
+        pass
+
+    def relayBatchPad(self, sessId, L, t):
+        """Pad all batches of cells to `L` cells total.
+
+        Pad all batches to `L` cells total or until it receives a
+        relayAppHint(sessId, False).
+
+        Parameters
+        ----------
+        sessId : str
+            The session ID from relayAppHint().
+        L : int
+            The multiple of cells to pad to.
+        t : int
+            The number of microseconds to wait between cells to consider them
+            part of the same batch.
+        """
+        self._period = t
+        self._sessId = sessId
+        self._delayProbdist = probdist.new(lambda: self._period,
+                                            lambda i, n, c: 1)
+        # Set the stop condition to satisfy that the number of messages
+        # sent within the session is a multiple of parameter `L` and the
+        # session has finished.
+        self.stopCondition = lambda self: self._numMessages[0] % L == 0 \
                                     and not self._visiting
 
     #==========================================================================
