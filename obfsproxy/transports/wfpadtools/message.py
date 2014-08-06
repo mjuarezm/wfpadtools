@@ -245,8 +245,6 @@ def getOpcodeNames(opcode):
         return "START_PADDING"
     elif opcode == const.OP_STOP:
         return "STOP_PADDING"
-    elif opcode == const.OP_IGNORE:
-        return "RELAY_IGNORE"
     elif opcode == const.OP_SEND_PADDING:
         return "RELAY_SEND_PADDING"
     elif opcode == const.OP_APP_HINT:
@@ -302,7 +300,6 @@ def isOpCodeSane(opcode):
         const.OP_BATCH_PAD,
         const.OP_BURST_HISTO,
         const.OP_GAP_HISTO,
-        const.OP_IGNORE,
         const.OP_INJECT_HISTO,
         const.OP_PAYLOAD_PAD,
         const.OP_SEND_PADDING,

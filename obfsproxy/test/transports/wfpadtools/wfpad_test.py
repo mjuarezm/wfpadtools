@@ -161,21 +161,6 @@ class StopPaddingTest(ControlMessageCommunicationTest, STTest):
     args = None
 
 
-class SendIgnoreTest(ControlMessageCommunicationTest, STTest):
-    opcode = const.OP_IGNORE
-    args = None
-
-    def spectest_padding_message(self):
-        paddingMsgs = [msg for msg in self.clientDumps
-                        if msg['flags'] == const.FLAG_PADDING]
-        expNumPaddingMsgs = 1
-        numPaddingMsgs = len(paddingMsgs)
-        self.assertEquals(numPaddingMsgs, expNumPaddingMsgs,
-                          "Observed number of padding msgs (%s)"
-                          " does not match the expected one: %s"
-                          % (numPaddingMsgs, expNumPaddingMsgs))
-
-
 class SendPaddingTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_SEND_PADDING
     N, t = 5, 0.1

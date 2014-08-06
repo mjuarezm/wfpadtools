@@ -278,6 +278,12 @@ class WFPadTransport(BaseTransport):
         self._numMessages[0] += 1
         self.sendMessagesDownstream([msg])
 
+    def sendIgnore(self):
+        """Simple fixed-length (CELL_SIZE) padding cell."""
+        self.sendMessage(payload="",
+                         paddingLen=const.MPU,
+                         flags=const.FLAG_PADDING)
+
     def sendControlMessages(self, opcode, args):
         """Send control messages."""
         msgs = self._msgFactory.createWFPadControlMessages(opcode, args)
@@ -506,16 +512,6 @@ class WFPadTransport(BaseTransport):
 # (https://lists.torproject.org/pipermail/tor-dev/2014-July/007246.html)
 #==============================================================================
 
-    def relayIgnore(self):
-        """Simple fixed-length (CELL_SIZE) padding cell."""
-        log.debug("[wfpad] - Sending padding cell in response to an "
-                  " %s control message." % getOpcodeNames(const.OP_IGNORE))
-        reactor.callLater(0,
-                          self.sendMessage,
-                          payload="",
-                          paddingLen=const.MPU,
-                          flags=const.FLAG_PADDING)
-
     def relaySendPadding(self, N, t):
         """Send the requested number of padding cells in response.
 
@@ -530,7 +526,7 @@ class WFPadTransport(BaseTransport):
                   "response to a %s control message."
                   % (N, t, getOpcodeNames(const.OP_SEND_PADDING)))
         for _ in xrange(N):
-            reactor.callLater(t, self.relayIgnore, N=N)
+            reactor.callLater(t, self.sendIgnore)
 
     def relayAppHint(self, sessId, status):
         """A hint from the application layer for session start/end.
@@ -710,10 +706,6 @@ class WFPadTransport(BaseTransport):
     def sendStopPaddingRequest(self):
         """Send a start padding as control message."""
         self.sendControlMessage(const.OP_STOP)
-
-    def sendIgnoreRequest(self):
-        """Send an ignore request as control message."""
-        self.sendControlMessage(const.OP_IGNORE)
 
     def sendPaddingCellsRequest(self, N, t):
         """Send an ignore request as control message."""

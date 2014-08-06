@@ -29,51 +29,50 @@ ST_CONNECTED = 1
 ST_PADDING = 2
 
 # Flags header protocol
-FLAG_DATA = (1 << 0)
-FLAG_PADDING = (1 << 1)
-FLAG_CONTROL = (1 << 2)
+FLAG_DATA       = (1 << 0)
+FLAG_PADDING    = (1 << 1)
+FLAG_CONTROL    = (1 << 2)
 
 # Control OP codes
-OP_START = 0
-OP_STOP = 1
+OP_START        = 0
+OP_STOP         = 1
 
 # Generic primitives
-OP_IGNORE = 2
-OP_SEND_PADDING = 3
-OP_APP_HINT = 4
+OP_SEND_PADDING = 2
+OP_APP_HINT     = 3
 
 # Adaptive padding primitives
-OP_BURST_HISTO = 5
-OP_GAP_HISTO = 6
-OP_INJECT_HISTO = 7
+OP_BURST_HISTO  = 4
+OP_GAP_HISTO    = 5
+OP_INJECT_HISTO = 6
 
 # CS-BuFLO primitives
-OP_TOTAL_PAD = 8
-OP_PAYLOAD_PAD = 9
+OP_TOTAL_PAD    = 7
+OP_PAYLOAD_PAD  = 8
 
 # Tamaraw primitives
-OP_BATCH_PAD = 10
+OP_BATCH_PAD    = 9
 
 # WFPad message structure fields's constants
-TOTLENGTH_POS = 0
-TOTLENGTH_LEN = 2
+TOTLENGTH_POS   = 0
+TOTLENGTH_LEN   = 2
 
-PAYLOAD_POS = 2
-PAYLOAD_LEN = 2
+PAYLOAD_POS     = 2
+PAYLOAD_LEN     = 2
 
-FLAGS_POS = 4
-FLAGS_LEN = 1
+FLAGS_POS       = 4
+FLAGS_LEN       = 1
 
-CONTROL_POS = 5
-CONTROL_LEN = 1
+CONTROL_POS     = 5
+CONTROL_LEN     = 1
 
 ARGS_TOTAL_LENGTH_POS = 6
 ARGS_TOTAL_LENGTH_LEN = 2
 
-CTRL_ID_POS = 8
-CTRL_ID_LEN = 1
+CTRL_ID_POS     = 8
+CTRL_ID_LEN     = 1
 
-ARGS_POS = 9
+ARGS_POS        = 9
 
 
 # arguments specification [arg_1, arg_2, ...] where arg_i = (length, type)
@@ -94,7 +93,6 @@ def get_args_len(self, opcode):
 ARGS_DICT = {
              OP_START: [0],
              OP_STOP: [0],
-             OP_IGNORE: [0],
              OP_SEND_PADDING: [2, arg(ord, "num_padding_msgs"), arg(ord, "delay")],
              OP_APP_HINT: [2, arg(str, "session_id"), arg(bool, "status")],
              OP_BURST_HISTO: [3, arg((list, int), "histogram"), arg((list, int), "labels_ms"), arg(bool, "remove_toks")],
