@@ -138,6 +138,7 @@ class WFPadTransport(BaseTransport):
     _visiting = False  # Flags a visit to a page.
     _currentArgs = ""  # Arguments of the current control message.
     _numMessages = [0, 0]  # Count total number of messages (snt, rcv)
+    _deferredNextPadding = None
     _burstHisto = {'rcv': None, 'snd': None}
     _gapHisto = {'rcv': None, 'snd': None}
 
@@ -348,7 +349,7 @@ class WFPadTransport(BaseTransport):
         if self.stopCondition(self):
             self.stopPadding()
             return
-        reactor.callLater(delay, self.flushPaddingBuffer)
+        self._deferredNextPadding = reactor.callLater(delay, self.flushPaddingBuffer)
 
     def processMessages(self, data):
         """Extract WFPad protocol messages.
@@ -469,6 +470,82 @@ class WFPadTransport(BaseTransport):
         if self._state >= const.ST_CONNECTED:
             self.processMessages(d)
 
+
+class WFPadClient(WFPadTransport):
+    """Extend the WFPad class."""
+
+    def __init__(self):
+        """Initialize a WFPadClient object."""
+        WFPadTransport.__init__(self)
+
+    #==========================================================================
+    # Methods to send control messages
+    #==========================================================================
+    def sendControlMessage(self, opcode, args=None, delay=0):
+        """Send a message with a specific _opcode field."""
+        reactor.callLater(delay,
+                          self.sendControlMessages,
+                          opcode=opcode,
+                          args=args)
+
+    def sendStartPaddingRequest(self):
+        """Send a start padding as control message."""
+        self.sendControlMessage(const.OP_START)
+
+    def sendStopPaddingRequest(self):
+        """Send a start padding as control message."""
+        self.sendControlMessage(const.OP_STOP)
+
+    def sendPaddingCellsRequest(self, N, t):
+        """Send an ignore request as control message."""
+        self.sendControlMessage(const.OP_SEND_PADDING,
+                                args=[N, t])
+
+    def sendAppHintRequest(self, sessNumber, status=True):
+        """Send an app hint request as control message.
+
+        We hash the session number, the PT object id and a timestamp
+        in order to get a unique identifier.
+
+        Parameters
+        ----------
+        sessNumber : int
+        status : boolean
+                indicates whether a session starts (True) or ends (False).
+        """
+        sessId = ut.hash_text(str(sessNumber)
+                               + str(id(self))
+                               + str(ut.timestamp()))
+        self.sendControlMessage(const.OP_APP_HINT, args=[sessId, status])
+
+    def sendBurstHistogram(self, histo, labels, remove_toks=False):
+        self.sendControlMessage(const.OP_BURST_HISTO,
+                                args=[histo, labels, remove_toks])
+
+    def sendGapHistogram(self, histo, labels, remove_toks=False):
+        self.sendControlMessage(const.OP_GAP_HISTO,
+                                args=[histo, labels, remove_toks])
+
+    def sendTotalPadRequest(self, sess_id, K, t):
+        """Send request to pad all batches to 2^K cells total."""
+        self.sendControlMessage(const.OP_TOTAL_PAD, args=[sess_id, K, t])
+
+    def sendPayloadPadRequest(self):
+        """TODO: not clear whether this primitive is useful for Tor."""
+        self.sendControlMessage(const.OP_PAYLOAD_PAD)
+
+    def sendBatchPadRequest(self, sess_id, L, t):
+        """Send request to pad batches to L cells."""
+        self.sendControlMessage(const.OP_BATCH_PAD, args=[sess_id, L, t])
+
+
+class WFPadServer(WFPadTransport):
+    """Extend the WFPad class."""
+
+    def __init__(self):
+        """Initialize a WFPadServer object."""
+        WFPadTransport.__init__(self)
+
     #==========================================================================
     # Methods to deal with control messages
     #==========================================================================
@@ -482,9 +559,7 @@ class WFPadTransport(BaseTransport):
             self.stopPadding()
 
         # Generic primitives
-        if opcode == const.OP_IGNORE:
-            self.relayIgnore()
-        elif opcode == const.OP_SEND_PADDING:
+        if opcode == const.OP_SEND_PADDING:
             self.relaySendPadding(*args)
         elif opcode == const.OP_APP_HINT:
             self.relayAppHint(*args)
@@ -509,7 +584,7 @@ class WFPadTransport(BaseTransport):
 
 #==============================================================================
 # WFPad Primitives proposed by Mike Perry
-# (https://lists.torproject.org/pipermail/tor-dev/2014-July/007246.html)
+# (https://gitweb.torproject.org/user/mikeperry/torspec.git/blob/refs/heads/multihop-padding-primitives:/proposals/ideas/xxx-multihop-padding-primitives.txt)
 #==============================================================================
 
     def relaySendPadding(self, N, t):
@@ -688,79 +763,3 @@ class WFPadTransport(BaseTransport):
         # session has finished.
         self.stopCondition = lambda self: self._numMessages[0] % L == 0 \
                                     and not self._visiting
-
-    #==========================================================================
-    # Methods to send control messages
-    #==========================================================================
-    def sendControlMessage(self, opcode, args=None, delay=0):
-        """Send a message with a specific _opcode field."""
-        reactor.callLater(delay,
-                          self.sendControlMessages,
-                          opcode=opcode,
-                          args=args)
-
-    def sendStartPaddingRequest(self):
-        """Send a start padding as control message."""
-        self.sendControlMessage(const.OP_START)
-
-    def sendStopPaddingRequest(self):
-        """Send a start padding as control message."""
-        self.sendControlMessage(const.OP_STOP)
-
-    def sendPaddingCellsRequest(self, N, t):
-        """Send an ignore request as control message."""
-        self.sendControlMessage(const.OP_SEND_PADDING,
-                                args=[N, t])
-
-    def sendAppHintRequest(self, sessNumber, status=True):
-        """Send an app hint request as control message.
-
-        We hash the session number, the PT object id and a timestamp
-        in order to get a unique identifier.
-
-        Parameters
-        ----------
-        sessNumber : int
-        status : boolean
-                indicates whether a session starts (True) or ends (False).
-        """
-        sessId = ut.hash_text(str(sessNumber)
-                               + str(id(self))
-                               + str(ut.timestamp()))
-        self.sendControlMessage(const.OP_APP_HINT, args=[sessId, status])
-
-    def sendBurstHistogram(self, histo, labels, remove_toks=False):
-        self.sendControlMessage(const.OP_BURST_HISTO,
-                                args=[histo, labels, remove_toks])
-
-    def sendGapHistogram(self, histo, labels, remove_toks=False):
-        self.sendControlMessage(const.OP_GAP_HISTO,
-                                args=[histo, labels, remove_toks])
-
-    def sendTotalPadRequest(self, sess_id, K, t):
-        """Send request to pad all batches to 2^K cells total."""
-        self.sendControlMessage(const.OP_TOTAL_PAD, args=[sess_id, K, t])
-
-    def sendPayloadPadRequest(self):
-        """TODO: not clear whether this primitive is useful for Tor."""
-        self.sendControlMessage(const.OP_PAYLOAD_PAD)
-
-    def sendBatchPadRequest(self, sess_id, L, t):
-        """Send request to pad batches to L cells."""
-        self.sendControlMessage(const.OP_BATCH_PAD, args=[sess_id, L, t])
-
-
-class WFPadClient(WFPadTransport):
-    """Extend the WFPad class."""
-
-    def __init__(self):
-        """Initialize a WFPadClient object."""
-        WFPadTransport.__init__(self)
-
-
-class WFPadServer(WFPadTransport):
-    """Extend the WFPad class."""
-
-    def __init__(self):
-        """Initialize a WFPadServer object."""
-        WFPadTransport.__init__(self)
