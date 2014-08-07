@@ -472,47 +472,36 @@ class WFPadTransport(BaseTransport):
 
 
 class WFPadClient(WFPadTransport):
-    """Extend the WFPad class."""
+    """Extend the WFPad class.
 
+    Methods to request primitives are only implemented in the client. The
+    control is given to the client, the client specifies the padding strategy
+    to the server by means of control messages. Only the client can send
+    control messages. The padding strategy is implemented directly in the
+    client.
+    """
     def __init__(self):
         """Initialize a WFPadClient object."""
         WFPadTransport.__init__(self)
 
-    #==========================================================================
-    # Methods to send control messages
-    #==========================================================================
     def sendControlMessage(self, opcode, args=None, delay=0):
-        """Send a message with a specific _opcode field."""
+        """Send a message with a specific opcode field."""
         reactor.callLater(delay,
                           self.sendControlMessages,
                           opcode=opcode,
                           args=args)
 
     def sendStartPaddingRequest(self):
-        """Send a start padding as control message."""
         self.sendControlMessage(const.OP_START)
 
     def sendStopPaddingRequest(self):
-        """Send a start padding as control message."""
         self.sendControlMessage(const.OP_STOP)
 
     def sendPaddingCellsRequest(self, N, t):
-        """Send an ignore request as control message."""
         self.sendControlMessage(const.OP_SEND_PADDING,
                                 args=[N, t])
 
     def sendAppHintRequest(self, sessNumber, status=True):
-        """Send an app hint request as control message.
-
-        We hash the session number, the PT object id and a timestamp
-        in order to get a unique identifier.
-
-        Parameters
-        ----------
-        sessNumber : int
-        status : boolean
-                indicates whether a session starts (True) or ends (False).
-        """
         sessId = ut.hash_text(str(sessNumber)
                                + str(id(self))
                                + str(ut.timestamp()))
@@ -527,15 +516,12 @@ class WFPadClient(WFPadTransport):
                                 args=[histo, labels, remove_toks])
 
     def sendTotalPadRequest(self, sess_id, K, t):
-        """Send request to pad all batches to 2^K cells total."""
         self.sendControlMessage(const.OP_TOTAL_PAD, args=[sess_id, K, t])
 
     def sendPayloadPadRequest(self):
-        """TODO: not clear whether this primitive is useful for Tor."""
         self.sendControlMessage(const.OP_PAYLOAD_PAD)
 
     def sendBatchPadRequest(self, sess_id, L, t):
-        """Send request to pad batches to L cells."""
         self.sendControlMessage(const.OP_BATCH_PAD, args=[sess_id, L, t])
 
 
@@ -568,7 +554,7 @@ class WFPadServer(WFPadTransport):
         elif opcode == const.OP_BURST_HISTO:
             self.relayBurstHistogram(*args)
         elif opcode == const.OP_GAP_HISTO:
-            self.gapHistogram(*args)
+            self.relayGapHistogram(*args)
 
         # CS-BuFLO primitives
         elif opcode == const.OP_TOTAL_PAD:
@@ -613,14 +599,14 @@ class WFPadServer(WFPadTransport):
         status : bool
                  True or False, indicating session start and end respectively.
         """
-        log.debug("[wfpad] - Setting sessId to %s and visiting to %s "
+        log.debug("[wfpad] - Session %s will %s, "
                   "in response to a %s control message."
                   % (sessId, status, getOpcodeNames(const.OP_SEND_PADDING)))
         self._sessId = sessId
         self._visiting = status
 
     def relayBurstHistogram(self, histo, labels, removeToks=False,
-                            interpolate=True, when="rcv"):
+                                interpolate=True, when="rcv"):
         """Specify histogram encoding the delay distribution.
 
         The delay distribution represents the probability of sending a single
@@ -663,8 +649,8 @@ class WFPadServer(WFPadTransport):
                                               genProbSignletonBurst,
                                               bins=len(histo) - 1)
 
-    def gapHistogram(self, histo, labels, removeToks=False,
-                            interpolate=True, when="rcv"):
+    def relayGapHistogram(self, histo, labels, removeToks=False,
+                                interpolate=True, when="rcv"):
         """Specify histogram that encodes the delay distribution
 
         The delay distribution represents the probability of sending a

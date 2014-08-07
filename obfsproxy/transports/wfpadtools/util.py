@@ -122,7 +122,7 @@ def timestamp():
     return time()
 
 
-def get_page(url, port, timeout=const.GET_PAGE_TIMEOUT):
+def get_page(url, port, timeout):
     session = requests.session()
     session.proxies = {'http': 'socks5://127.0.0.1:{}'.format(port),
                        'https': 'socks5://127.0.0.1:{}'.format(port)}
