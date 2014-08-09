@@ -9,14 +9,11 @@ our protocol specification.
 """
 import json
 import math
-import random
-
-import obfsproxy.transports.base as base
-from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const
 
 import obfsproxy.common.log as logging
 import obfsproxy.common.serialize as pack
+import obfsproxy.transports.base as base
 
 
 log = logging.get_obfslogger()
@@ -63,6 +60,7 @@ class WFPadMessage(object):
                                       across all messages. We need this to
                                       know when do we have to wait for more
                                       messages carrying the rest of args.
+                                      Mandatory if it's a control message.
                                       Note: we can compute number of total
                                       messages from this field like:
                                            num_msgs = args_total_len/MPU
@@ -425,9 +423,12 @@ class WFPadMessageExtractor(object):
                                                "message opcode.")
 
         self.ctrlHdrLen = const.CTRL_HDR_LEN
+
+        # Parse args length
+        self.totalArgsLen = self.gettotalArgsLen()
+
         # If the opcode requires args
-        if const.ARGS_DICT[self.opcode][0] > 0:
-            self.totalArgsLen = self.gettotalArgsLen()
+        if self.totalArgsLen > 0:
             self.ctrlId = self.getCtrlId()
             self.ctrlHdrLen += const.ARGS_TOTAL_LENGTH_LEN + const.CTRL_ID_LEN
             MPUCtrlArgs = const.MTU - self.ctrlHdrLen
@@ -438,7 +439,8 @@ class WFPadMessageExtractor(object):
                 if numMsgs > (self.ctrlId + 1):
                     self.argsParseLen = MPUCtrlArgs
                 elif numMsgs == (self.ctrlId + 1):
-                    self.argsParseLen = getParseLength(self.totalArgsLen, MPUCtrlArgs)
+                    self.argsParseLen = getParseLength(self.totalArgsLen,
+                                                       MPUCtrlArgs)
             self.args = self.getMessageField(const.ARGS_POS, self.argsParseLen)
             self.ctrlHdrLen += self.argsParseLen
 

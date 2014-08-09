@@ -4,7 +4,8 @@ This module implements the BuFLO countermeasure proposed by Dyer et al.
 import obfsproxy.common.log as logging
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const, socks_shim
-from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
+from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport, WFPadClient,\
+    WFPadServer
 from obfsproxy.transports.wfpadtools.wfpad import WFPadShimObserver
 
 log = logging.get_obfslogger()
@@ -108,7 +109,7 @@ class BuFLOTransport(WFPadTransport):
             cls._psize = args.psize
 
 
-class BuFLOClient(BuFLOTransport):
+class BuFLOClient(BuFLOTransport, WFPadClient):
     """Extend the BuFLOTransport class."""
 
     def __init__(self):
@@ -116,7 +117,7 @@ class BuFLOClient(BuFLOTransport):
         BuFLOTransport.__init__(self)
 
 
-class BuFLOServer(BuFLOTransport):
+class BuFLOServer(BuFLOTransport, WFPadServer):
     """Extend the BuFLOTransport class."""
 
     def __init__(self):

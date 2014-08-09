@@ -20,7 +20,7 @@ class WFPadMessageFactoryTest(unittest.TestCase):
     def test_control_message(self):
         # Test control message with no arguments
         ctrlMsgsNoArgs = self.msgFactory.createWFPadControlMessages(
-                                                        const.OP_IGNORE)
+                                                        const.OP_PAYLOAD_PAD)
         self.assertEqual(len(ctrlMsgsNoArgs), 1,
                      "More than one message for control without "
                      "args was created.")
@@ -32,7 +32,7 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         # Test control message with arguments that fit in payload
         testArgs, expArgs = [1, 2], '[1, 2]'
         ctrlMsgsArgs = self.msgFactory.createWFPadControlMessages(
-                                                     const.OP_IGNORE,
+                                                     const.OP_APP_HINT,
                                                      args=testArgs)
         self.assertEqual(len(ctrlMsgsArgs), 1,
                      "More than one message for control without args "
@@ -48,7 +48,7 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         testArgs = range(1000)
         expArgs = str(testArgs)
         ctrlMsgsArgs = self.msgFactory.createWFPadControlMessages(
-                                                     const.OP_IGNORE,
+                                                     const.OP_APP_HINT,
                                                      args=testArgs)
         self.assertTrue(len(ctrlMsgsArgs) > 1,
                      "No more than one message for control without args "

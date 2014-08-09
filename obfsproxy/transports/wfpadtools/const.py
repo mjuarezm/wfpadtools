@@ -17,10 +17,6 @@ ST_WAIT                 = 0
 ST_CONNECTED            = 1
 ST_PADDING              = 2
 
-# Padding substates
-SUBST_WAIT_UPSTREAM     = 0
-SUBST_WAIT_DOWNSTREAM   = 1
-
 # Flags header protocol
 FLAG_DATA               = (1 << 0)
 FLAG_PADDING            = (1 << 1)
@@ -67,16 +63,13 @@ CTRL_ID_LEN             = 1
 
 ARGS_POS                = 9
 
-# Header length
-MIN_HDR_LEN             = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
-CTRL_HDR_LEN            = MIN_HDR_LEN + CONTROL_LEN
-
-# The maximum amount of padding to be appended to handshake data
-MAX_PADDING_LENGTH      = 1500
-
 # Length of WFPad's MTU in bytes.  Note that this is *not* the link MTU
 # which is probably 1500.
 MTU                     = 1448
+
+# Header length
+MIN_HDR_LEN             = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
+CTRL_HDR_LEN            = MIN_HDR_LEN + CONTROL_LEN
 
 # Maximum payload unit of a WFPad message in bytes
 MPU                     = MTU - MIN_HDR_LEN

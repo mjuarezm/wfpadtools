@@ -1,13 +1,14 @@
+from obfsproxy.test import tester
 from os.path import join, basename, exists
 from subprocess import Popen
+from time import sleep
 import unittest
 
 import obfsproxy.common.log as logging
-from obfsproxy.test.transports.wfpadtools.sttest import STTest
-from obfsproxy.transports.wfpadtools import const
 import obfsproxy.transports.wfpadtools.util as ut
-from obfsproxy.test import tester
-from time import sleep
+from obfsproxy.transports.wfpadtools import const
+from obfsproxy.test.transports.wfpadtools.sttest import STTest
+
 
 # Test config
 DEBUG_FNAME = "debug.log"
@@ -18,8 +19,10 @@ DATA_DIRS = {
              }
 FINISHED_BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done."
 WATCHDOG_TIMEOUT = 180
-GET_PAGE_TIMEOUT    = 10
+GET_PAGE_TIMEOUT = 10
+
 DEBUG = True
+# DEBUG = False
 
 # Switch to leave Tor running and speed-up tests
 LEAVE_TOR_RUNNING = False
@@ -155,7 +158,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
         self.assertEqual(resp.status_code, 200,
                          "The status code (%s) is not OK."
                          % resp.status_code)
-        self.failUnless(resp.text)  # make sure it has body
+        self.failUnless(resp.text)  # make sure it has a body
         self.assertIn("using Tor successfully to reach the web", resp.text,
                       "Tor-check does not detect Tor: %s"
                       % resp.text)
@@ -164,12 +167,13 @@ class UnmanagedTorTest(tester.TransportsSetUp):
 class WFPadToolsTransportTests():
     """Test protection offered by transport against Website Fingerprinting."""
 
-    @unittest.skip("")
+    @unittest.skip("Not implemented yet.")
     def test_attacks(self):
+        # TODO: as future work, one could implement existing attacks and
+        # deploy them in this test.
         pass
 
 
-@unittest.skip("")
 class WFPadTorTest(UnmanagedTorTest, WFPadToolsTransportTests, STTest):
     transport = tester.DirectWFPad.transport
     client_args = list(tester.DirectWFPad.client_args)
