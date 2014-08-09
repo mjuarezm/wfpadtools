@@ -382,6 +382,7 @@ class WFPadTransport(BaseTransport):
                 log.debug("[wfad] Data flag detected, relaying to data stream")
                 self.circuit.upstream.write(msg.payload)
 
+
             # Filter padding messages out.
             elif msg.flags == const.FLAG_PADDING:
                 log.debug("[wfad] Padding message ignored.")
