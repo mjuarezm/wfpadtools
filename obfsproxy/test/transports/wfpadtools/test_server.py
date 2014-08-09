@@ -7,7 +7,8 @@ import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.util as ut
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.dummy import DummyTransport
-from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
+from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport, WFPadClient,\
+    WFPadServer
 
 import pickle
 from time import time
@@ -61,20 +62,6 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 "numMessages": self._numMessages
                 }
 
-    def parseControl(self, data):
-        if ":" in data:
-            op, payload = data.split(":")
-            if op == "TEST":
-                opcode, args_str = payload.split(";")
-                opcode = int(opcode)
-                args = None
-                if args_str != "":
-                    args = json.loads(args_str)
-                WFPadTransport.sendControlMessage(self, opcode, args)
-            return True
-        else:
-            return False
-
     def concatControlMsg(self, msgs):
         ctrlMsgs = [msg for msg in msgs if msg['flags'] == const.FLAG_CONTROL]
         noCtrlMsgs = [msg for msg in msgs if msg['flags'] != const.FLAG_CONTROL]
@@ -106,11 +93,24 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
         self.tempDump(msgs)
 
 
-class WFPadTestClient(WFPadTestTransport):
-    pass
+class WFPadTestClient(WFPadTestTransport, WFPadClient):
+
+    def parseControl(self, data):
+        if ":" in data:
+            op, payload = data.split(":")
+            if op == "TEST":
+                opcode, args_str = payload.split(";")
+                opcode = int(opcode)
+                args = None
+                if args_str != "":
+                    args = json.loads(args_str)
+                WFPadClient.sendControlMessage(self, opcode, args)
+            return True
+        else:
+            return False
 
 
-class WFPadTestServer(WFPadTestTransport, DumpingInterface):
+class WFPadTestServer(WFPadTestTransport, WFPadServer):
     pass
 
 

@@ -63,6 +63,8 @@ CTRL_ID_LEN             = 1
 
 ARGS_POS                = 9
 
+NO_ARGS                 = [OP_START, OP_STOP]
+
 # Length of WFPad's MTU in bytes.  Note that this is *not* the link MTU
 # which is probably 1500.
 MTU                     = 1448

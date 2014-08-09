@@ -177,12 +177,12 @@ class ReadWorker(object):
 # (except that I have fleshed out the SOCKS test a bit).
 # It will be made more general and parametric Real Soon.
 
-SHIM_PORT  = 4997
-SOCKS_PORT  = 4998
-TESTSHIM_PORT = -1
-ENTRY_PORT  = 4999
-SERVER_PORT = 5000
-EXIT_PORT   = 5001
+TESTSHIM_PORT   = -1
+SHIM_PORT       = 4997
+SOCKS_PORT      = 4998
+ENTRY_PORT      = 4999
+SERVER_PORT     = 5000
+EXIT_PORT       = 5001
 
 #
 # Test base classes.  They do _not_ inherit from unittest.TestCase

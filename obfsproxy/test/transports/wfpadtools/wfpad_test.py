@@ -17,6 +17,7 @@ from obfsproxy.common import transport_config
 from obfsproxy.test.tester import TransportsSetUp
 import socket
 import multiprocessing
+from obfsproxy.transports.wfpadtools.message import getOpcodeNames
 
 DEBUG = True
 
@@ -120,6 +121,8 @@ class ControlMessageCommunicationTest(TestSetUp):
         """Test control messages communication."""
         # Send instruction to test server
         self.send_instruction(self.opcode, self.args)
+        log.debug("Test for " + getOpcodeNames(self.opcode) +
+                  " with args: %s" % self.args)
 
         # Load wrapper
         self.wrapper = self.load_wrapper()
@@ -246,14 +249,13 @@ class GapHistoTest(ControlMessageCommunicationTest, STTest):
 
 class TotalPadTest(PostPrimitiveTest, STTest):
     opcode = const.OP_TOTAL_PAD
-    sessId, K, delay = "id123", 3, 1
-    args = [sessId, K, delay]
+    sessId, delay = "id123", 1
+    args = [sessId, delay]
 
     def spectest_run(self):
         self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
         self.send_instruction(const.OP_START)
         self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
-        sleep((1 << self.K) * self.delay)
         self.postWrapper = self.load_wrapper()
         self.postClientDumps = [msg for msg in self.postWrapper
                                 if msg['client']]
@@ -261,15 +263,14 @@ class TotalPadTest(PostPrimitiveTest, STTest):
                                 if not msg['client']]
         PostPrimitiveTest.spectest_run(self)
 
-    def posttest_num_messages(self):
+    def posttest_num_messages_is_power_of_2(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
                              if msg['flags'] == const.FLAG_PADDING]
         obsNumMessages = len(clientPaddingMsgs)
-        expNumMessages = 1 << self.K
-        self.assertEqual(obsNumMessages, expNumMessages,
+        self.assertTrue((obsNumMessages & (obsNumMessages - 1)) == 0,
                          "The observed number of padding messages (%s) "
-                         "does not match the expected one (%s)"
-                         % (obsNumMessages, expNumMessages))
+                         "is not a power of 2."
+                         % obsNumMessages)
 
     def posttest_period(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
@@ -301,15 +302,14 @@ class BatchPadTest(PostPrimitiveTest, STTest):
                                 if not msg['client']]
         PostPrimitiveTest.spectest_run(self)
 
-    def posttest_num_messages(self):
+    def posttest_num_messages_is_multiple_of_L(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
                              if msg['flags'] == const.FLAG_PADDING]
         obsNumMessages = len(clientPaddingMsgs)
-        expNumMessages = self.L
-        self.assertEqual(obsNumMessages, expNumMessages,
-                         "The observed number of padding messages (%s) "
-                         "does not match the expected one (%s)"
-                         % (obsNumMessages, expNumMessages))
+        self.assertTrue(obsNumMessages % self.L == 0,
+                        "The observed number of padding messages (%s) "
+                        "is not a multiple of %s."
+                        % (obsNumMessages, self.L))
 
     def posttest_period(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps

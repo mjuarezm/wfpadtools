@@ -425,7 +425,10 @@ class WFPadMessageExtractor(object):
         self.ctrlHdrLen = const.CTRL_HDR_LEN
 
         # Parse args length
-        self.totalArgsLen = self.gettotalArgsLen()
+        if self.opcode in const.NO_ARGS:
+            self.totalArgsLen = 0
+        else:
+            self.totalArgsLen = self.gettotalArgsLen()
 
         # If the opcode requires args
         if self.totalArgsLen > 0:

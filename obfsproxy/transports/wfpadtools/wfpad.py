@@ -583,7 +583,7 @@ class WFPadServer(WFPadTransport):
         t : int
             Number of microseconds delay before sending.
         """
-        log.debug("[wfpad] - Sending %s padding cells after %t delay in "
+        log.debug("[wfpad] - Sending %s padding cells after %s delay in "
                   "response to a %s control message."
                   % (N, t, getOpcodeNames(const.OP_SEND_PADDING)))
         for _ in xrange(N):
@@ -601,7 +601,7 @@ class WFPadServer(WFPadTransport):
         """
         log.debug("[wfpad] - Session %s will %s, "
                   "in response to a %s control message."
-                  % (sessId, status, getOpcodeNames(const.OP_SEND_PADDING)))
+                  % (sessId, status, getOpcodeNames(const.OP_APP_HINT)))
         self._sessId = sessId
         self._visiting = status
 
