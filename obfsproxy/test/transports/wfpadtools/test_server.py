@@ -7,8 +7,7 @@ import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.util as ut
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.dummy import DummyTransport
-from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport, WFPadClient,\
-    WFPadServer
+from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 
 import pickle
 from time import time
@@ -56,15 +55,30 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 "time": time(),
                 "client": self.weAreClient,
                 "visiting": self._visiting,
-                "sessid": self._sessId,
+                "sessid": self.getSessId(),
                 "ctrlId": msg.ctrlId,
                 "totalArgsLen": msg.totalArgsLen,
                 "numMessages": self._numMessages
                 }
 
+    def parseControl(self, data):
+        if ":" in data:
+            op, payload = data.split(":")
+            if op == "TEST":
+                opcode, args_str = payload.split(";")
+                opcode = int(opcode)
+                args = None
+                if args_str != "":
+                    args = json.loads(args_str)
+                self.sendControlMessage(opcode, args)
+            return True
+        else:
+            return False
+
     def concatControlMsg(self, msgs):
         ctrlMsgs = [msg for msg in msgs if msg['flags'] == const.FLAG_CONTROL]
-        noCtrlMsgs = [msg for msg in msgs if msg['flags'] != const.FLAG_CONTROL]
+        noCtrlMsgs = [msg for msg in msgs
+                      if msg['flags'] != const.FLAG_CONTROL]
         if not ctrlMsgs:
             return noCtrlMsgs
         finalMsg = ctrlMsgs[0]
@@ -93,24 +107,11 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
         self.tempDump(msgs)
 
 
-class WFPadTestClient(WFPadTestTransport, WFPadClient):
-
-    def parseControl(self, data):
-        if ":" in data:
-            op, payload = data.split(":")
-            if op == "TEST":
-                opcode, args_str = payload.split(";")
-                opcode = int(opcode)
-                args = None
-                if args_str != "":
-                    args = json.loads(args_str)
-                WFPadClient.sendControlMessage(self, opcode, args)
-            return True
-        else:
-            return False
+class WFPadTestClient(WFPadTestTransport):
+    pass
 
 
-class WFPadTestServer(WFPadTestTransport, WFPadServer):
+class WFPadTestServer(WFPadTestTransport):
     pass
 
 

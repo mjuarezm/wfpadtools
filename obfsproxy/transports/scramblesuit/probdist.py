@@ -101,3 +101,7 @@ class RandProbDist:
 
 # Alias class name in order to provide a more intuitive API.
 new = RandProbDist
+
+
+def uniform(x):
+    return new(lambda i, n, c: x, lambda i, n, c: 1)

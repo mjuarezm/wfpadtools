@@ -337,7 +337,7 @@ class DirectWFPad(DirectShimTest, unittest.TestCase):
            "127.0.0.1:%d" % SERVER_PORT,
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = ("wfpad", "client",
-            "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
+            "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
             "127.0.0.1:%d" % ENTRY_PORT,
             "--dest=127.0.0.1:%d" % SERVER_PORT)
 

@@ -17,7 +17,7 @@ class BuFLOShimObserver(WFPadShimObserver):
     def onSessionStarts(self):
         """Do operations to be done when session starts."""
         super(BuFLOShimObserver, self).onSessionStarts()
-        self.wfpad.startPadding()
+        self.wfpad.onSessionStart()
 
 
 class BuFLOTransport(WFPadTransport):
@@ -36,16 +36,16 @@ class BuFLOTransport(WFPadTransport):
         super(BuFLOTransport, self).__init__()
 
         # Initialize minimum time for padding at each visit to a web page.
-        self._delayProbdist = probdist.new(lambda i, n, c: self._period,
+        self._delayDataProbdist = probdist.new(lambda i, n, c: self._period,
                                           lambda i, n, c: 1)
-        self._lengthProbdist = probdist.new(lambda i, n, c: self._psize,
+        self._lengthDataProbdist = probdist.new(lambda i, n, c: self._psize,
                                            lambda i, n, c: 1)
 
         # Register observer for shim events
         if self.weAreClient:
             shim = socks_shim.get()
-            self.sessionObserver = BuFLOShimObserver(self)
-            shim.registerObserver(self.sessionObserver)
+            self._sessionObserver = BuFLOShimObserver(self)
+            shim.registerObserver(self._sessionObserver)
 
     def circuitConnected(self):
         """Initiate handshake.
@@ -60,8 +60,8 @@ class BuFLOTransport(WFPadTransport):
         """Unregister shim observers."""
         if self.weAreClient:
             shim = socks_shim.get()
-            if shim.isRegistered(self.sessionObserver):
-                shim.deregisterObserver(self.sessionObserver)
+            if shim.isRegistered(self._sessionObserver):
+                shim.deregisterObserver(self._sessionObserver)
 
     @classmethod
     def register_external_mode_cli(cls, subparser):

@@ -20,8 +20,6 @@ Possible primitives WFPadTools allows for:
   could also specify a different value or specify a probability distribution
   to draw packet lengths to pad to at each message.
 
-- 
-
 Important note: this framework is intended for research purposes and it has the
 following limitations:
 
@@ -46,6 +44,8 @@ following limitations:
 - Right now it cannot be used stand-alone (to obfuscate applications other
   than Tor, for instance).
 
+  # TODO: test if it's vulnerable to timing attacks: padding msg vs. data msg.
+
 """
 import json
 import random
@@ -59,7 +59,8 @@ from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message, socks_shim
 from obfsproxy.transports.wfpadtools import util as ut
 import obfsproxy.transports.wfpadtools.const as const
-from obfsproxy.transports.wfpadtools.message import WFPadMessage, getOpcodeNames
+from obfsproxy.transports.wfpadtools import message as mes
+
 
 log = logging.get_obfslogger()
 
@@ -84,6 +85,15 @@ class WFPadShimObserver(object):
         self._sessions = {}
         self._sessId = 0
 
+    def getSessId(self):
+        """Return a hash of the current session id.
+
+        We concatenate with timestamp to get a unique session Id.
+        In the final countermeasure we can hash the URL to set particular
+        padding strategies for individual pages.
+        """
+        return ut.hash_text(str(self._sessId) + str(ut.timestamp()))
+
     def getNumConnections(self, sessId):
         """Return the number of open connections for session `sessId`."""
         if sessId not in self._sessions:
@@ -94,7 +104,7 @@ class WFPadShimObserver(object):
         """Add id of new connection to the set of open connections."""
         if self.getNumConnections(self._sessId) == 0:
             self._sessId += 1
-            self.onSessionStarts(connId)
+            self.onSessionStarts(self._sessId)
         if self._sessId in self._sessions:
             self._sessions[self._sessId].add(connId)
         else:
@@ -106,20 +116,22 @@ class WFPadShimObserver(object):
             connId in self._sessions[self._sessId]:
                 self._sessions[self._sessId].remove(connId)
         if self.getNumConnections(self._sessId) == 0:
-            self.onSessionEnds(connId)
+            self.onSessionEnds(self._sessId)
             if self._sessId in self._sessions:
                 del self._sessions[self._sessId]
 
     def onSessionStarts(self, connId):
         """Sets wfpad's `_visiting` flag to `True`."""
-        log.debug("[wfad] Session %d begins." % connId)
+        log.debug("[wfad] Session %s begins." % connId)
         self.wfpad._visiting = True
-        self.wfpad._numMessages = [0, 0]
+        self.wfpad._numMessages = {'rcv': 0, 'snd': 0}
+        self.wfpad.onSessionStarts(self._sessId)
 
     def onSessionEnds(self, connId):
         """Sets wfpad's `_visiting` flag to `False`."""
-        log.debug("[wfad] Session %d ends." % connId)
+        log.debug("[wfad] Session %s ends." % connId)
         self.wfpad._visiting = False
+        self.wfpad.onSessionEnds(self._sessId)
 
 
 class WFPadTransport(BaseTransport):
@@ -131,54 +143,55 @@ class WFPadTransport(BaseTransport):
     specified yet. This class also provides an interface for the
     responses to these primitives of the other end.
     """
-    _sessId = 0
-    _sendBuf = ""  # Buffer for outgoing data while transport is not connected.
-    _elapsed = 0  # Counts time spent on padding.
-    _consecPaddingMsgs = 0  # Counts number of consecutive padding messages.
-    _visiting = False  # Flags a visit to a page.
+    _lastMsgTimestamp = 0
+    _visiting = False
+    _numMessages = {'rcv': 0, 'snd': 0}
     _currentArgs = ""  # Arguments of the current control message.
-    _numMessages = [0, 0]  # Count total number of messages (snt, rcv)
-    _deferredNextPadding = None
-    _burstHisto = {'rcv': None, 'snd': None}
-    _gapHisto = {'rcv': None, 'snd': None}
 
     def __init__(self):
         """Initialize a WFPadTransport object."""
-        log.debug("[wfad] Initializing %s (id=%s)." % (const.TRANSPORT_NAME,
-                                                       str(id(self))))
+        log.debug("[wfad] Initializing %s (id=%s)."
+                  % (const.TRANSPORT_NAME, str(id(self))))
         super(WFPadTransport, self).__init__()
 
-        # Initialize the protocol's state machine.
+        # Initialize the protocol's state machine
         self._state = const.ST_WAIT
 
-        # Buffer used for padding.
-        self._paddingBuffer = Buffer()
+        # Buffer used to queue pending data messages
+        self._dataBuffer = Buffer()
 
-        # Used to extract protocol messages from encrypted data.
+        # Objects to extract and parse protocol messages
         self._msgFactory = message.WFPadMessageFactory()
         self._msgExtractor = message.WFPadMessageExtractor()
 
-        # Initialize probability distributions
         self._period = 0.1
-        self._delayProbdist = probdist.new(lambda i, n, c: self._period,
-                                            lambda i, n, c: 1)
         self._psize = const.MTU
-        self._lengthProbdist = probdist.new(lambda i, n, c: self._psize,
-                                             lambda i, n, c: 1)
 
-        # Run this method to evaluate the stop condition
-        # The default condition is to pad continuously.
-        # More sophisticated defenses would reduce the
-        # overhead by setting more sophisticated stopping conditions.
-        self.stopCondition = lambda s: False
+        # Initialize deferred events
+        self._deferredData = None
+        self._deferredGapSnd = None
+        self._deferredGapRcv = None
+        self._deferredBurstSnd = None
+        self._deferredBurstRcv = None
 
-        # Get global shim object.
-        if self.weAreClient and self.shim_args and not socks_shim.get():
-            try:
-                shim_port, socks_port = self.shim_args
-                socks_shim.new(int(shim_port), int(socks_port))
-            except Exception as e:
-                log.error('Failed to initialize SOCKS shim: %s', e)
+        # By default padding is disabled
+        self.setPaddingDisabled()
+
+        # By default we don't pad message lengths
+        self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
+
+        # This method is evaluated to decide when to stop padding
+        self.stopCondition = lambda Self: False
+
+        # Get global shim object
+        if self.weAreClient:
+            if not socks_shim.get():
+                socks_shim.new(*self.shim_ports)
+            shim = socks_shim.get()
+            self._sessionObserver = WFPadShimObserver(self)
+            shim.registerObserver(self._sessionObserver)
+        else:
+            self._sessId = 0
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
@@ -199,98 +212,126 @@ class WFPadTransport(BaseTransport):
             raise PluggableTransportError(
                 "Pluggable Transport args invalid: %s" % args)
 
-        cls.shim_args = None
+        cls.shim_ports = (const.SHIM_PORT, const.SOCKS_PORT)
         if args.shim:
-            cls.shim_args = args.shim.split(',')
+            cls.shim_ports = map(int, args.shim.split(','))
 
     @classmethod
     def setup(cls, transportConfig):
         """Called once when obfsproxy starts."""
-        # Note that this is not a WF defense by itself.
         log.info("\n\n"
                   "########################################################\n"
                   " WFPad isn't a Website Fingerprinting defense by itself.\n"
                   "########################################################\n")
 
-        # Set whether we are a client or not.
+        # Check whether object is client or server
         cls.weAreClient = transportConfig.weAreClient
         cls.weAreServer = not cls.weAreClient
-        cls.weAreExternal = transportConfig.weAreExternal
+
+    def circuitDestroyed(self, reason, side):
+        """Unregister shim observers."""
+        if self.weAreClient:
+            shim = socks_shim.get()
+            if shim.isRegistered(self._sessionObserver):
+                shim.deregisterObserver(self._sessionObserver)
 
     def circuitConnected(self):
         """Initiate handshake.
 
         This method is only relevant for clients since servers never initiate
-        handshakes.
-        # TODO: implement handshake
+        handshakes. The handshake must be extended by the final countermeasure
+        to initialize the histograms that gover the delay distributions at the
+        server side. By default, we start
         """
         # Change state to ST_CONNECTED
         self._state = const.ST_CONNECTED
+        log.debug("[wfpad] Connected with the other WFPad end.")
 
         # Once we are connected we can flush data accumulated in the buffer.
-        self.flushSendBuffer()
+        if len(self._dataBuffer) > 0:
+            self.flushDataBuffer()
 
-    def flushSendBuffer(self):
-        """Flush the application's queued data.
+        if self.weAreClient:
+            # To be implemented in the method that overrides this one in the
+            # child class of the final countermeasure.
+            pass
 
-        The application could have sent data while we were busy authenticating
-        the remote machine.  This method flushes the data which could have been
-        queued in the meanwhile in `self._sendBuf'.
-        """
-        if len(self._sendBuf) == 0:
-            log.debug("[wfad] Send buffer is empty; nothing to flush.")
-            return
-
-        # Flush the buffered data, the application is so eager to send.
-        log.debug("[wfad] Flushing %d bytes of buffered application data." %
-                  len(self._sendBuf))
-
-        self.pushData(self._sendBuf)
-        self._sendBuf = ""
-
-    def sendMessagesDownstream(self, messages):
-        """Sends `messages` over the wire.
-
-        Cast messages to str, concatenate them and write them to downstream.
-        """
-        msgsStr = "".join([str(msg) for msg in messages])
-        self.circuit.downstream.write(msgsStr)
-
-    def pushData(self, data, opcode=None, args=None):
-        """Push `data` forward either to a buffer or to the other end.
-
-        If we're padding, we push data to the padding buffer. Otherwise, we
-        encapsulate data into WFPad messages and send them downstream directly.
-        """
-        log.debug("[wfad] Processing %d bytes of outgoing data." % len(data))
-        if self._state is const.ST_PADDING:
-            self._paddingBuffer.write(data)
+    def sendDownstream(self, data):
+        """Sends `data` downstream over the wire."""
+        if isinstance(data, str):
+            self.circuit.downstream.write(data)
+        elif isinstance(data, mes.WFPadMessage):
+            self.circuit.downstream.write(str(data))
+            self._numMessages['snd'] += 1
+        elif isinstance(data, list):
+            for listElement in data:
+                self.sendDownstream(listElement)
         else:
-            msgs = self._msgFactory.createWFPadMessages(data,
-                                            flags=const.FLAG_DATA,
-                                            opcode=opcode,
-                                            args=args)
-            self._numMessages[0] += len(msgs)
-            self.sendMessagesDownstream(msgs)
+            raise RuntimeError("Attempted to send non-string data over the wire.")
 
     def sendMessage(self, payload="", paddingLen=0, flags=const.FLAG_DATA):
         """Send message over the wire."""
-        msg = self._msgFactory.createWFPadMessage(payload, paddingLen, flags)
-        self._numMessages[0] += 1
-        self.sendMessagesDownstream([msg])
+        self.sendDownstream(self._msgFactory.new(payload, paddingLen, flags))
 
     def sendIgnore(self):
-        """Simple fixed-length (CELL_SIZE) padding cell."""
-        self.sendMessage(payload="",
-                         paddingLen=const.MPU,
-                         flags=const.FLAG_PADDING)
+        """Simple fixed-length padding message."""
+        log.debug("[wfpad] Send ignore message.")
+        self.sendMessage(paddingLen=const.MPU, flags=const.FLAG_PADDING)
 
-    def sendControlMessages(self, opcode, args):
-        """Send control messages."""
-        msgs = self._msgFactory.createWFPadControlMessages(opcode, args)
-        self.sendMessagesDownstream(msgs)
+    def sendControlMessage(self, opcode, args):
+        """Send control message over the wire."""
+        if self.weAreServer:
+            raise Exception("[wfpad ] Server cannot send control messages.")
+        msgs = self._msgFactory.newControl(opcode, args)
+        self.sendDownstream(msgs)
 
-    def flushPaddingBuffer(self, length=None, opcode=None, args=None):
+    def pushData(self, data):
+        """Push `data` forward.
+
+        If we draw a 0 time delay, we encapsulate and send data directly.
+        Otherwise, we push data to data buffer and start flushing it.
+        """
+        log.debug("[wfad] Pushing %d bytes of outgoing data." % len(data))
+
+        delay = self._delayDataProbdist.randomSample()
+
+        if delay == 0:
+            log.debug("[wfpad] Data message is not delayed.")
+            self.sendDownstream(self._msgFactory.encapsulate(data))
+
+        else:
+            self._dataBuffer.write(data)
+            log.debug("[wfad] Buffered %d bytes of outgoing data." %
+                      len(self._dataBuffer))
+
+            # Cancel existing deferred calls to padding
+            if (self._deferredBurstSnd and self._deferredBurstSnd.active()) \
+                or (self._deferredGapSnd and self._deferredGapSnd.active()):
+                if self._deferredBurstSnd and self._deferredBurstSnd.active():
+                    self._deferredBurstSnd.cancel()
+                if self._deferredGapSnd and self._deferredGapSnd.active():
+                    self._deferredGapSnd.cancel()
+                reactorTime = reactor.seconds()
+                delay -= reactorTime - self._lastMsgTimestamp
+                log.debug("[wfpad] The deferred padding was cancelled. "
+                          " started at %s and now is %s, so we delay "
+                          "msg %s sec." % (self._lastMsgTimestamp,
+                                           reactorTime,
+                                           delay))
+
+            if delay < 0:
+                delay = 0
+                log.debug("[wfpad] Delaying msg %ssec."
+                           " Padding delays cannot be"
+                           " shorter than data delays." % delay)
+
+            log.debug("[wfad] Flushing buffer after delay %s." % delay)
+
+            if not self._deferredData or not self._deferredData.active():
+                self._deferredData = reactor.callLater(delay,
+                                                       self.flushDataBuffer)
+
+    def flushDataBuffer(self, length=None):
         """Reads from buffer and creates messages to send them over the link.
 
         In case the buffer is not empty, the buffer is flushed and we send
@@ -300,56 +341,57 @@ class WFPadTransport(BaseTransport):
         The function is called again after a certain delay, which is sampled
         from the time probability distribution.
         """
-        msg = WFPadMessage()
-        msgTotalLen = length if length else self.drawMessageLength()
+        msgTotalLen = length if length else \
+                            self._lengthDataProbdist.randomSample()
+
+        msg = mes.WFPadMessage()
+        dataLen = len(self._dataBuffer)
+        if msgTotalLen is const.INF_LABEL:
+            msgTotalLen = dataLen % const.MPU + const.MIN_HDR_LEN
+
+        log.debug("[wfad] %s bytes of data found in buffer. Flush buffer."
+                  % dataLen)
+
+        assert(dataLen > 0)
         payloadLen = msgTotalLen - const.MIN_HDR_LEN
-        dataLen = len(self._paddingBuffer)
-        self._numMessages[0] += 1
+
         # If there is data in buffer, encapsulate and send them.
-        if dataLen > 0:
-            self._consecPaddingMsgs = 0
-            log.debug("[wfad] Data found in buffer. Flush buffer.")
+        self._consecPaddingMsgs = 0
 
-            # If data in buffer fills the specified length, we just
-            # encapsulate and send the message.
-            if dataLen > payloadLen:
-                log.debug("[wfad] Message with no padding.")
-                data = self._paddingBuffer.read(payloadLen)
-                msg = self._msgFactory.createWFPadMessage(data,
-                                                          opcode=opcode,
-                                                          args=args)
+        # If data in buffer fills the specified length, we just
+        # encapsulate and send the message.
+        if dataLen > payloadLen:
+            data = self._dataBuffer.read(payloadLen)
+            msg = self._msgFactory.new(payload=data)
 
-            # If data in buffer does not fill the message's payload,
-            # pad so that it reaches the specified length.
-            else:
-                log.debug("[wfad] Message with padding.")
-                data = self._paddingBuffer.read()
-                paddingLen = payloadLen - dataLen
-                msg = self._msgFactory.createWFPadMessage(data,
-                                                          paddingLen,
-                                                          opcode=opcode,
-                                                          args=args)
+        # If data in buffer does not fill the message's payload,
+        # pad so that it reaches the specified length.
+        else:
+            data = self._dataBuffer.read()
+            paddingLen = payloadLen - dataLen
+            log.debug("[wfad] Padding message to %d (adding %d)."
+                      % (msgTotalLen, paddingLen))
+            msg = self._msgFactory.new(data, paddingLen)
+
+        log.debug("[wfad] Sent data message of length %d." % msgTotalLen)
+
+        self.sendDownstream(msg)
+        self._lastMsgTimestamp = reactor.seconds()
 
         # If buffer is empty, generate padding messages.
+        if len(self._dataBuffer) > 0:
+            delay = self._delayDataProbdist.randomSample()
+            log.debug("[wfpad]  data waiting in buffer, flushing again "
+                      "after delay %s." % delay)
+            self._deferredData = reactor.callLater(delay,
+                                                   self.flushDataBuffer)
         else:
-            log.debug("[wfad] Generate padding message.")
-            self._consecPaddingMsgs += 1
-            msg = self._msgFactory.createWFPadMessage("",
-                                                      payloadLen,
-                                                      flags=const.FLAG_PADDING,
-                                                      opcode=opcode,
-                                                      args=args)
-        self.sendMessagesDownstream([msg])
-
-        # Compute the delay for the next message.
-        delay = self.drawFlushDelay()
-        self._elapsed += delay
-
-        # Return if the stopping condition is satisfied.
-        if self.stopCondition(self):
-            self.stopPadding()
-            return
-        self._deferredNextPadding = reactor.callLater(delay, self.flushPaddingBuffer)
+            delay = self._burstHistoProbdist['snd'].randomSample()
+            log.debug("[wfpad] buffer is empty, pad `snd` gap "
+                      "after delay %s." % delay)
+            if delay is not const.INF_LABEL:
+                self._deferredBurstSnd = reactor.callLater(delay,
+                                                      self.sendPaddingSndHisto)
 
     def processMessages(self, data):
         """Extract WFPad protocol messages.
@@ -371,26 +413,10 @@ class WFPadTransport(BaseTransport):
             print str(e)
             log.exception("[wfpad] Exception extracting "
                           "messages from stream: %s" % str(e))
-        self._numMessages[1] += len(msgs)
+
         for msg in msgs:
-
-            if (msgs is None) or (len(msgs) == 0):
-                return
-
-            # Forward data to the application.
-            if msg.flags == const.FLAG_DATA:
-                log.debug("[wfad] Data flag detected, relaying to data stream")
-                self.circuit.upstream.write(msg.payload)
-
-
-            # Filter padding messages out.
-            elif msg.flags == const.FLAG_PADDING:
-                log.debug("[wfad] Padding message ignored.")
-                pass
-
-            # Process control messages
-            elif msg.flags == const.FLAG_CONTROL:
-
+            if msg.flags == const.FLAG_CONTROL:
+                # Process control messages
                 if msg.args:
                     log.debug("[wfad] Message with control data received.")
                     self._currentArgs += msg.args
@@ -403,52 +429,93 @@ class WFPadTransport(BaseTransport):
                 else:
                     self.receiveControlMessage(msg.opcode)
 
-            # Otherwise, flag not recognized
             else:
-                log.warning("Invalid message flags: %d." % msg.flags)
+                delay = self._burstHistoProbdist['rcv'].randomSample()
+                if delay is not const.INF_LABEL:
+                    self._deferredBurstRcv = reactor.callLater(delay,
+                                               self.sendPaddingRcvHisto)
+
+                self._numMessages['rcv'] += 1
+                # Forward data to the application.
+                if msg.flags == const.FLAG_DATA:
+                    log.debug("[wfad] Data flag detected, relaying upstream")
+                    self.circuit.upstream.write(msg.payload)
+
+                # Filter padding messages out.
+                elif msg.flags == const.FLAG_PADDING:
+                    log.debug("[wfad] Padding message ignored.")
+                    pass
+
+                # Otherwise, flag not recognized
+                else:
+                    log.error("Invalid message flags: %d." % msg.flags)
 
         return msgs
 
-    def drawMessageLength(self):
-        """Return length for a specific message.
+    def onSessionStarts(self, sessId):
+        """Sens hint for session start.
 
-        The final countermeasure could override this method to,
-        instead of drawing the delay from a probability distribution,
-        iterate over a list to mimic a specific pattern of lengths.
+        To be extended at child classes that implement
+        final website fingerprinting countermeasures.
         """
-        return self._lengthProbdist.randomSample()
+        if self.weAreClient:
+            self.sendControlMessage(const.OP_APP_HINT,
+                                    [self.getSessId(), True])
+        else:
+            self._sessId = sessId
 
-    def drawFlushDelay(self):
-        """Return delay between calls to `flushPaddingBuffer`.
+    def onSessionEnds(self, sessId):
+        """Send hint for session end.
 
-        The final countermeasure could override this method to,
-        instead of drawing the delay from a probability distribution,
-        iterate over a list to mimic a specific pattern of delays.
+        Interface to be extended at child classes that implement
+        final website fingerprinting countermeasures.
         """
-        return self._delayProbdist.randomSample()
+        if self.weAreClient:
+            self.sendControlMessage(const.OP_APP_HINT,
+                                [self.getSessId(), False])
 
-    def getConsecPaddingMsgs(self):
-        """Return number of padding messages."""
-        return self._consecPaddingMsgs
+    def getSessId(self):
+        """Return current session Id."""
+        if self.weAreClient:
+            return self._sessionObserver.getSessId()
+        else:
+            return self._sessId
 
-    def setConsecPaddingMsgs(self, numPaddingMsgs):
-        """Set number of padding messages."""
-        self._consecPaddingMsgs = numPaddingMsgs
+    def setConstantRatePadding(self, t):
+        self._delayDataProbdist = probdist.uniform(t)
+        self._burstHistoProbdist['snd'] = probdist.uniform(t)
+        self._gapHistoProbdist['snd'] = probdist.uniform(t)
 
-    def getElapsed(self):
-        """Return time _elapsed since padding started."""
-        return self._elapsed
+    def setPaddingDisabled(self):
+        self._delayDataProbdist = probdist.uniform(0)
+        self._burstHistoProbdist = {'rcv': probdist.uniform(const.INF_LABEL),
+                                    'snd': probdist.uniform(const.INF_LABEL)}
+        self._gapHistoProbdist = {'rcv': probdist.uniform(const.INF_LABEL),
+                                  'snd': probdist.uniform(const.INF_LABEL)}
 
-    def startPadding(self):
-        """Changes protocol's state to ST_PADDING and starts timer."""
-        self._state = const.ST_PADDING
-        self._elapsed = 0
-        self.flushPaddingBuffer()
+    def sendPaddingSndHisto(self):
+        if self.stopCondition(self):
+            log.debug("[wfpad]  Stop condition is `True`.")
+            return
+        self.sendIgnore()
+        self._consecPaddingMsgs += 1
+        log.debug("[wfpad]  Sent ignore to pad snd burst.")
+        delay = self._gapHistoProbdist['snd'].randomSample()
+        if delay is not const.INF_LABEL:
+            log.debug("[wfpad]  Wait for data, pad snd gap otherwise.")
+            self._deferredBurstSnd = reactor.callLater(delay,
+                                                 self.sendPaddingSndHisto)
 
-    def stopPadding(self):
-        """Changes protocol's state to ST_CONNECTED and stops timer."""
-        if self._state is const.ST_PADDING:
-            self._state = const.ST_CONNECTED
+    def sendPaddingRcvHisto(self):
+        if self.stopCondition(self):
+            return
+        self.sendIgnore()
+        log.debug("[wfpad]  Sent ignore to pad rcv burst.")
+        delay = self._gapHistoProbdist['rcv'].randomSample()
+        if delay is not const.INF_LABEL:
+            log.debug("[wfpad]  Wait for data, pad rcv gap otherwise.")
+            self._deferredBurstRcv = reactor.callLater(delay,
+                                                 self.sendPaddingRcvHisto)
 
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream.
@@ -458,80 +525,21 @@ class WFPadTransport(BaseTransport):
         """
         d = data.read()
         if self._state >= const.ST_CONNECTED:
-            self.flushSendBuffer()
             self.pushData(d)
         else:
-            self._sendBuf += d
+            self._dataBuffer.write(d)
             log.debug("[wfad] Buffered %d bytes of outgoing data." %
-                      len(self._sendBuf))
+                      len(self._dataBuffer))
 
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
         d = data.read()
         if self._state >= const.ST_CONNECTED:
+            if self._deferredBurstRcv and self._deferredBurstRcv.active():
+                self._deferredBurstRcv.cancel()
+            if self._deferredGapRcv and self._deferredGapRcv.active():
+                self._deferredGapRcv.cancel()
             self.processMessages(d)
-
-
-class WFPadClient(WFPadTransport):
-    """Extend the WFPad class.
-
-    Methods to request primitives are only implemented in the client. The
-    control is given to the client, the client specifies the padding strategy
-    to the server by means of control messages. Only the client can send
-    control messages. The padding strategy is implemented directly in the
-    client.
-    """
-    def __init__(self):
-        """Initialize a WFPadClient object."""
-        WFPadTransport.__init__(self)
-
-    def sendControlMessage(self, opcode, args=None, delay=0):
-        """Send a message with a specific opcode field."""
-        reactor.callLater(delay,
-                          self.sendControlMessages,
-                          opcode=opcode,
-                          args=args)
-
-    def sendStartPaddingRequest(self):
-        self.sendControlMessage(const.OP_START)
-
-    def sendStopPaddingRequest(self):
-        self.sendControlMessage(const.OP_STOP)
-
-    def sendPaddingCellsRequest(self, N, t):
-        self.sendControlMessage(const.OP_SEND_PADDING,
-                                args=[N, t])
-
-    def sendAppHintRequest(self, sessNumber, status=True):
-        sessId = ut.hash_text(str(sessNumber)
-                               + str(id(self))
-                               + str(ut.timestamp()))
-        self.sendControlMessage(const.OP_APP_HINT, args=[sessId, status])
-
-    def sendBurstHistogram(self, histo, labels, remove_toks=False):
-        self.sendControlMessage(const.OP_BURST_HISTO,
-                                args=[histo, labels, remove_toks])
-
-    def sendGapHistogram(self, histo, labels, remove_toks=False):
-        self.sendControlMessage(const.OP_GAP_HISTO,
-                                args=[histo, labels, remove_toks])
-
-    def sendTotalPadRequest(self, sess_id, K, t):
-        self.sendControlMessage(const.OP_TOTAL_PAD, args=[sess_id, K, t])
-
-    def sendPayloadPadRequest(self):
-        self.sendControlMessage(const.OP_PAYLOAD_PAD)
-
-    def sendBatchPadRequest(self, sess_id, L, t):
-        self.sendControlMessage(const.OP_BATCH_PAD, args=[sess_id, L, t])
-
-
-class WFPadServer(WFPadTransport):
-    """Extend the WFPad class."""
-
-    def __init__(self):
-        """Initialize a WFPadServer object."""
-        WFPadTransport.__init__(self)
 
     #==========================================================================
     # Methods to deal with control messages
@@ -540,10 +548,9 @@ class WFPadServer(WFPadTransport):
         """Do operation indicated by the _opcode."""
         log.debug("Received control message with opcode %d and args: %s"
                   % (opcode, args))
-        if opcode == const.OP_START:
-            self.startPadding()
-        elif opcode == const.OP_STOP:
-            self.stopPadding()
+
+        if self.weAreClient:
+            raise Exception("Client cannot receive control messages.")
 
         # Generic primitives
         if opcode == const.OP_SEND_PADDING:
@@ -584,9 +591,9 @@ class WFPadServer(WFPadTransport):
         t : int
             Number of microseconds delay before sending.
         """
-        log.debug("[wfpad] - Sending %s padding cells after %s delay in "
+        log.debug("[wfpad]  Sending %s padding cells after %s delay in "
                   "response to a %s control message."
-                  % (N, t, getOpcodeNames(const.OP_SEND_PADDING)))
+                  % (N, t, mes.getOpcodeNames(const.OP_SEND_PADDING)))
         for _ in xrange(N):
             reactor.callLater(t, self.sendIgnore)
 
@@ -600,11 +607,16 @@ class WFPadServer(WFPadTransport):
         status : bool
                  True or False, indicating session start and end respectively.
         """
-        log.debug("[wfpad] - Session %s will %s, "
+        log.debug("[wfpad]  Session %s will %s, "
                   "in response to a %s control message."
-                  % (sessId, status, getOpcodeNames(const.OP_APP_HINT)))
-        self._sessId = sessId
+                  % (sessId,
+                     "start" if status else "stop",
+                     mes.getOpcodeNames(const.OP_APP_HINT)))
         self._visiting = status
+        if status == True:
+            self.onSessionStarts(sessId)
+        else:
+            self.onSessionEnds(sessId)
 
     def relayBurstHistogram(self, histo, labels, removeToks=False,
                                 interpolate=True, when="rcv"):
@@ -638,7 +650,7 @@ class WFPadServer(WFPadTransport):
             padding packet is sent in the direction of the client.
         """
         def genSingletonBurst(index, bins, accumProb):
-            if interpolate and index < bins - 1:
+            if interpolate and index < bins:
                     return random.choice(xrange(labels[index],
                                                 labels[index + 1]))
             return labels[index]
@@ -646,7 +658,7 @@ class WFPadServer(WFPadTransport):
         def genProbSignletonBurst(index, bins, accumProb):
             return histo[index]
 
-        self._burstHisto[when] = probdist.new(genSingletonBurst,
+        self._burstHistoProbdist[when] = probdist.new(genSingletonBurst,
                                               genProbSignletonBurst,
                                               bins=len(histo) - 1)
 
@@ -685,7 +697,7 @@ class WFPadServer(WFPadTransport):
             padding.
         """
         def genSingletonGap(index, bins, accumProb):
-            if interpolate and index < bins - 1:
+            if interpolate and index < bins:
                 return random.choice(xrange(labels[index],
                                             labels[index + 1]))
             return labels[index]
@@ -693,7 +705,7 @@ class WFPadServer(WFPadTransport):
         def genProbSignletonGap(index, bins, accumProb):
             return histo[index]
 
-        self._gapHisto[when] = probdist.new(genSingletonGap,
+        self._gapHistoProbdist[when] = probdist.new(genSingletonGap,
                                             genProbSignletonGap,
                                             bins=len(histo) - 1)
 
@@ -713,8 +725,7 @@ class WFPadServer(WFPadTransport):
         """
         self._period = t
         self._sessId = sessId
-        self._delayProbdist = probdist.new(lambda i, n, c: self._period,
-                                            lambda i, n, c: 1)
+        self.setConstantRatePadding(t)
         # Set the stop condition to satisfy that the number of messages
         # sent within the session is a power of 2 (otherwise it'll continue
         # padding until the closest one) and that the session has finished.
@@ -743,10 +754,23 @@ class WFPadServer(WFPadTransport):
         """
         self._period = t
         self._sessId = sessId
-        self._delayProbdist = probdist.new(lambda i, n, c: self._period,
-                                            lambda i, n, c: 1)
+        self.setConstantRatePadding(t)
         # Set the stop condition to satisfy that the number of messages
         # sent within the session is a multiple of parameter `L` and the
         # session has finished.
         self.stopCondition = lambda self: self._numMessages[0] % L == 0 \
                                     and not self._visiting
+
+
+class WFPadClient(WFPadTransport):
+
+    def __init__(self):
+        """Initialize a WFPadClient object."""
+        WFPadTransport.__init__(self)
+
+
+class WFPadServer(WFPadTransport):
+
+    def __init__(self):
+        """Initialize a WFPadServer object."""
+        WFPadTransport.__init__(self)

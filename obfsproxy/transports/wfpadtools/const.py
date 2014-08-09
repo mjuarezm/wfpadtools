@@ -12,19 +12,16 @@ TEST_SERVER_DIR         = join(TEMP_DIR, "test_server")
 BASE_DIR                = abspath(join(dirname(__file__), pardir, pardir))
 PYOBFSPROXY_PATH        = join(BASE_DIR, "pyobfsproxy.py")
 
+INF_LABEL = -1
+
 # Protocol states
 ST_WAIT                 = 0
 ST_CONNECTED            = 1
-ST_PADDING              = 2
 
 # Flags header protocol
 FLAG_DATA               = (1 << 0)
 FLAG_PADDING            = (1 << 1)
 FLAG_CONTROL            = (1 << 2)
-
-# Control OP codes
-OP_START                = 0
-OP_STOP                 = 1
 
 # Generic primitives
 OP_SEND_PADDING         = 2
@@ -63,8 +60,6 @@ CTRL_ID_LEN             = 1
 
 ARGS_POS                = 9
 
-NO_ARGS                 = [OP_START, OP_STOP]
-
 # Length of WFPad's MTU in bytes.  Note that this is *not* the link MTU
 # which is probably 1500.
 MTU                     = 1448
@@ -77,3 +72,7 @@ CTRL_HDR_LEN            = MIN_HDR_LEN + CONTROL_LEN
 MPU                     = MTU - MIN_HDR_LEN
 MPU_CTRL                = MTU - CTRL_HDR_LEN
 MPTU_CTRL_ARGS          = MPU_CTRL - ARGS_TOTAL_LENGTH_LEN - CTRL_ID_LEN
+
+# Default shim ports
+SHIM_PORT       = 4997
+SOCKS_PORT      = 4998

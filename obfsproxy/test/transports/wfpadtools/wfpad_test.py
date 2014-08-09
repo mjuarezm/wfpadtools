@@ -153,17 +153,6 @@ class PostPrimitiveTest(ControlMessageCommunicationTest):
         for specTest in specTests:
             getattr(self, specTest)()
 
-
-class StartPaddingTest(ControlMessageCommunicationTest, STTest):
-    opcode = const.OP_START
-    args = None
-
-
-class StopPaddingTest(ControlMessageCommunicationTest, STTest):
-    opcode = const.OP_STOP
-    args = None
-
-
 class SendPaddingTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_SEND_PADDING
     N, t = 5, 0.1
@@ -254,7 +243,6 @@ class TotalPadTest(PostPrimitiveTest, STTest):
 
     def spectest_run(self):
         self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
-        self.send_instruction(const.OP_START)
         self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
         self.postWrapper = self.load_wrapper()
         self.postClientDumps = [msg for msg in self.postWrapper
@@ -292,7 +280,6 @@ class BatchPadTest(PostPrimitiveTest, STTest):
 
     def spectest_run(self):
         self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
-        self.send_instruction(const.OP_START)
         self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
         sleep(self.L * self.delay)
         self.postWrapper = self.load_wrapper()

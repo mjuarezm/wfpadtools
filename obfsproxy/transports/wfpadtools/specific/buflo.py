@@ -1,23 +1,15 @@
 """
 This module implements the BuFLO countermeasure proposed by Dyer et al.
 """
+import time
+
 import obfsproxy.common.log as logging
 from obfsproxy.transports.scramblesuit import probdist
-from obfsproxy.transports.wfpadtools import const, socks_shim
-from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport, WFPadClient,\
-    WFPadServer
-from obfsproxy.transports.wfpadtools.wfpad import WFPadShimObserver
+from obfsproxy.transports.wfpadtools import const
+from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
+
 
 log = logging.get_obfslogger()
-
-
-class BuFLOShimObserver(WFPadShimObserver):
-
-    def onSessionStarts(self, connId):
-        """Do operations to be done when session starts."""
-        super(BuFLOShimObserver, self).onSessionStarts(connId)
-        self.wfpad.startPadding()
-        self.wfpad.sendAppHintRequest(self._sessId)
 
 
 class BuFLOTransport(WFPadTransport):
@@ -28,46 +20,18 @@ class BuFLOTransport(WFPadTransport):
     minimum time for which the link will be padded is also specified.
     """
     # Defaults for BuFLO specifications.
+    _mintime = -1
+    _startTime = time.time()
     _period = 0.01
     _psize = const.MTU
-    _mintime = -1
 
     def __init__(self):
-        log.debug("[wfad] Initializing %s (id=%s)." % (const.TRANSPORT_NAME,
-                                                       str(id(self))))
         super(BuFLOTransport, self).__init__()
-
-        # Initialize minimum time for padding at each visit to a web page.
-        self._delayProbdist = probdist.new(lambda i, n, c: self._period,
-                                          lambda i, n, c: 1)
-        self._lengthProbdist = probdist.new(lambda i, n, c: self._psize,
-                                           lambda i, n, c: 1)
-
         # The stop condition in BuFLO:
         # BuFLO stops padding if the visit has finished and the
         # elapsed time has exceeded the minimum padding time.
-        self.stopCondition = lambda s: self.getElapsed() > self._mintime \
-                                                    and not self._visiting
-
-        # Register observer for shim events
-        if self.weAreClient:
-            shim = socks_shim.get()
-            self.sessionObserver = BuFLOShimObserver(self)
-            shim.registerObserver(self.sessionObserver)
-
-    @classmethod
-    def setup(cls, transportConfig):
-        """Called once when obfsproxy starts."""
-        cls.weAreClient = transportConfig.weAreClient
-        cls.weAreServer = not cls.weAreClient
-        cls.weAreExternal = transportConfig.weAreExternal
-
-    def circuitDestroyed(self, reason, side):
-        """Unregister shim observers."""
-        if self.weAreClient:
-            shim = socks_shim.get()
-            if shim.isRegistered(self.sessionObserver):
-                shim.deregisterObserver(self.sessionObserver)
+        self.stopCondition = lambda s: self.getElapsed() > self._mintime and \
+                                            not self._visiting
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
@@ -108,17 +72,31 @@ class BuFLOTransport(WFPadTransport):
         if args.psize:
             cls._psize = args.psize
 
+    def getElapsed(self):
+        """Returns time elapsed since the beginning of the session.
 
-class BuFLOClient(BuFLOTransport, WFPadClient):
-    """Extend the BuFLOTransport class."""
+        If a session has not yet started, it returns time since __init__.
+        """
+        elapsed = time.time() - self._startTime
+        log.debug("[buflo] Return elapsed time "
+                  "since start of session %d." % elapsed)
+        return elapsed
+
+    def onSessionStarts(self, sessId):
+        WFPadTransport.onSessionStarts(self, sessId)
+        self._startTime = time.time()
+        self._lengthDataProbdist = probdist.uniform(self._psize)
+        self.setConstantRatePadding(self._period)
+
+
+class BuFLOClient(BuFLOTransport):
 
     def __init__(self):
         """Initialize a BuFLOClient object."""
         BuFLOTransport.__init__(self)
 
 
-class BuFLOServer(BuFLOTransport, WFPadServer):
-    """Extend the BuFLOTransport class."""
+class BuFLOServer(BuFLOTransport):
 
     def __init__(self):
         """Initialize a BuFLOServer object."""

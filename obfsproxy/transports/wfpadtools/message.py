@@ -163,15 +163,15 @@ class WFPadMessage(object):
 class WFPadMessageFactory(object):
     """Creates WFPad's protocol messages."""
 
-    def createWFPadMessage(self, payload="", paddingLen=0,
+    def new(self, payload="", paddingLen=0,
                            flags=const.FLAG_DATA, opcode=None,
                            totalArgsLen=0, ctrlId=0, args=None):
         return WFPadMessage(payload, paddingLen, flags, opcode,
                             totalArgsLen, ctrlId, args)
 
-    def createWFPadControlMessages(self, opcode, args=None):
+    def newControl(self, opcode, args=None):
         if not args:
-            return [self.createWFPadMessage(flags=const.FLAG_CONTROL,
+            return [self.new(flags=const.FLAG_CONTROL,
                                             opcode=opcode)]
         messages = []
         strArgs = json.dumps(args)
@@ -180,7 +180,7 @@ class WFPadMessageFactory(object):
         while len(strArgs) > 0:
             payloadLen = const.MPTU_CTRL_ARGS
             # TODO: implement piggybacking
-            messages.append(self.createWFPadMessage(flags=const.FLAG_CONTROL,
+            messages.append(self.new(flags=const.FLAG_CONTROL,
                                                     opcode=opcode,
                                                     totalArgsLen=totalArgsLen,
                                                     ctrlId=ctrlId,
@@ -189,7 +189,7 @@ class WFPadMessageFactory(object):
             strArgs = strArgs[payloadLen:]
         return messages
 
-    def createWFPadMessages(self, data,
+    def encapsulate(self, data,
                             flags=const.FLAG_DATA, opcode=None, args=None):
         """Create protocol messages out of the given payload.
 
@@ -201,19 +201,19 @@ class WFPadMessageFactory(object):
             payloadLen = const.MPU
             dataLen = len(data)
             if dataLen > payloadLen:
-                messages.append(self.createWFPadMessage(data[:payloadLen],
+                messages.append(self.new(data[:payloadLen],
                                                         flags=flags,
                                                         opcode=opcode,
                                                         args=args))
                 data = data[payloadLen:]
             else:
-                messages.append(self.createWFPadMessage(data[:dataLen],
+                messages.append(self.new(data[:dataLen],
                                              paddingLen=(payloadLen - dataLen),
                                              flags=flags,
                                              opcode=opcode,
                                              args=args))
                 data = data[dataLen:]
-        log.debug("Created %d protocol messages." % len(messages))
+        log.debug("[wfpad] Created %d protocol messages." % len(messages))
         return messages
 
 
@@ -239,14 +239,10 @@ def getOpcodeNames(opcode):
     This function is only useful for printing easy-to-read opcode names in
     debug log messages.
     """
-    if opcode == const.OP_START:
-        return "START_PADDING"
-    elif opcode == const.OP_STOP:
-        return "STOP_PADDING"
-    elif opcode == const.OP_SEND_PADDING:
+    if opcode == const.OP_SEND_PADDING:
         return "RELAY_SEND_PADDING"
     elif opcode == const.OP_APP_HINT:
-        return "RELAY_SEND_PADDING"
+        return "RELAY_APP_HINT"
     elif opcode == const.OP_BURST_HISTO:
         return "RELAY_BURST_HISTOGRAM"
     elif opcode == const.OP_GAP_HISTO:
@@ -272,7 +268,7 @@ def isSane(totalLen, payloadLen, flags):
         """Check if the given length is fine."""
         return True if (0 <= length <= const.MPU) else False
 
-    log.debug("Message header: totalLen=%d, payloadLen=%d, flags"
+    log.debug("[wfpad] Message header: totalLen=%d, payloadLen=%d, flags"
               "=%s" % (totalLen, payloadLen, getFlagNames(flags)))
 
     validFlags = [
@@ -290,7 +286,7 @@ def isSane(totalLen, payloadLen, flags):
 def isOpCodeSane(opcode):
     """Verify the the extra control message fields are correct."""
 
-    log.debug("Opcode: value=%s, name=%s"
+    log.debug("[wfpad] Opcode: value=%s, name=%s"
               % (opcode, getOpcodeNames(opcode)))
 
     validOpCodes = [
@@ -301,8 +297,6 @@ def isOpCodeSane(opcode):
         const.OP_INJECT_HISTO,
         const.OP_PAYLOAD_PAD,
         const.OP_SEND_PADDING,
-        const.OP_START,
-        const.OP_STOP,
         const.OP_TOTAL_PAD
     ]
     return (opcode in validOpCodes)
@@ -425,10 +419,7 @@ class WFPadMessageExtractor(object):
         self.ctrlHdrLen = const.CTRL_HDR_LEN
 
         # Parse args length
-        if self.opcode in const.NO_ARGS:
-            self.totalArgsLen = 0
-        else:
-            self.totalArgsLen = self.gettotalArgsLen()
+        self.totalArgsLen = self.gettotalArgsLen()
 
         # If the opcode requires args
         if self.totalArgsLen > 0:

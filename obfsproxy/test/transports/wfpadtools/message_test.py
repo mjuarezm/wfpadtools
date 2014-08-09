@@ -13,13 +13,13 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         pass
 
     def test_normal_message(self):
-        msg = self.msgFactory.createWFPadMessage("payload",
+        msg = self.msgFactory.new("payload",
                                                  flags=const.FLAG_DATA)
         pass
 
     def test_control_message(self):
         # Test control message with no arguments
-        ctrlMsgsNoArgs = self.msgFactory.createWFPadControlMessages(
+        ctrlMsgsNoArgs = self.msgFactory.newControl(
                                                         const.OP_PAYLOAD_PAD)
         self.assertEqual(len(ctrlMsgsNoArgs), 1,
                      "More than one message for control without "
@@ -31,7 +31,7 @@ class WFPadMessageFactoryTest(unittest.TestCase):
 
         # Test control message with arguments that fit in payload
         testArgs, expArgs = [1, 2], '[1, 2]'
-        ctrlMsgsArgs = self.msgFactory.createWFPadControlMessages(
+        ctrlMsgsArgs = self.msgFactory.newControl(
                                                      const.OP_APP_HINT,
                                                      args=testArgs)
         self.assertEqual(len(ctrlMsgsArgs), 1,
@@ -47,7 +47,7 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         # Test control message with arguments that do not fit
         testArgs = range(1000)
         expArgs = str(testArgs)
-        ctrlMsgsArgs = self.msgFactory.createWFPadControlMessages(
+        ctrlMsgsArgs = self.msgFactory.newControl(
                                                      const.OP_APP_HINT,
                                                      args=testArgs)
         self.assertTrue(len(ctrlMsgsArgs) > 1,
@@ -66,7 +66,7 @@ class WFPadMessageExtractorTest(unittest.TestCase):
 
     def test_extract_control_message(self):
         testArgs = [range(500), range(500)]
-        ctrlMsgsArgs = self.msgFactory.createWFPadControlMessages(
+        ctrlMsgsArgs = self.msgFactory.newControl(
                                                      const.OP_GAP_HISTO,
                                                      args=testArgs)
         strMsg = "".join([str(msg) for msg in ctrlMsgsArgs])
