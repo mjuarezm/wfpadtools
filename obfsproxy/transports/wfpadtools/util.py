@@ -122,6 +122,17 @@ def timestamp():
     return time()
 
 
+def isDeferActive(deferred):
+    """Alias to check if twisted deferred is active."""
+    return deferred and not deferred.called
+
+
+def cancelDefer(deferred):
+    """Alias to cancel twisted deferred is active."""
+    if isDeferActive(deferred):
+        deferred.cancel()
+
+
 def get_page(url, port, timeout):
     session = requests.session()
     session.proxies = {'http': 'socks5://127.0.0.1:{}'.format(port),

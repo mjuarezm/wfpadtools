@@ -10,6 +10,7 @@ import random
 import const
 
 import obfsproxy.common.log as logging
+from random import randint
 
 log = logging.get_obfslogger()
 
@@ -21,7 +22,8 @@ class RandProbDist:
     Provides code to generate, sample and dump probability distributions.
     """
 
-    def __init__( self, genSingleton, genProbSignleton=None, seed=None, bins=None):
+    def __init__( self, genSingleton=None, genProbSignleton=None, seed=None, histo=None,
+                  labels=None, bins=None, interpolate=None, removeToks=None):
         """
         Initialise a discrete probability distribution.
 
@@ -30,12 +32,20 @@ class RandProbDist:
         be used to seed the PRNG so that the probability distribution is
         generated deterministically.
         """
+        assert(genSingleton or histo)
 
-        self.prng = random if (seed is None) else random.Random(seed)
-
-        self.sampleList = []
-        self.dist = self.genDistribution(genSingleton, genProbSignleton, bins)
-        self.dumpDistribution()
+        self.histo = histo
+        self.labels = labels
+        self.interpolate = interpolate
+        self.removeToks = removeToks
+        self.last_i = None
+        if histo:
+            assert(labels != None and interpolate != None and removeToks != None)
+        else:
+            self.prng = random if (seed is None) else random.Random(seed)
+            self.sampleList = []
+            self.dist = self.genDistribution(genSingleton, genProbSignleton, bins)
+            self.dumpDistribution()
 
     def genDistribution( self, genSingleton, genProbSignleton, bins=None):
         """
@@ -84,20 +94,37 @@ class RandProbDist:
                     log.debug("P(%s) = %.3f" %
                               (str(singleton), self.dist[singleton]))
 
+    def removeToken(self):
+        if self.histo and self.removeToks == True:
+            self.histo[self.last_i] -= 1
+        else:
+            pass
+
     def randomSample( self ):
         """
         Draw and return a random sample from the probability distribution.
         """
+        if self.histo:
+            sample = randint(0, sum(self.histo))  # between 0 and sum_tokens
+            for i, b in enumerate(self.histo):
+                sample -= b
+                if sample <= 0:
+                    if self.interpolate and i < len(self.histo) - 1:
+                        if i == 0:
+                            return self.labels[i] * random()
+                        else:
+                            return self.labels[i - 1] + (self.labels[i] - \
+                                            self.labels[i - 1]) * random()
+                    return self.labels[i]
+        else:
+            assert len(self.sampleList) > 0
 
-        assert len(self.sampleList) > 0
+            rand = random.random()
 
-        rand = random.random()
-
-        for cumulProb, singleton in self.sampleList:
-            if rand <= cumulProb:
-                return singleton
-
-        return self.sampleList[-1][1]
+            for cumulProb, singleton in self.sampleList:
+                if rand <= cumulProb:
+                    return singleton
+            return self.sampleList[-1][1]
 
 # Alias class name in order to provide a more intuitive API.
 new = RandProbDist

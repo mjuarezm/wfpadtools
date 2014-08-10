@@ -169,6 +169,11 @@ class WFPadMessageFactory(object):
         return WFPadMessage(payload, paddingLen, flags, opcode,
                             totalArgsLen, ctrlId, args)
 
+    def newIgnore(self, paddingLen):
+        return self.new(payload="",
+                        paddingLen=paddingLen,
+                        flags=const.FLAG_PADDING)
+
     def newControl(self, opcode, args=None):
         if not args:
             return [self.new(flags=const.FLAG_CONTROL,
@@ -325,6 +330,7 @@ class WFPadMessageExtractor(object):
         self.ctrlId         = 0
         self.argsParseLen   = 0
         self.args           = ""
+        self.totalArgs      = ""
 
     def getMessageField(self, position, length):
         """Return chunk of `length` starting at `position` in the buffer."""

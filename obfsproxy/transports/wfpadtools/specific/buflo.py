@@ -23,7 +23,7 @@ class BuFLOTransport(WFPadTransport):
     _mintime = -1
     _startTime = time.time()
     _period = 0.01
-    _psize = const.MTU
+    _length = const.MTU
 
     def __init__(self):
         super(BuFLOTransport, self).__init__()
@@ -70,7 +70,7 @@ class BuFLOTransport(WFPadTransport):
         if args.period:
             cls._period = args.period
         if args.psize:
-            cls._psize = args.psize
+            cls._length = args.psize
 
     def getElapsed(self):
         """Returns time elapsed since the beginning of the session.
@@ -85,7 +85,7 @@ class BuFLOTransport(WFPadTransport):
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
         self._startTime = time.time()
-        self._lengthDataProbdist = probdist.uniform(self._psize)
+        self._lengthDataProbdist = probdist.uniform(self._length)
         self.setConstantRatePadding(self._period)
 
 

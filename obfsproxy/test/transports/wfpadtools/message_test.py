@@ -13,8 +13,7 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         pass
 
     def test_normal_message(self):
-        msg = self.msgFactory.new("payload",
-                                                 flags=const.FLAG_DATA)
+        msg = self.msgFactory.new("payload", flags=const.FLAG_DATA)
         pass
 
     def test_control_message(self):

@@ -58,7 +58,9 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 "sessid": self.getSessId(),
                 "ctrlId": msg.ctrlId,
                 "totalArgsLen": msg.totalArgsLen,
-                "numMessages": self._numMessages
+                "numMessages": self._numMessages,
+                "burstDistr": self._burstHistoProbdist,
+                "gapDistr": self._gapHistoProbdist,
                 }
 
     def parseControl(self, data):
@@ -67,6 +69,9 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
             if op == "TEST":
                 opcode, args_str = payload.split(";")
                 opcode = int(opcode)
+                if opcode == 0:
+                    self.sendDataMessage("foo")
+                    return True
                 args = None
                 if args_str != "":
                     args = json.loads(args_str)

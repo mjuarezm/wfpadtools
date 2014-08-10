@@ -9,7 +9,6 @@ import json
 import time
 import pickle
 import unittest
-from sets import Set
 from time import sleep
 from os import listdir
 from os.path import join, isfile, exists
@@ -148,10 +147,20 @@ class PostPrimitiveTest(ControlMessageCommunicationTest):
 
     def spectest_run(self):
         """Run tests that start with `posttest`."""
+        self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
+        self.do_instructions()
+        self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
+        self.postWrapper = self.load_wrapper()
+        log.debug("Post wrapper: %s" % self.postWrapper)
+        self.postClientDumps = [msg for msg in self.postWrapper
+                                if msg['client']]
+        self.postServerDumps = [msg for msg in self.postWrapper
+                                if not msg['client']]
         specTests = [testMethod for testMethod in dir(self)
                      if testMethod.startswith('posttest')]
         for specTest in specTests:
             getattr(self, specTest)()
+
 
 class SendPaddingTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_SEND_PADDING
@@ -208,21 +217,42 @@ class AppHintTest(ControlMessageCommunicationTest, STTest):
                           % (firstServerDumpMsg['visiting'], self.status))
 
 
-class BurstHistoTest(ControlMessageCommunicationTest, STTest):
+class RcvUnifHistoTest(PostPrimitiveTest, STTest):
+    sessId = 111
     opcode = const.OP_BURST_HISTO
-    histo = [23, 10, 9, 7, 9, 8, 3, 7, 3, 10, 5, 2, 1, 2, 0, 1, 0]
-    labels_ms = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096,
-                 8192, 16384, 32768, 65536, -1]
-    removeTokens = False
-    interpolate = True
+    delay = 0.2
+    histo = [1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    labels_ms = [delay, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+                 2048, 4096, 8192, 16384, 32768, 65536, -1]
+    removeTokens = True
+    interpolate = False
     when = "rcv"
     args = [histo, labels_ms, removeTokens, interpolate, when]
 
-    def spectest_receive(self):
-        pass
+    def do_instructions(self):
+        self.send_instruction(const.OP_GAP_HISTO, [self.histo,
+                                                   self.labels_ms,
+                                                   self.removeTokens,
+                                                   self.interpolate,
+                                                   "rcv"])
+        sleep(0.5)
+        self.send_instruction(0)
+        sleep(1)
+
+    def posttest_period(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
+            observedPeriod = msg2["time"] - msg1["time"]
+            expectedPeriod = self.delay
+            self.assertAlmostEqual(observedPeriod, expectedPeriod,
+                               msg="The observed period %s does not"
+                               " match with the expected period: %s"
+                               % (observedPeriod, expectedPeriod),
+                               delta=0.05)
 
 
-class GapHistoTest(ControlMessageCommunicationTest, STTest):
+class SndHistoTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_GAP_HISTO
     histo = [23, 10, 9, 7, 9, 8, 3, 7, 3, 10, 5, 2, 1, 2, 0, 1, 0]
     labels_ms = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096,
@@ -241,15 +271,8 @@ class TotalPadTest(PostPrimitiveTest, STTest):
     sessId, delay = "id123", 1
     args = [sessId, delay]
 
-    def spectest_run(self):
-        self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
-        self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
-        self.postWrapper = self.load_wrapper()
-        self.postClientDumps = [msg for msg in self.postWrapper
-                                if msg['client']]
-        self.postServerDumps = [msg for msg in self.postWrapper
-                                if not msg['client']]
-        PostPrimitiveTest.spectest_run(self)
+    def do_instructions(self):
+        pass
 
     def posttest_num_messages_is_power_of_2(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
@@ -278,16 +301,8 @@ class BatchPadTest(PostPrimitiveTest, STTest):
     sessId, L, delay = "id123", 5, 1
     args = [sessId, L, delay]
 
-    def spectest_run(self):
-        self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
-        self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
-        sleep(self.L * self.delay)
-        self.postWrapper = self.load_wrapper()
-        self.postClientDumps = [msg for msg in self.postWrapper
-                                if msg['client']]
-        self.postServerDumps = [msg for msg in self.postWrapper
-                                if not msg['client']]
-        PostPrimitiveTest.spectest_run(self)
+    def do_instructions(self):
+        pass
 
     def posttest_num_messages_is_multiple_of_L(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
@@ -383,31 +398,25 @@ class WFPadShimObserver(STTest):
         wfpad.WFPadClient.setup(pt_config)
         wfpadClient = wfpad.WFPadClient()
 
-        # Create an instace of the shim
+        # Create an instance of the shim
         self.shimObs = wfpad.WFPadShimObserver(wfpadClient)
-
-        # Open a few connections
-        self.shimObs.onConnect(1)
-        self.shimObs.onConnect(2)
-        self.shimObs.onConnect(3)
 
     def test_opening_connections(self):
         """Test opening new connections.
 
-        If the observer is notified of a new open connection,
+        If the observer is notified of a new connection,
         test that the connection is added to the data structure
         and make sure session has started.
-        Also test adding the same connection twice.
         """
         self.shimObs.onConnect(1)
 
-        obsSessions = self.shimObs._sessions
-        expSessions = {1: Set([1, 2, 3])}
+        obsConnections = self.shimObs._connections
+        expConnections = [1]
 
-        self.assertDictEqual(obsSessions, expSessions,
-                            "Observed sessions %s do not match"
-                            " with expected sessions %s."
-                            % (obsSessions, expSessions))
+        self.assertListEqual(obsConnections, expConnections,
+                            "Observed connections %s do not match"
+                            " with expected connections %s."
+                            % (obsConnections, expConnections))
 
         self.assertTrue(self.shimObs.wfpad._visiting,
                          "The session has not started."
@@ -418,66 +427,51 @@ class WFPadShimObserver(STTest):
 
         If the observer is notified of a connection being closed,
         test that connections are removed from data structure correctly.
-        Also test removing the same connection twice.
         """
-        self.shimObs.onDisconnect(1)
-        self.shimObs.onDisconnect(1)
+        self.shimObs.onConnect(1)
+        self.shimObs.onConnect(2)
+        self.shimObs.onDisconnect(2)
 
-        obsSessions = self.shimObs._sessions
-        expSessions = {1: Set([2, 3])}
+        obsConnections = self.shimObs._connections
+        expConnections = [1]
 
-        self.assertDictEqual(obsSessions, expSessions,
-                            "Observed sessions %s do not match"
-                            " with expected sessions %s."
-                            % (obsSessions, expSessions))
+        self.assertListEqual(obsConnections, expConnections,
+                            "Observed connections %s do not match"
+                            " with expected connections %s."
+                            % (obsConnections, expConnections))
 
-    def test_edge_cases(self):
-        """Test the data structure is working properly in the edge cases.
+    def test_end_session(self):
+        """Test triggering of end of session.
 
         When the last connection is removed from data structure, make sure
-        the session ends. Also, test removing a connection that is not in
-        the data structure.
+        the session ends. Also, test removing a connection not in the list.
         """
+        self.shimObs.onConnect(1)
         self.shimObs.onDisconnect(1)
-        self.shimObs.onDisconnect(2)
-        self.shimObs.onDisconnect(14)
-        self.shimObs.onDisconnect(3)
-
-        obsSessions = self.shimObs._sessions
-        expSessions = {}
-
-        self.assertDictEqual(obsSessions, expSessions,
-                            "Observed sessions %s do not match"
-                            " with expected sessions %s."
-                            % (obsSessions, expSessions))
 
         self.assertFalse(self.shimObs.wfpad._visiting,
                          "The session has not ended."
                          "The wfpad's `_visiting` flag is `True`.")
 
-    def test_after_removing_all_sessions(self):
-        """Test session counter for new sessions.
+        self.should_raise("Exception was not raised when trying"
+                            " to remove a connection not in the list.",
+                            self.shimObs.onDisconnect, 1)
 
-        After removing all connections, when a new connection is started,
-        the session id must be incremented. Also, test removing connection
-        when data structure is empty.
+    def test_start_session(self):
+        """Test triggering of start of session.
+
+        When the first connection is added to data structure, make sure
+        the session starts. Also, test adding connection twice.
         """
-        self.shimObs.onDisconnect(1)
-        self.shimObs.onDisconnect(2)
-        self.shimObs.onDisconnect(3)
         self.shimObs.onConnect(1)
-
-        obsSessions = self.shimObs._sessions
-        expSessions = {2: Set([1])}
-
-        self.assertDictEqual(obsSessions, expSessions,
-                    "Observed sessions %s do not match"
-                    " with expected sessions %s."
-                    % (obsSessions, expSessions))
 
         self.assertTrue(self.shimObs.wfpad._visiting,
                          "The session has not started."
                          "The wfpad's `_visiting` flag is `False`.")
+
+        self.should_raise("Exception was not raised when trying"
+                            " to add a connection already in the list.",
+                            self.shimObs.onConnect, 1)
 
 
 if __name__ == "__main__":
