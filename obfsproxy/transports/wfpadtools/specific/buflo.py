@@ -86,7 +86,7 @@ class BuFLOTransport(WFPadTransport):
         WFPadTransport.onSessionStarts(self, sessId)
         self._startTime = time.time()
         self._lengthDataProbdist = probdist.uniform(self._length)
-        self.setConstantRatePadding(self._period)
+        self.constantRatePaddingDistrib(self._period)
 
 
 class BuFLOClient(BuFLOTransport):

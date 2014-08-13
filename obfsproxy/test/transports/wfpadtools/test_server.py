@@ -54,7 +54,7 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 "flags": msg.flags,
                 "time": time(),
                 "client": self.weAreClient,
-                "visiting": self._visiting,
+                "visiting": self.isVisiting(),
                 "sessid": self.getSessId(),
                 "ctrlId": msg.ctrlId,
                 "totalArgsLen": msg.totalArgsLen,

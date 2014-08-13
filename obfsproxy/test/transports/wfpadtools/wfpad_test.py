@@ -237,7 +237,7 @@ class RcvUnifHistoTest(PostPrimitiveTest, STTest):
                                                    "rcv"])
         sleep(0.5)
         self.send_instruction(0)
-        sleep(1)
+        sleep(2)
 
     def posttest_period(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
@@ -418,10 +418,6 @@ class WFPadShimObserver(STTest):
                             " with expected connections %s."
                             % (obsConnections, expConnections))
 
-        self.assertTrue(self.shimObs.wfpad._visiting,
-                         "The session has not started."
-                         "The wfpad's `_visiting` flag is `False`.")
-
     def test_closing_connections(self):
         """Test closing connections.
 
@@ -449,9 +445,9 @@ class WFPadShimObserver(STTest):
         self.shimObs.onConnect(1)
         self.shimObs.onDisconnect(1)
 
-        self.assertFalse(self.shimObs.wfpad._visiting,
+        self.assertFalse(self.shimObs._visiting,
                          "The session has not ended."
-                         "The wfpad's `_visiting` flag is `True`.")
+                         "The `_visiting` flag is `True`.")
 
         self.should_raise("Exception was not raised when trying"
                             " to remove a connection not in the list.",
@@ -465,9 +461,9 @@ class WFPadShimObserver(STTest):
         """
         self.shimObs.onConnect(1)
 
-        self.assertTrue(self.shimObs.wfpad._visiting,
+        self.assertTrue(self.shimObs._visiting,
                          "The session has not started."
-                         "The wfpad's `_visiting` flag is `False`.")
+                         "The `_visiting` flag is `False`.")
 
         self.should_raise("Exception was not raised when trying"
                             " to add a connection already in the list.",

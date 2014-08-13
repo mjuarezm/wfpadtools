@@ -5,16 +5,15 @@ The class RandProbDist provides an interface to randomly generate probability
 distributions.  Random samples can then be drawn from these distributions.
 """
 
+from random import randint
 import random
 
 import const
-
 import obfsproxy.common.log as logging
-from random import randint
+
 
 log = logging.get_obfslogger()
 
-VERBOSE = False
 
 class RandProbDist:
 
@@ -85,18 +84,18 @@ class RandProbDist:
 
         Only probabilities > 0.01 are dumped.
         """
-        if VERBOSE:
-            log.debug("Dumping probability distribution.")
+        log.debug("Dumping probability distribution.")
 
-            for singleton in self.dist.iterkeys():
-                # We are not interested in tiny probabilities.
-                if self.dist[singleton] > 0.01:
-                    log.debug("P(%s) = %.3f" %
-                              (str(singleton), self.dist[singleton]))
+        for singleton in self.dist.iterkeys():
+            # We are not interested in tiny probabilities.
+            if self.dist[singleton] > 0.01:
+                log.debug("P(%s) = %.3f" %
+                          (str(singleton), self.dist[singleton]))
 
-    def removeToken(self):
+    def removeToken(self, label=None):
         if self.histo and self.removeToks == True:
             self.histo[self.last_i] -= 1
+            log.debug("[probdist] Removed tokem from bin %s" % self.last_i)
         else:
             pass
 
