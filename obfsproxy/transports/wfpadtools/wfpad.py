@@ -75,17 +75,17 @@ following limitations:
 
 """
 import json
-from twisted.internet import reactor, task
-
-import obfsproxy.common.log as logging
 from obfsproxy.transports.base import BaseTransport, PluggableTransportError
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message as mes
 from obfsproxy.transports.wfpadtools import message, socks_shim
 from obfsproxy.transports.wfpadtools import util as ut
+from twisted.internet import reactor, task
+from twisted.internet.defer import CancelledError
+
+import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
-from twisted.internet.defer import Deferred, CancelledError
 
 
 log = logging.get_obfslogger()
@@ -382,7 +382,8 @@ class WFPadTransport(BaseTransport):
 
         if delay == 0:
             # Send data message over the wire
-            self.sendDownstream(self._msgFactory.encapsulate(data))
+            self.sendDownstream(self._msgFactory.encapsulate(data,
+                                 lenProbdist=self._lengthDataProbdist))
             log.debug("[wfpad] Data message has been sent without delay.")
 
         else:

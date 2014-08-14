@@ -17,22 +17,10 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         pass
 
     def test_control_message(self):
-        # Test control message with no arguments
-        ctrlMsgsNoArgs = self.msgFactory.newControl(
-                                                        const.OP_PAYLOAD_PAD)
-        self.assertEqual(len(ctrlMsgsNoArgs), 1,
-                     "More than one message for control without "
-                     "args was created.")
-        ctrlMsgNoArgs = ctrlMsgsNoArgs[0]
-        self.assertFalse(ctrlMsgNoArgs.args,
-                         "The test control message contains args: %s"
-                         % ctrlMsgNoArgs.args)
-
         # Test control message with arguments that fit in payload
         testArgs, expArgs = [1, 2], '[1, 2]'
-        ctrlMsgsArgs = self.msgFactory.newControl(
-                                                     const.OP_APP_HINT,
-                                                     args=testArgs)
+        ctrlMsgsArgs = self.msgFactory.encapsulate(opcode=const.OP_APP_HINT,
+                                                   args=testArgs)
         self.assertEqual(len(ctrlMsgsArgs), 1,
                      "More than one message for control without args "
                      "was created.")
@@ -46,9 +34,8 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         # Test control message with arguments that do not fit
         testArgs = range(1000)
         expArgs = str(testArgs)
-        ctrlMsgsArgs = self.msgFactory.newControl(
-                                                     const.OP_APP_HINT,
-                                                     args=testArgs)
+        ctrlMsgsArgs = self.msgFactory.encapsulate(opcode=const.OP_APP_HINT,
+                                                   args=testArgs)
         self.assertTrue(len(ctrlMsgsArgs) > 1,
                      "No more than one message for control without args "
                      "was created.")
@@ -65,9 +52,8 @@ class WFPadMessageExtractorTest(unittest.TestCase):
 
     def test_extract_control_message(self):
         testArgs = [range(500), range(500)]
-        ctrlMsgsArgs = self.msgFactory.newControl(
-                                                     const.OP_GAP_HISTO,
-                                                     args=testArgs)
+        ctrlMsgsArgs = self.msgFactory.encapsulate(opcode=const.OP_GAP_HISTO,
+                                                   args=testArgs)
         strMsg = "".join([str(msg) for msg in ctrlMsgsArgs])
         extractedMsgs = self.msgExtractor.extract(strMsg)
         self.assertEqual(strMsg, "".join([str(msg) for msg in extractedMsgs]),
