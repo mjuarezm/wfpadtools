@@ -93,15 +93,15 @@ class WFPadMessageFactory(object):
                 return payloadLen
         return const.MPU_CTRL if flags is const.FLAG_CONTROL else const.MPU
 
-    def encapsulate(self, data="", opcode=None, args=None, lenProbdist=None):
+    def encapsulate(self, data="", opcode=None, args="", lenProbdist=None):
         """Wrap data into WFPad protocol messages."""
         assert(data or opcode)
 
         messages = []
-        if data:
-            messages = self._encapsulateData(data, lenProbdist)
-        else:
+        if opcode:
             messages = self._encapsulateCtrl(opcode, args, data, lenProbdist)
+        else:
+            messages = self._encapsulateData(data, lenProbdist)
 
         log.debug("[wfpad] Created %d protocol messages." % len(messages))
         return messages
@@ -248,7 +248,7 @@ class WFPadMessageExtractor(object):
         """Create a new WFPadMessageExtractor object."""
         self.totalLen = self.payloadLen = self.flags = self.opcode = None
         self.argsLen = self.argsParseLen = 0
-        self.recvBuf = self.args = ""
+        self.recvBuf = self.args = totalArgs = ""
 
     def getHeaderLen(self):
         if self.flags:

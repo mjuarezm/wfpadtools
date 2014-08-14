@@ -86,6 +86,7 @@ from twisted.internet.defer import CancelledError
 
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
+from sets import Set
 
 
 log = logging.get_obfslogger()
@@ -103,33 +104,44 @@ class WFPadShimObserver(object):
         """Instantiates a new `WFPadShimObserver` object."""
         log.debug("[wfpad - shim obs] New instance of the shim observer.")
         self._wfpad = instanceWFPadTransport
-        self._connections = []
+        self._sessions = {}
         self._visiting = False
         self._sessId = 0
 
+    def getNumConnections(self, sessId):
+        """Return the number of open connections for session `sessId`."""
+        if sessId not in self._sessions:
+            return 0
+        return len(self._sessions[sessId])
+
     def onConnect(self, connId):
-        """Add id of new connection to list of open connections."""
-        assert(connId not in self._connections)
-        if len(self._connections) == 0:
+        """Add id of new connection to the set of open connections."""
+        if self.getNumConnections(self._sessId) == 0:
             self._sessId += 1
-            self.onSessionStarts()
-        self._connections.append(connId)
+            self.onSessionStarts(connId)
+        if self._sessId in self._sessions:
+            self._sessions[self._sessId].add(connId)
+        else:
+            self._sessions[self._sessId] = Set([connId])
 
     def onDisconnect(self, connId):
-        """Remove id of connection from list of open connections."""
-        assert(connId in self._connections)
-        self._connections.remove(connId)
-        if len(self._connections) == 0:
-            self.onSessionEnds()
+        """Remove id of connection to the set of open connections."""
+        if self._sessId in self._sessions and \
+            connId in self._sessions[self._sessId]:
+                self._sessions[self._sessId].remove(connId)
+        if self.getNumConnections(self._sessId) == 0:
+            self.onSessionEnds(connId)
+            if self._sessId in self._sessions:
+                del self._sessions[self._sessId]
 
-    def onSessionStarts(self):
+    def onSessionStarts(self, sessId):
         """Sets wfpad's `_visiting` flag to `True`."""
         log.debug("[wfpad - shim obs] Session %s begins." % self._sessId)
         self._visiting = True
         self._wfpad._numMessages = {'rcv': 0, 'snd': 0}
         self._wfpad.onSessionStarts(self._sessId)
 
-    def onSessionEnds(self):
+    def onSessionEnds(self, sessId):
         """Sets wfpad's `_visiting` flag to `False`."""
         log.debug("[wfpad - shim obs] Session %s ends." % self._sessId)
         self._visiting = False
@@ -344,7 +356,8 @@ class WFPadTransport(BaseTransport):
             raise Exception("[wfpad ] Server cannot send control messages.")
         log.debug("[wfpad] Sending control message: opcode=%s, args=%s."
                   % (opcode, args))
-        self.sendDownstream(self._msgFactory.newControl(opcode, args))
+        self.sendDownstream(self._msgFactory.encapsulate("", opcode, args,
+                                        lenProbdist=self._lengthDataProbdist))
 
     def pushData(self, data):
         """Push `data` to the buffer or send it over the wire.
@@ -394,7 +407,7 @@ class WFPadTransport(BaseTransport):
 
             # In case we the buffer is not currently being flushed,
             # make a delayed call to the flushing method
-            if self._deferData.called:
+            if self._deferData and self._deferData.called:
                 self._deferData = deferLater(delay, self.flushBuffer)
                 log.debug("[wfad] Delay buffer flush %s sec." % delay)
 
@@ -476,7 +489,7 @@ class WFPadTransport(BaseTransport):
                     log.debug("[wfad] Message with control data received.")
                     self._msgExtractor.totalArgs += msg.args
                     # We need to wait until we have all the args
-                    if msg.totalArgsLen == len(self._msgExtractor.totalArgs):
+                    if msg.argsLen == len(self._msgExtractor.totalArgs):
                         args = json.loads(self._msgExtractor.totalArgs)
                         self._msgExtractor.totalArgs = ""
                 self.circuit.upstream.write(msg.payload)

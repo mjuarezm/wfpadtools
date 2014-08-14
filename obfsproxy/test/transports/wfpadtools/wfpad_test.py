@@ -1,22 +1,24 @@
-import obfsproxy.common.log as logging
-from obfsproxy.test import tester
-from obfsproxy.transports.wfpadtools import wfpad
-from obfsproxy.transports.wfpadtools import const
-from obfsproxy.transports.wfpadtools import util as ut
-from obfsproxy.test.transports.wfpadtools.sttest import STTest
-
 import json
-import time
-import pickle
-import unittest
-from time import sleep
+import multiprocessing
 from os import listdir
 from os.path import join, isfile, exists
-from obfsproxy.common import transport_config
-from obfsproxy.test.tester import TransportsSetUp
+import pickle
+from sets import Set
 import socket
-import multiprocessing
+from time import sleep
+import time
+import unittest
+
+from obfsproxy.common import transport_config
+import obfsproxy.common.log as logging
+from obfsproxy.test import tester
+from obfsproxy.test.tester import TransportsSetUp
+from obfsproxy.test.transports.wfpadtools.sttest import STTest
+from obfsproxy.transports.wfpadtools import const
+from obfsproxy.transports.wfpadtools import util as ut
+from obfsproxy.transports.wfpadtools import wfpad
 from obfsproxy.transports.wfpadtools.message import getOpcodeNames
+
 
 DEBUG = True
 
@@ -398,76 +400,101 @@ class WFPadShimObserver(STTest):
         wfpad.WFPadClient.setup(pt_config)
         wfpadClient = wfpad.WFPadClient()
 
-        # Create an instance of the shim
+        # Create an instace of the shim
         self.shimObs = wfpad.WFPadShimObserver(wfpadClient)
+
+        # Open a few connections
+        self.shimObs.onConnect(1)
+        self.shimObs.onConnect(2)
+        self.shimObs.onConnect(3)
 
     def test_opening_connections(self):
         """Test opening new connections.
 
-        If the observer is notified of a new connection,
+        If the observer is notified of a new open connection,
         test that the connection is added to the data structure
         and make sure session has started.
+        Also test adding the same connection twice.
         """
         self.shimObs.onConnect(1)
 
-        obsConnections = self.shimObs._connections
-        expConnections = [1]
+        obsSessions = self.shimObs._sessions
+        expSessions = {1: Set([1, 2, 3])}
 
-        self.assertListEqual(obsConnections, expConnections,
-                            "Observed connections %s do not match"
-                            " with expected connections %s."
-                            % (obsConnections, expConnections))
+        self.assertDictEqual(obsSessions, expSessions,
+                            "Observed sessions %s do not match"
+                            " with expected sessions %s."
+                            % (obsSessions, expSessions))
+
+        self.assertTrue(self.shimObs._wfpad._visiting,
+                         "The session has not started."
+                         "The wfpad's `_visiting` flag is `False`.")
 
     def test_closing_connections(self):
         """Test closing connections.
 
         If the observer is notified of a connection being closed,
         test that connections are removed from data structure correctly.
+        Also test removing the same connection twice.
         """
-        self.shimObs.onConnect(1)
-        self.shimObs.onConnect(2)
-        self.shimObs.onDisconnect(2)
-
-        obsConnections = self.shimObs._connections
-        expConnections = [1]
-
-        self.assertListEqual(obsConnections, expConnections,
-                            "Observed connections %s do not match"
-                            " with expected connections %s."
-                            % (obsConnections, expConnections))
-
-    def test_end_session(self):
-        """Test triggering of end of session.
-
-        When the last connection is removed from data structure, make sure
-        the session ends. Also, test removing a connection not in the list.
-        """
-        self.shimObs.onConnect(1)
+        self.shimObs.onDisconnect(1)
         self.shimObs.onDisconnect(1)
 
-        self.assertFalse(self.shimObs._visiting,
-                         "The session has not ended."
-                         "The `_visiting` flag is `True`.")
+        obsSessions = self.shimObs._sessions
+        expSessions = {1: Set([2, 3])}
 
-        self.should_raise("Exception was not raised when trying"
-                            " to remove a connection not in the list.",
-                            self.shimObs.onDisconnect, 1)
+        self.assertDictEqual(obsSessions, expSessions,
+                            "Observed sessions %s do not match"
+                            " with expected sessions %s."
+                            % (obsSessions, expSessions))
 
-    def test_start_session(self):
-        """Test triggering of start of session.
+    def test_edge_cases(self):
+        """Test the data structure is working properly in the edge cases.
 
-        When the first connection is added to data structure, make sure
-        the session starts. Also, test adding connection twice.
+        When the last connection is removed from data structure, make sure
+        the session ends. Also, test removing a connection that is not in
+        the data structure.
         """
+        self.shimObs.onDisconnect(1)
+        self.shimObs.onDisconnect(2)
+        self.shimObs.onDisconnect(14)
+        self.shimObs.onDisconnect(3)
+
+        obsSessions = self.shimObs._sessions
+        expSessions = {}
+
+        self.assertDictEqual(obsSessions, expSessions,
+                            "Observed sessions %s do not match"
+                            " with expected sessions %s."
+                            % (obsSessions, expSessions))
+
+        self.assertFalse(self.shimObs._wfpad._visiting,
+                         "The session has not ended."
+                         "The wfpad's `_visiting` flag is `True`.")
+
+    def test_after_removing_all_sessions(self):
+        """Test session counter for new sessions.
+
+        After removing all connections, when a new connection is started,
+        the session id must be incremented. Also, test removing connection
+        when data structure is empty.
+        """
+        self.shimObs.onDisconnect(1)
+        self.shimObs.onDisconnect(2)
+        self.shimObs.onDisconnect(3)
         self.shimObs.onConnect(1)
+
+        obsSessions = self.shimObs._sessions
+        expSessions = {2: Set([1])}
+
+        self.assertDictEqual(obsSessions, expSessions,
+                    "Observed sessions %s do not match"
+                    " with expected sessions %s."
+                    % (obsSessions, expSessions))
 
         self.assertTrue(self.shimObs._visiting,
                          "The session has not started."
-                         "The `_visiting` flag is `False`.")
-
-        self.should_raise("Exception was not raised when trying"
-                            " to add a connection already in the list.",
-                            self.shimObs.onConnect, 1)
+                         "The wfpad's `_visiting` flag is `False`.")
 
 
 if __name__ == "__main__":

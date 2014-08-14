@@ -21,7 +21,7 @@ FINISHED_BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done."
 WATCHDOG_TIMEOUT = 180
 GET_PAGE_TIMEOUT = 10
 
-DEBUG = False
+DEBUG = True
 # DEBUG = False
 
 # Switch to leave Tor running and speed-up tests

@@ -60,6 +60,22 @@ class WFPadMessageExtractorTest(unittest.TestCase):
                          "First extracted messages do not match with"
                          " first original messages.")
 
+        # Test piggybacking
+        piggybackedData = "Iampiggybacked"
+        ctrlMsgsArgs = self.msgFactory.encapsulate(opcode=const.OP_GAP_HISTO,
+                                                   args=testArgs,
+                                                   data=piggybackedData)
+        strMsg = "".join([str(msg) for msg in ctrlMsgsArgs])
+        extractedMsgs = self.msgExtractor.extract(strMsg)
+        self.assertEqual(strMsg, "".join([str(msg) for msg in extractedMsgs]),
+                         "First extracted messages do not match with"
+                         " first original messages.")
+
+        obsPigBckdData = extractedMsgs[:-1].payload
+        self.assertEqual(obsPigBckdData, piggybackedData,
+                         "Observed piggybacked data: %s and expected"
+                         " data do not match" % (obsPigBckdData,
+                                                 piggybackedData))
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
