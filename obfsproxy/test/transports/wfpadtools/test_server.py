@@ -56,8 +56,6 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 "client": self.weAreClient,
                 "visiting": self.isVisiting(),
                 "sessid": self.getSessId(),
-                "ctrlId": msg.ctrlId,
-                "totalArgsLen": msg.totalArgsLen,
                 "numMessages": self._numMessages,
                 "burstDistr": self._burstHistoProbdist,
                 "gapDistr": self._gapHistoProbdist,
