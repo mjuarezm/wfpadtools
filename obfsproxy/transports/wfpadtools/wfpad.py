@@ -318,7 +318,6 @@ class WFPadTransport(BaseTransport):
                 self._deferBurst['rcv'].cancel()
             if self._deferGap['rcv'] and not self._deferGap['rcv'].called:
                 self._deferGap['rcv'].cancel()
-                self._deferBurst['rcv'].Deferred()
             self.processMessages(d)
 
     def sendDownstream(self, data):
@@ -539,13 +538,15 @@ class WFPadTransport(BaseTransport):
         if when is 'snd':
             self._consecPaddingMsgs += 1
             self._lastSndTimestamp = reactor.seconds()
-        gapDelay = self._gapHistoProbdist[when].randomSample()
-        if gapDelay is const.INF_LABEL:
+        delay = self._gapHistoProbdist[when].randomSample()
+        if delay is const.INF_LABEL:
             return
         log.debug("[wfpad]  Wait for data, pad snd gap otherwise.")
-        self._deferGap[when] = deferLater(gapDelay,
+        self._deferGap[when] = deferLater(delay,
                                           self.sendPaddingHisto,
-                                          self._deferGapCallback[when])
+                                          when=when,
+                                          cbk=self._deferGapCallback[when])
+        return delay
 
     def constantRatePaddingDistrib(self, t):
         self._delayDataProbdist = probdist.uniform(t)
@@ -693,12 +694,12 @@ class WFPadTransport(BaseTransport):
             arrives from upstream (the middle node). In both cases, the
             padding packet is sent in the direction of the client.
         """
-        self._deferBurstCallback[when] = self._burstHistoProbdist[when] \
-                                                .removeToken()
         self._burstHistoProbdist[when] = probdist.new(histo=histo,
                                                       labels=labels,
                                                       interpolate=interpolate,
                                                       removeToks=removeToks)
+        self._deferBurstCallback[when] = self._burstHistoProbdist[when]\
+                                                                .removeToken
 
     def relayGapHistogram(self, histo, labels, removeToks=False,
                                 interpolate=True, when="rcv"):
@@ -734,12 +735,12 @@ class WFPadTransport(BaseTransport):
             BURST_HISTOGRAM initiated padding into GAP_HISTOGRAM initiated
             padding.
         """
-        self._deferGapCallback[when] = self._gapHistoProbdist[when] \
-                                                .removeToken()
         self._gapHistoProbdist[when] = probdist.new(histo=histo,
                                                     labels=labels,
                                                     interpolate=interpolate,
                                                     removeToks=removeToks)
+        self._deferGapCallback[when] = self._gapHistoProbdist[when]\
+                                                        .removeToken
 
     def relayTotalPad(self, sessId, t):
         """Pad all batches to nearest 2^K cells total or until session ends.
@@ -801,9 +802,13 @@ def deferLater(*args, **kargs):
     It allows to call twisted deferLater and add callback and errback methods.
     """
     delay, fn = args[0], args[1]
-    d = task.deferLater(reactor, delay, fn, *args[2:], **kargs)
+    callback = None
     if 'cbk' in kargs:
-        d.addCallback(kargs['cbk'])
+        callback = kargs['cbk']
+        del kargs['cbk']
+    d = task.deferLater(reactor, delay, fn, *args[2:], **kargs)
+    if callback:
+        d.addCallback(callback)
 
     def errbackCancel(e):
         if isinstance(e, CancelledError):

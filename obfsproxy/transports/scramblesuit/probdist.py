@@ -10,6 +10,7 @@ import random
 
 import const
 import obfsproxy.common.log as logging
+import bisect
 
 
 log = logging.get_obfslogger()
@@ -37,8 +38,8 @@ class RandProbDist:
         self.labels = labels
         self.interpolate = interpolate
         self.removeToks = removeToks
-        self.last_i = None
-        if histo:
+
+        if self.histo:
             assert(labels != None and interpolate != None and removeToks != None)
         else:
             self.prng = random if (seed is None) else random.Random(seed)
@@ -92,9 +93,18 @@ class RandProbDist:
                 log.debug("P(%s) = %.3f" %
                           (str(singleton), self.dist[singleton]))
 
-    def removeToken(self, label=None):
+    def getIndexFromLabel(self, label):
+        if self.interpolate:
+            return bisect.bisect_left(self.labels, label,
+                                      hi=len(self.labels) - 1)
+        else:
+            return self.labels.index(label)
+
+    def removeToken(self, label):
         if self.histo and self.removeToks == True:
-            self.histo[self.last_i] -= 1
+            histo_i = self.getIndexFromLabel(label)
+            if self.histo[histo_i] > 0:
+                self.histo[histo_i] -= 1
             log.debug("[probdist] Removed tokem from bin %s" % self.last_i)
         else:
             pass

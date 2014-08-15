@@ -20,8 +20,8 @@ from obfsproxy.transports.wfpadtools import wfpad
 from obfsproxy.transports.wfpadtools.message import getOpcodeNames
 
 
-# DEBUG = True
-DEBUG = False
+DEBUG = True
+# DEBUG = False
 
 # Logging settings:
 log = logging.get_obfslogger()
@@ -241,6 +241,9 @@ class RcvUnifHistoTest(PostPrimitiveTest, STTest):
         sleep(0.5)
         self.send_instruction(0)
         sleep(2)
+
+    def posttest_removetoks(self):
+        self.assertTrue(False, "")
 
     def posttest_period(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps

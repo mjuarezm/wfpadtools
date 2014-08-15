@@ -57,8 +57,12 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                 "visiting": self.isVisiting(),
                 "sessid": self.getSessId(),
                 "numMessages": self._numMessages,
-                "burstDistr": self._burstHistoProbdist,
-                "gapDistr": self._gapHistoProbdist,
+                "burstDistr": [(k, v.histo)
+                               for k, v in self._burstHistoProbdist.iteritems()
+                               if v.histo],
+                "gapDistr": [(k, v.histo)
+                             for k, v in self._gapHistoProbdist.iteritems()
+                             if v.histo],
                 }
 
     def parseControl(self, data):
