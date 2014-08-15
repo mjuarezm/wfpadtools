@@ -1,0 +1,183 @@
+                      WFPadTools Protocol Specification
+
+								Marc Juarez
+
+0. Preliminaries
+
+    The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+    "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and "OPTIONAL" in this
+    document are to be interpreted as described in RFC 2119.
+
+1. Overview
+
+    WFPadTools is a pluggable transport protocol for the obfsproxy
+    obfuscation framework [1]. It implements the necessary building blocks
+    for the development of link padding-based website fingerprinting [2]
+    countermeasures in Tor. The protocol allows to insert dummy messages
+    to the stream between the OP and the bridge that are discarded at the
+    each of the ends.
+
+2. Stack
+
+
+
+3.  WFPadTools protocol
+ 
+	Application data is transported wrapping them into WFPadTools messages (data
+	unit of the WFPadTools protocol) which structure is described next. WFPadTools
+	defines two message headers, one for data/dummy messages and the other to
+	signal control operations to the other end of the transport.
+	
+	The data/dummy message is depicted below and has a 5-byte header. The fields
+	of the header are: total length, payload length and flags.
+	
+			   <-------------------  MTU  ------------------->
+			    2 Bytes  2 Bytes  1 Byte  <--- Up to MPU ---->
+			  +--------+---------+-------+----------+---------+
+			  | Total  | Payload | Flags |  Payload | Padding |
+			  | length | length  |       |   (opt)  |  (opt)  |
+			  +--------+---------+-------+----------+---------+
+			   <------ Min. Header -----> <-- Min. Payload -->
+	
+	The 2-byte total length refers to the overall length of the message excluding
+	the header, whereas the 2-byte payload length refers to the payload only. The
+	difference between total length and payload length is the length of the payload
+	padding that can be optionally used for modifying the distribution of packet
+	lengths. Although Tor cells are already padded up to 512 bytes, it could be that
+	other distributions provide a better trade-off between bandwidth overhead and
+	website fingerprinting resistance.  
+
+	When total length and payload length are set to 0, it results into an empty
+	protocol message. Note that the total length can be set to zero and the payload
+	length to the total Maximum Payload Unit (MPU) size, which results in a dummy
+	message.
+	
+	The other type of message is the control message and has a longer header that
+	allows to specify opcode and arguments of the control operation. The structure
+	of the control message is depicted below.
+	
+			  <-------------------  MTU  ---------------------->
+			  5 Bytes  1 Byte   2 Bytes  <----- Up to MPU ----->
+			 +--------+---------+-------+--------+--------------+
+			 |  Min.  | Opcode  | Args  |  Args  | Min. payload |
+			 | Header |         | len.  |  (opt) |     (opt)    |
+			 +--------+---------+-------+--------+--------------+
+			  <--------- Header -------> <------ Payload ------>
+	
+	WFPadTools Maximum Transmission Unit (MTU) size is 1448 bytes. Excluding the
+	headers, this results in 1443 bytes of transported data in data messages. Control
+	messages MAY also piggyback 1440 - len(args) bytes of application data.
+
+	The extra fields in this header are: opcode and args length. The opcode is the
+	number of operation and args length is the total length of the arguments.
+	The arguments might be too long to fit in one single message, in that case, we
+	can send control messages with len(args) > len(MPU). Since TCP is the underlying
+	transport protocol, there is no need for integrity or order checks and we can obtain
+	the arguments by parsing control messages until the amount of args parsed equals
+	args length.
+
+	The 1-byte flag field in the headers is used for protocol signaling. Below, all
+	defined flags along with their semantics are explained.
+	
+    Flag name       | Bit # | Description
+    ----------------+-------+--------------------------------------------------
+    FLAG_DATA	    |   1   | The payload consists of application data which
+                    |       | must be forwarded to the application.
+    ----------------+-------+--------------------------------------------------
+    FLAG_PADDING    |   2   | The payload holds padding that must be discarded.
+    ----------------+-------+--------------------------------------------------
+    FLAG_CONTROL    |   3   | The payload holds arguments for the control
+                    |       | operation and can hold the same payload as 
+                    |       | FLAG_DATA and FLAG_PADDING.
+    ----------------+-------+--------------------------------------------------
+    
+    There is a precedence of flags. When FLAG_PADDING is signaled to the other end,
+    the message is discarded, ignoring the state of the other flags. When data is
+    on, the message is forwarded upstream to the application. If the control message
+    flag is set, the transport parses the arguments and the opcode. In case the other
+    FLAG_DATA is set, it will relay the payload of the message. If FLAG_PADDING is set,
+    it will discard the payload of the message. So, the allowed combinations of flags
+    are:
+	
+	Flag value      | Description
+	----------------+-----------------------------------------------------
+	   001		    | Parse the payload and forward it.
+	----------------+-----------------------------------------------------
+	   010	        | Discard the message.
+	----------------+-----------------------------------------------------
+	   100          | Parse opcode and arguments and do operation.
+	----------------+-----------------------------------------------------
+	   101          | Parse opcode, arguments and payload. Run control
+	   				| operation and forward the payload.
+	----------------+-----------------------------------------------------
+	   110          | Parse opcode and arguments and do operation.
+	   				| Discard the payload.  
+	----------------+-----------------------------------------------------
+
+	WFPadTools message contains the transported data which might be followed
+	by padding. Padding MUST always be discarded.
+	
+	WFPadTools MUST be used in combination with another pluggable transport that
+	provides encryption. Then we can assume that padding is always going to be
+	encrypted and client and server MAY simply pad with 0 bytes.
+
+	For the motivation, a protocol overview and the threat model, please refer
+	to the Google Summer of Code project proposal [3].
+    
+    This protocol specification discusses the intention of the padding primitives
+    based on [2].
+
+4. Primitives
+
+	In this section I'll give a short summary of the primitives implemented in the
+	WFPadTools transport. Signaling of primitives is implemented using control
+	messages, each operation code corresponds to a primitive:
+
+	--------------------+-----------------------------------------------------
+	   OP_SEND_PADDING  | Request N dummy messages after a delay of t seconds.
+	--------------------+-----------------------------------------------------
+	   OP_APP_HINT	    | Signal the start/end of a session.
+	--------------------+-----------------------------------------------------
+	   OP_BURST_HISTO   | Specifies probability distributions for delays after
+	   					| data in order to pad burst in traffic.
+	--------------------+-----------------------------------------------------
+	   OP_GAP_HISTO     | Specifies probability distributions for delays after
+	   					| a dummy message in order to pad gaps in traffic.
+	--------------------+-----------------------------------------------------
+	   OP_TOTAL_PAD     | Parse opcode and arguments and do operation.
+	--------------------+-----------------------------------------------------
+	   OP_PAYLOAD_PAD   | Parse opcode and arguments and do operation.
+	--------------------+-----------------------------------------------------
+	   OP_BATCH_PAD     | Parse opcode and arguments and do operation.
+	--------------------+-----------------------------------------------------
+
+	For further details about the primitives and references to the research papers,
+	see [3].
+
+4.1. Histograms
+
+	Histograms for the probability distributions MUST cover all interval values from
+	0 to infinity. For example, in this implementation histograms length cannot be
+	greater than 2, the last bin corresponds to the infinity label and the 0 delay is
+	implicitly specified (in the first position there is a positive delay).
+
+5. State machine
+
+6. Handshake
+
+    Client                         Server  Legend:
+      |  		prob. distrib    	 |     
+      | ---------------------------> |     
+      |           					 |     
+      | <--------------------------- |     
+      |       					     |     
+      | <--------------------------> |      
+ 
+References
+
+	[1] https://www.torproject.org/projects/obfsproxy.html.en
+
+	[2] http://www.cypherpunks.ca/~iang/pubs/webfingerprint-wpes.pdf
+
+ 	[3] https://gitweb.torproject.org/user/mikeperry/torspec.git/blob/refs/heads/multihop-padding-primitives:/proposals/ideas/xxx-multihop-padding-primitives.txt
+ 	

@@ -1,30 +1,15 @@
 """
 This module implements the BuFLO countermeasure proposed by Dyer et al.
 """
+import time
+
 import obfsproxy.common.log as logging
 from obfsproxy.transports.scramblesuit import probdist
-from obfsproxy.transports.wfpadtools import const, socks_shim
+from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
-from obfsproxy.transports.wfpadtools.wfpad import WFPadShimObserver
+
 
 log = logging.get_obfslogger()
-
-
-class BuFLOShimObserver(WFPadShimObserver):
-
-    def onSessionStarts(self):
-        """Do operations to be done when session starts."""
-        super(BuFLOShimObserver, self).onSessionStarts()
-        log.debug("[buflo] observed the start of a new session.")
-        self.wfpad.startPadding()
-        self.wfpad.sendAppHintRequest(self.wfpad._sessionNumber)
-        self.wfpad._visiting = True
-
-    def onSessionEnds(self):
-        """Do operations to be done when session ends."""
-        log.debug("[buflo] observed the end of a session.")
-        super(BuFLOShimObserver, self).onSessionEnds()
-        self.wfpad._visiting = False
 
 
 class BuFLOTransport(WFPadTransport):
@@ -34,52 +19,24 @@ class BuFLOTransport(WFPadTransport):
     for time, and a constant probability distribution for packet lengths. The
     minimum time for which the link will be padded is also specified.
     """
-    # Defaults for BuFLO specifications.
-    _period = 0.01
-    _psize = const.MTU
-    _mintime = -1
 
     def __init__(self):
         super(BuFLOTransport, self).__init__()
+        # Initialize start time
+        self._startTime = time.time()
 
-        # Initialize minimum time for padding at each visit to a web page.
-        self._delayProbdist = probdist.new(lambda: self._period,
-                                          lambda i, n, c: 1)
-        self._lengthProbdist = probdist.new(lambda: self._psize,
-                                           lambda i, n, c: 1)
+        # Set constant length for messages
+        self._lengthDataProbdist = probdist.uniform(self._length)
 
-        # Register observer for shim events
-        if self.weAreClient:
-            shim = socks_shim.get()
-            self.sessionObserver = BuFLOShimObserver(self)
-            shim.registerObserver(self.sessionObserver)
-
-    @classmethod
-    def setup(cls, transportConfig):
-        """Called once when obfsproxy starts."""
-        cls.weAreClient = transportConfig.weAreClient
-        cls.weAreServer = not cls.weAreClient
-        cls.weAreExternal = transportConfig.weAreExternal
-
-    def circuitConnected(self):
-        """Initiate handshake.
-
-        This method is only relevant for clients since servers never initiate
-        handshakes.
-        """
-        self._state = const.ST_CONNECTED
-        self.flushSendBuffer()
-
-    def circuitDestroyed(self, reason, side):
-        """Unregister shim observers."""
-        if self.weAreClient:
-            shim = socks_shim.get()
-            if shim.isRegistered(self.sessionObserver):
-                shim.deregisterObserver(self.sessionObserver)
+        # The stop condition in BuFLO:
+        # BuFLO stops padding if the visit has finished and the
+        # elapsed time has exceeded the minimum padding time.
+        self.stopCondition = lambda s: self.getElapsed() > self._mintime and \
+                                            not self._visiting
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
-        """Register CLI arguments."""
+        """Register CLI arguments for BuFLO parameters."""
         subparser.add_argument("--period",
                                required=False,
                                type=float,
@@ -107,6 +64,11 @@ class BuFLOTransport(WFPadTransport):
         BuFLO pads at a constant rate `period` and pads the packets to a
         constant size `psize`.
         """
+        # Defaults for BuFLO specifications.
+        cls._mintime = -1
+        cls._period = 1
+        cls._length = const.MPU
+
         super(BuFLOTransport, cls).validate_external_mode_cli(args)
 
         if args.mintime:
@@ -114,20 +76,25 @@ class BuFLOTransport(WFPadTransport):
         if args.period:
             cls._period = args.period
         if args.psize:
-            cls._psize = args.psize
+            cls._length = args.psize
 
-    def stopCondition(self):
-        """Returns the evaluation of the condition to stop padding.
+    def getElapsed(self):
+        """Returns time elapsed since the beginning of the session.
 
-        BuFLO stops padding if the visit has finished and the elapsed time has
-        exceeded the minimum padding time.
+        If a session has not yet started, it returns time since __init__.
         """
-        return self.getElapsed() > self._mintime \
-                and self._state is self._visiting
+        elapsed = time.time() - self._startTime
+        log.debug("[buflo] Return elapsed time "
+                  "since start of session %d." % elapsed)
+        return elapsed
+
+    def onSessionStarts(self, sessId):
+        WFPadTransport.onSessionStarts(self, sessId)
+        self._startTime = time.time()
+        self.constantRatePaddingDistrib(self._period)
 
 
 class BuFLOClient(BuFLOTransport):
-    """Extend the BuFLOTransport class."""
 
     def __init__(self):
         """Initialize a BuFLOClient object."""
@@ -135,7 +102,6 @@ class BuFLOClient(BuFLOTransport):
 
 
 class BuFLOServer(BuFLOTransport):
-    """Extend the BuFLOTransport class."""
 
     def __init__(self):
         """Initialize a BuFLOServer object."""

@@ -1,16 +1,27 @@
-import obfsproxy.common.log as logging
-from obfsproxy.test import tester
-from obfsproxy.transports.wfpadtools import const
-from obfsproxy.transports.wfpadtools import util as ut
-from obfsproxy.test.transports.wfpadtools.sttest import STTest
-
-import time
-import pickle
-import unittest
+import json
+import multiprocessing
 from os import listdir
 from os.path import join, isfile, exists
+import pickle
+from sets import Set
+import socket
+from time import sleep
+import time
+import unittest
 
-DEBUG = False
+from obfsproxy.common import transport_config
+import obfsproxy.common.log as logging
+from obfsproxy.test import tester
+from obfsproxy.test.tester import TransportsSetUp
+from obfsproxy.test.transports.wfpadtools.sttest import STTest
+from obfsproxy.transports.wfpadtools import const
+from obfsproxy.transports.wfpadtools import util as ut
+from obfsproxy.transports.wfpadtools import wfpad
+from obfsproxy.transports.wfpadtools.message import getOpcodeNames
+
+
+DEBUG = True
+# DEBUG = False
 
 # Logging settings:
 log = logging.get_obfslogger()
@@ -20,23 +31,41 @@ if DEBUG:
     log.set_log_severity('debug')
 
 
-class TransportsSetUpTest(object):
+class DummyReadWorker(object):
 
-    def setUp(self):
-        self.obfs_client = tester.Obfsproxy(self.client_args)
+    @staticmethod
+    def work(host, port):
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind((host, port))
+        listener.listen(1)
+        (conn, _) = listener.accept()
+        listener.close()
+        try:
+            while True:
+                conn.recv(4096)
+        except Exception, e:
+            print "Exception %s" % str(e)
+        conn.close()
 
-    def tearDown(self):
-        self.obfs_client.stop()
+    def __init__(self, address):
+        self.worker = multiprocessing.Process(target=self.work,
+                                              args=(address))
+        self.worker.start()
+
+    def stop(self):
+        if self.worker.is_alive():
+            self.worker.terminate()
 
 
-class TestSetUp(TransportsSetUpTest):
+class TestSetUp(TransportsSetUp):
 
     def setUp(self):
         if exists(const.TEST_SERVER_DIR):
             ut.removedir(const.TEST_SERVER_DIR)
         ut.createdir(const.TEST_SERVER_DIR)
         super(TestSetUp, self).setUp()
-        self.output_reader = tester.ReadWorker(("127.0.0.1", tester.EXIT_PORT))
+        self.output_reader = DummyReadWorker(("127.0.0.1", tester.EXIT_PORT))
         self.input_chan = tester.connect_with_retry(("127.0.0.1",
                                                      tester.ENTRY_PORT))
         self.input_chan.settimeout(tester.SOCKET_TIMEOUT)
@@ -46,104 +75,361 @@ class TestSetUp(TransportsSetUpTest):
         self.input_chan.close()
         super(TestSetUp, self).tearDown()
         ut.removedir(const.TEST_SERVER_DIR)
+        if DEBUG:
+            self.print_output()
 
-    def direct_transfer(self):
-        self.input_chan.sendall(tester.TEST_FILE)
+    def print_output(self):
+        report = ""
+        report += self.obfs_client.check_completion("obfsproxy client (%s)"
+                                                % self.transport, report != "")
+        report += self.obfs_server.check_completion("obfsproxy server (%s)"
+                                                % self.transport, report != "")
+        log.debug(report)
+
+    def send_to_transport(self, data):
+        self.input_chan.sendall(data)
         time.sleep(2)
-        self.input_chan.close()
 
-    def load_wrappers(self):
-        return [pickle.load(open(join(const.TEST_SERVER_DIR, f)))
+    def load_wrapper(self):
+        return sum([pickle.load(open(join(const.TEST_SERVER_DIR, f)))
                     for f in listdir(const.TEST_SERVER_DIR)
-                        if isfile(join(const.TEST_SERVER_DIR, f))]
+                        if isfile(join(const.TEST_SERVER_DIR, f))], [])
 
 
-@unittest.skip("")
-class WFPadTests(TestSetUp, unittest.TestCase):
-    transport = "wfpad"
-    period = 0.1
-    psize = 1448
-    client_args = ("--test-server=127.0.0.1:%d" % tester.EXIT_PORT,
-                   "wfpad", "client",
-                   "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+class ControlMessageCommunicationTest(TestSetUp):
+    transport = "wfpadtest"
+    server_args = ("wfpadtest", "server",
+           "127.0.0.1:%d" % tester.SERVER_PORT,
+           "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
+    client_args = ("wfpadtest", "client",
+           "127.0.0.1:%d" % tester.ENTRY_PORT,
+           "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
 
-    def test_timing(self):
-        super(WFPadTests, self).direct_transfer()
-        for wrapper in self.load_wrappers():
-            for _, obsIat in wrapper:
-                print obsIat
-                self.assertAlmostEqual(self.period, obsIat,
-                                       None,
-                                       "The observed period %s does not match"
-                                       " with the expected period %s"
-                                       % (obsIat, self.period),
-                                       delta=0.05)
+    def send_instruction(self, opcode, args=None):
+        """Send instruction to wfpadtest client."""
+        instrMsg = "TEST:{};".format(str(opcode))
+        if args:
+            instrMsg += json.dumps(args)
+        self.send_to_transport(instrMsg)
 
-    def test_sizes(self):
-        super(WFPadTests, self).direct_transfer()
-        for wrapper in self.load_wrappers():
-            for obsLength, _ in wrapper:
-                print obsLength
-                self.assertEqual(self.psize, obsLength,
-                                       "The observed size %s does not match"
-                                       " with the expected size %s"
-                                       % (obsLength, self.psize))
+    def specific_tests(self):
+        """Run tests that start with `spectest`."""
+        specTests = [testMethod for testMethod in dir(self)
+                     if testMethod.startswith('spectest')]
+        for specTest in specTests:
+            getattr(self, specTest)()
+
+    def test_control_msg_communication(self):
+        """Test control messages communication."""
+        # Send instruction to test server
+        self.send_instruction(self.opcode, self.args)
+        log.debug("Test for " + getOpcodeNames(self.opcode) +
+                  " with args: %s" % self.args)
+
+        # Load wrapper
+        self.wrapper = self.load_wrapper()
+        log.debug("Messages in wrappers: %s" % self.wrapper)
+
+        # Filter client and server messages
+        self.serverDumps = [msg for msg in self.wrapper if not msg['client']]
+        self.clientDumps = [msg for msg in self.wrapper if msg['client']]
+
+        # Filter messages with `opcode`
+        opcodeMsgs = [msg['opcode'] for msg in self.serverDumps
+                      if msg['opcode'] == self.opcode]
+
+        # Test the control message was received successfully
+        self.assertTrue(opcodeMsgs, "Server did not receive the control "
+                                    "message with opcode: %s" % self.opcode)
+
+        # Run specific tests
+        self.specific_tests()
 
 
-# @unittest.skip("")
-class BuFLOTests(TestSetUp, STTest):
-    transport = "buflo"
-    period = 1
-    psize = 1448
-    mintime = 2
-    client_args = ("--test-server=127.0.0.1:%d" % tester.EXIT_PORT,
-                   "buflo", "client",
-                   "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--socks-shim=%d,%d" % (tester.SHIM_PORT,
-                                           tester.TESTSHIM_PORT),
-                   "--period=%d" % period,
-                   "--psize=%d" % psize,
-                   "--mintime=%d" % mintime,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+class PostPrimitiveTest(ControlMessageCommunicationTest):
+
+    def spectest_run(self):
+        """Run tests that start with `posttest`."""
+        self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
+        self.do_instructions()
+        self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
+        self.postWrapper = self.load_wrapper()
+        log.debug("Post wrapper: %s" % self.postWrapper)
+        self.postClientDumps = [msg for msg in self.postWrapper
+                                if msg['client']]
+        self.postServerDumps = [msg for msg in self.postWrapper
+                                if not msg['client']]
+        specTests = [testMethod for testMethod in dir(self)
+                     if testMethod.startswith('posttest')]
+        for specTest in specTests:
+            getattr(self, specTest)()
+
+
+class SendPaddingTest(ControlMessageCommunicationTest, STTest):
+    opcode = const.OP_SEND_PADDING
+    N, t = 5, 1
+    args = [N, t]
+
+    def spectest_n_padding_messages(self):
+        paddingMsgs = [msg for msg in self.clientDumps
+                        if msg['flags'] == const.FLAG_PADDING]
+        expNumPaddingMsgs = self.N
+        numPaddingMsgs = len(paddingMsgs)
+        self.assertEquals(numPaddingMsgs, expNumPaddingMsgs,
+                          "Observed number of padding msgs (%s)"
+                          " does not match the expected one: %s"
+                          % (numPaddingMsgs, expNumPaddingMsgs))
+
+    def spectest_delay(self):
+        controlMsg = self.serverDumps[0]
+        firstPaddingMsg = sorted(self.clientDumps,
+                                 key=lambda x: x['time'])[0]
+        expectedDelay = self.t / 1000.0
+        observedDelay = firstPaddingMsg['time'] - controlMsg['time']
+        self.assertAlmostEqual(observedDelay, expectedDelay,
+                               msg="The observed delay %s does not"
+                               " match with the expected delay: %s"
+                               % (observedDelay, expectedDelay),
+                               delta=0.005)
+
+
+class AppHintTest(ControlMessageCommunicationTest, STTest):
+    """Test server sends a hint to client."""
+    opcode = const.OP_APP_HINT
+    sessId,  status = "id123", True
+    args = [sessId, status]
+    tag = True
+
+    def spectest_num_msgs(self):
+        self.assertEquals(len(self.serverDumps), 1,
+                          "Number of tagged messages (%s) is not correct."
+                          % (len(self.serverDumps)))
+
+    def spectest_sessid(self):
+        firstServerDumpMsg = self.serverDumps[0]
+        self.assertEquals(firstServerDumpMsg['sessid'], self.sessId,
+                          "The server's session Id (%s) does not match "
+                          "the session Id indicated in the hint (%s)."
+                          % (firstServerDumpMsg['sessid'], self.sessId))
+
+    def spectest_state(self):
+        firstServerDumpMsg = self.serverDumps[0]
+        self.assertEquals(firstServerDumpMsg['visiting'], self.status,
+                          "The server's state (%s) does not match "
+                          "the status indicated in the hint (%s)."
+                          % (firstServerDumpMsg['visiting'], self.status))
+
+
+class TotalPadTest(PostPrimitiveTest, STTest):
+    opcode = const.OP_TOTAL_PAD
+    sessId, delay = "id123", 1
+    args = [sessId, delay]
+
+    def do_instructions(self):
+        pass
+
+    def posttest_num_messages_is_power_of_2(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        obsNumMessages = len(clientPaddingMsgs)
+        self.assertTrue((obsNumMessages & (obsNumMessages - 1)) == 0,
+                         "The observed number of padding messages (%s) "
+                         "is not a power of 2."
+                         % obsNumMessages)
+
+    def posttest_period(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
+            observedPeriod = msg2["time"] - msg1["time"]
+            expectedPeriod = self.delay
+            self.assertAlmostEqual(observedPeriod, expectedPeriod,
+                               msg="The observed period %s does not"
+                               " match with the expected period: %s"
+                               % (observedPeriod, expectedPeriod),
+                               delta=0.05)
+
+
+class BatchPadTest(PostPrimitiveTest, STTest):
+    opcode = const.OP_BATCH_PAD
+    sessId, L, delay = "id123", 5, 1
+    args = [sessId, L, delay]
+
+    def do_instructions(self):
+        pass
+
+    def posttest_num_messages_is_multiple_of_L(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        obsNumMessages = len(clientPaddingMsgs)
+        self.assertTrue(obsNumMessages % self.L == 0,
+                        "The observed number of padding messages (%s) "
+                        "is not a multiple of %s."
+                        % (obsNumMessages, self.L))
+
+    def posttest_period(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
+            observedPeriod = msg2["time"] - msg1["time"]
+            expectedPeriod = self.delay
+            self.assertAlmostEqual(observedPeriod, expectedPeriod,
+                               msg="The observed period %s does not"
+                               " match with the expected period: %s"
+                               % (observedPeriod, expectedPeriod),
+                               delta=0.05)
+
+
+class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
+    sessId = 111
+    opcode = const.OP_BURST_HISTO
+    delay = 0.2
+    histo = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    labels_ms = [delay, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+                 2048, 4096, 8192, 16384, 32768, 65536, -1]
+    removeTokens = True
+    interpolate = False
+    when = "rcv"
+    args = [histo, labels_ms, removeTokens, interpolate, when]
+
+    def do_instructions(self):
+        self.send_instruction(const.OP_GAP_HISTO, [self.histo,
+                                                   self.labels_ms,
+                                                   self.removeTokens,
+                                                   self.interpolate,
+                                                   "rcv"])
+        sleep(0.5)
+        self.send_instruction(0)
+        sleep(2)
+
+    def posttest_removetoks(self):
+        lastServerMsg = [msg for msg in self.postServerDumps][-1:][0]
+        obsHisto = lastServerMsg['burstDistr']['rcv']
+        expHisto = [0] * len(self.histo)
+        self.assertListEqual(obsHisto, expHisto,
+                             "Observed 'rcv' histogram: %s does not match "
+                             "the expected histogram: %s" % (obsHisto,
+                                                             expHisto))
+
+    def posttest_period(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
+            observedPeriod = msg2["time"] - msg1["time"]
+            expectedPeriod = self.delay / 1000.0
+            self.assertAlmostEqual(observedPeriod, expectedPeriod,
+                               msg="The observed period %s does not"
+                               " match with the expected period: %s"
+                               % (observedPeriod, expectedPeriod),
+                               delta=0.005)
+
+
+class WFPadShimObserver(STTest):
 
     def setUp(self):
-        super(BuFLOTests, self).setUp()
-        self.shim_chan = tester.connect_with_retry(("127.0.0.1",
-                                                    tester.SHIM_PORT))
-        self.shim_chan.settimeout(tester.SOCKET_TIMEOUT)
+        # Initialize transport object
+        pt_config = transport_config.TransportConfig()
+        pt_config.setListenerMode("server")
+        pt_config.setObfsproxyMode("external")
+        wfpad.WFPadClient.setup(pt_config)
+        wfpadClient = wfpad.WFPadClient()
 
-    def tearDown(self):
-        self.shim_chan.close()
-        super(BuFLOTests, self).tearDown()
+        # Create an instace of the shim
+        self.shimObs = wfpad.WFPadShimObserver(wfpadClient)
 
-    def test_timing(self):
-        super(BuFLOTests, self).direct_transfer()
-        for wrapper in self.load_wrappers():
-            for _, obsIat in wrapper:
-                self.assertAlmostEqual(self.period, obsIat,
-                                       None,
-                                       "The observed period %s does not match"
-                                       " with the expected period %s"
-                                       % (obsIat, self.period),
-                                       delta=0.05)
+        # Open a few connections
+        self.shimObs.onConnect(1)
+        self.shimObs.onConnect(2)
+        self.shimObs.onConnect(3)
 
-    def test_sizes(self):
-        super(BuFLOTests, self).direct_transfer()
-        for wrapper in self.load_wrappers():
-            for length, iat in wrapper:
-                print length, iat
-                self.assertEqual(self.psize, length,
-                                       "The observed size %s does not match"
-                                       " with the expected size %s"
-                                       % (length, self.psize))
+    def test_opening_connections(self):
+        """Test opening new connections.
 
-    @unittest.skip("")
-    def test_pad_when_visiting(self):
-        wrapper = self.load_wrappers()
-        self.test_sizes()
-        self.assertTrue(wrapper, "The number of messages received is not"
-                        "sufficient: %d messages" % len(wrapper))
+        If the observer is notified of a new open connection,
+        test that the connection is added to the data structure
+        and make sure session has started.
+        Also test adding the same connection twice.
+        """
+        self.shimObs.onConnect(1)
+
+        obsSessions = self.shimObs._sessions
+        expSessions = {1: Set([1, 2, 3])}
+
+        self.assertDictEqual(obsSessions, expSessions,
+                            "Observed sessions %s do not match"
+                            " with expected sessions %s."
+                            % (obsSessions, expSessions))
+
+        self.assertTrue(self.shimObs._wfpad._visiting,
+                         "The session has not started."
+                         "The wfpad's `_visiting` flag is `False`.")
+
+    def test_closing_connections(self):
+        """Test closing connections.
+
+        If the observer is notified of a connection being closed,
+        test that connections are removed from data structure correctly.
+        Also test removing the same connection twice.
+        """
+        self.shimObs.onDisconnect(1)
+        self.shimObs.onDisconnect(1)
+
+        obsSessions = self.shimObs._sessions
+        expSessions = {1: Set([2, 3])}
+
+        self.assertDictEqual(obsSessions, expSessions,
+                            "Observed sessions %s do not match"
+                            " with expected sessions %s."
+                            % (obsSessions, expSessions))
+
+    def test_edge_cases(self):
+        """Test the data structure is working properly in the edge cases.
+
+        When the last connection is removed from data structure, make sure
+        the session ends. Also, test removing a connection that is not in
+        the data structure.
+        """
+        self.shimObs.onDisconnect(1)
+        self.shimObs.onDisconnect(2)
+        self.shimObs.onDisconnect(14)
+        self.shimObs.onDisconnect(3)
+
+        obsSessions = self.shimObs._sessions
+        expSessions = {}
+
+        self.assertDictEqual(obsSessions, expSessions,
+                            "Observed sessions %s do not match"
+                            " with expected sessions %s."
+                            % (obsSessions, expSessions))
+
+        self.assertFalse(self.shimObs._wfpad._visiting,
+                         "The session has not ended."
+                         "The wfpad's `_visiting` flag is `True`.")
+
+    def test_after_removing_all_sessions(self):
+        """Test session counter for new sessions.
+
+        After removing all connections, when a new connection is started,
+        the session id must be incremented. Also, test removing connection
+        when data structure is empty.
+        """
+        self.shimObs.onDisconnect(1)
+        self.shimObs.onDisconnect(2)
+        self.shimObs.onDisconnect(3)
+        self.shimObs.onConnect(1)
+
+        obsSessions = self.shimObs._sessions
+        expSessions = {2: Set([1])}
+
+        self.assertDictEqual(obsSessions, expSessions,
+                    "Observed sessions %s do not match"
+                    " with expected sessions %s."
+                    % (obsSessions, expSessions))
+
+        self.assertTrue(self.shimObs._visiting,
+                         "The session has not started."
+                         "The wfpad's `_visiting` flag is `False`.")
+
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

@@ -2,113 +2,70 @@ from os.path import join, abspath, dirname, pardir
 import tempfile
 
 
-# Constant paths
-TEMP_DIR = tempfile.gettempdir()
-TEST_SERVER_DIR = join(TEMP_DIR, "test_server")
-BASE_DIR = abspath(join(dirname(__file__), pardir, pardir))
-PYOBFSPROXY_PATH = join(BASE_DIR, "pyobfsproxy.py")
+# The protocol name which is used in log messages
+TRANSPORT_NAME          = "wfpad"
 
-# Trnasport constants
-TRANSPORT_NAME = "wfpad"  # The protocol name which is used in log messages.
+# Paths
+TEMP_DIR                = tempfile.gettempdir()
+TEST_SERVER_DIR         = join(TEMP_DIR, "test_server")
 
-# Tor constants
-ORPORT = "65535"
-DATA_DIRS = {"proxy": join(TEMP_DIR, "proxy"),
-             "router": join(TEMP_DIR, "router")}
+BASE_DIR                = abspath(join(dirname(__file__), pardir, pardir))
+PYOBFSPROXY_PATH        = join(BASE_DIR, "pyobfsproxy.py")
 
-DEBUG_FNAME = "debug.log"
-FINISH_BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done."
-
-# Times
-DEFAULT_TIME_PERIOD = 60
-GET_PAGE_TIMEOUT = 10
+INF_LABEL = -1
 
 # Protocol states
-ST_WAIT = 0
-ST_CONNECTED = 1
-ST_PADDING = 2
+ST_WAIT                 = 0
+ST_CONNECTED            = 1
 
 # Flags header protocol
-FLAG_DATA = (1 << 0)
-FLAG_PADDING = (1 << 1)
-FLAG_CONTROL = (1 << 2)
+FLAG_DATA               = (1 << 0)
+FLAG_PADDING            = (1 << 1)
+FLAG_CONTROL            = (1 << 2)
 
-# Control OP codes
-OP_START = 0
-OP_STOP = 1
-
-# Generic primitives
-OP_IGNORE = 2
-OP_SEND_PADDING = 3
-OP_APP_HINT = 4
-
-# Adaptive padding primitives
-OP_BURST_HISTO = 5
-OP_GAP_HISTO = 6
-OP_INJECT_HISTO = 7
-
-# CS-BuFLO primitives
-OP_TOTAL_PAD = 8
-OP_PAYLOAD_PAD = 9
-
-# Tamaraw primitives
-OP_BATCH_PAD = 10
+# Opcodes
+OP_SEND_PADDING         = 1
+OP_APP_HINT             = 2
+OP_BURST_HISTO          = 3
+OP_GAP_HISTO            = 4
+OP_INJECT_HISTO         = 5
+OP_TOTAL_PAD            = 6
+OP_PAYLOAD_PAD          = 7
+OP_BATCH_PAD            = 8
 
 # WFPad message structure fields's constants
-TOTLENGTH_POS = 0
-TOTLENGTH_LEN = 2
+TOTLENGTH_POS           = 0
+TOTLENGTH_LEN           = 2
 
-PAYLOAD_POS = 2
-PAYLOAD_LEN = 2
+PAYLOAD_POS             = 2
+PAYLOAD_LEN             = 2
 
-FLAGS_POS = 4
-FLAGS_LEN = 1
+FLAGS_POS               = 4
+FLAGS_LEN               = 1
 
-CONTROL_POS = 5
-CONTROL_LEN = 1
+CONTROL_POS             = 5
+CONTROL_LEN             = 1
 
-ARGSLENGTH_POS = 6
-ARGSLENGTH_LEN = 2
+ARGS_TOTAL_LENGTH_POS   = 6
+ARGS_TOTAL_LENGTH_LEN   = 2
 
-ARGS_POS = 8
-
-
-# arguments specification [arg_1, arg_2, ...] where arg_i = (length, type)
-class arg(object):
-
-    def __init__(self, arg_length, arg_type, name=None):
-        self.length = arg_length
-        self.type = arg_type
-        self.name = name
-
-    def __len__(self):
-        return self.length
-
-
-def get_args_len(self, opcode):
-    return sum(map(len, ARGS_DICT[opcode]))
-
-ARGS_DICT = {OP_SEND_PADDING: [2, arg(ord, "num_padding_msgs"), arg(ord, "delay")],
-             OP_APP_HINT: [2, arg(str, "session_id"), arg(bool, "status")],
-             OP_BURST_HISTO: [3, arg((list, int), "histogram"), arg((list, int), "labels_ms"), arg(bool, "remove_toks")],
-             OP_GAP_HISTO: [3, arg((list, int), "histogram"), arg((list, int), "labels_ms"), arg(bool, "remove_toks")],
-             OP_INJECT_HISTO: [2, arg((list, int), "histogram"), arg((list, int), "labels_ms")],
-             OP_TOTAL_PAD: [0],
-             OP_PAYLOAD_PAD: [2, arg(str, "session_id"), arg(int, "delay")],
-             OP_BATCH_PAD: [3, arg(str, "session_id"), arg(int, "L"), arg(int, "delay")],
-            }
-
-# Header length
-MIN_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
-CTRL_HDR_LEN = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN + CONTROL_LEN + ARGSLENGTH_LEN
-
-# The maximum amount of padding to be appended to handshake data.
-MAX_PADDING_LENGTH = 1500
+ARGS_POS                = 8
 
 # Length of WFPad's MTU in bytes.  Note that this is *not* the link MTU
 # which is probably 1500.
-MTU = 1448
+MTU                     = 1448
 
-# Maximum payload unit of a WFPad message in bytes.
-MPU = MTU - MIN_HDR_LEN
-MPU_CTRL = MTU - CTRL_HDR_LEN
+# Header length
+MIN_HDR_LEN             = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
+HDR_CTRL_LEN            = MIN_HDR_LEN + CONTROL_LEN + ARGS_TOTAL_LENGTH_LEN
+
+# Maximum payload unit of a WFPad message in bytes
+MPU                     = MTU - MIN_HDR_LEN
+MPU_CTRL                = MTU - HDR_CTRL_LEN
+
+# Max delay
+MAX_DELAY = 65536
+
+# Default shim ports
+SHIM_PORT       = 4997
+SOCKS_PORT      = 4998

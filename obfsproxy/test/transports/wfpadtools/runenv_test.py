@@ -18,7 +18,7 @@ class RunEnvTest(STTest):
 
     def test_bin_obfsproxy(self):
         """Checks obfsproxy executable/link is found in bin.
-        
+
         This is necessary to run tester.py. We assume unix dir structure
         as it also is assumed in tester.py. Since we want to use pyobfsproxy
         to run our transports still under development, we can create a symbolic

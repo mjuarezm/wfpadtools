@@ -1,17 +1,28 @@
+from obfsproxy.test import tester
 from os.path import join, basename, exists
 from subprocess import Popen
+from time import sleep
 import unittest
 
 import obfsproxy.common.log as logging
-from obfsproxy.test.transports.wfpadtools.sttest import STTest
-from obfsproxy.transports.wfpadtools import const
 import obfsproxy.transports.wfpadtools.util as ut
-from obfsproxy.test import tester
-from time import sleep
+from obfsproxy.transports.wfpadtools import const
+from obfsproxy.test.transports.wfpadtools.sttest import STTest
+
 
 # Test config
+DEBUG_FNAME = "debug.log"
+ORPORT = "65535"
+DATA_DIRS = {
+             "proxy": join(const.TEMP_DIR, "proxy"),
+             "router": join(const.TEMP_DIR, "router")
+             }
+FINISHED_BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done."
 WATCHDOG_TIMEOUT = 180
-DEBUG = True
+GET_PAGE_TIMEOUT = 10
+
+# DEBUG = True
+DEBUG = False
 
 # Switch to leave Tor running and speed-up tests
 LEAVE_TOR_RUNNING = False
@@ -41,13 +52,13 @@ class UnmanagedTorTest(tester.TransportsSetUp):
             # Run Tor bridge
             self.tor_endpoints["router"] = self.start_tor_bridge(
                                                 str(tester.EXIT_PORT),
-                                                const.DATA_DIRS["router"])
+                                                DATA_DIRS["router"])
             # Run Onion proxy
             self.tor_endpoints["proxy"] = self.start_tor_proxy(
                                                     str(tester.SOCKS_PORT),
                                                     str(tester.ENTRY_PORT),
                                                     str(tester.SERVER_PORT),
-                                                    const.DATA_DIRS["proxy"])
+                                                    DATA_DIRS["proxy"])
         except Exception as exc:
             log.exception("TEST: Exception setting up the class {}: {}"
                     .format(self.__class__.__name__, exc))
@@ -72,7 +83,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
     def tearDownClass(cls):
         super(UnmanagedTorTest, cls).tearDownClass()
         try:
-            for datadir in const.DATA_DIRS.itervalues():
+            for datadir in DATA_DIRS.itervalues():
                 pidfile = join(datadir, "pid")
                 if exists(pidfile):
                     pid = int(ut.read_file(pidfile))
@@ -83,11 +94,8 @@ class UnmanagedTorTest(tester.TransportsSetUp):
             log.exception("Exception raised tearing down class {}: {}"
                           .format(cls.__name__, exc))
 
-    def tor_log_watchdog(self, logfile):
-        ut.log_watchdog(const.FINISH_BOOTSRAP_LOGLINE,
-                        logfile,
-                        WATCHDOG_TIMEOUT,
-                        delay=3)
+    def tor_log_watchdog(self, logfile, line=FINISHED_BOOTSRAP_LOGLINE):
+        ut.log_watchdog(line, logfile, WATCHDOG_TIMEOUT, delay=3)
 
     def terminate_process_and_log(self, pid, msg=None):
         ut.terminate_process(pid)
@@ -103,7 +111,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
             log.debug("TEST: {} process is already running."
                       .format(tor_proc_name))
             return int(pid)
-        logfile = join(datadir, const.DEBUG_FNAME)
+        logfile = join(datadir, DEBUG_FNAME)
         ut.removedir(datadir)
         log.debug("TEST: Starting Tor {}". format(tor_proc_name))
         log_args = ["--DataDirectory", datadir,
@@ -141,8 +149,8 @@ class UnmanagedTorTest(tester.TransportsSetUp):
                     .format(self.transport, client_port),
              "--SOCKSPort", socksport])
 
-    def get_page(self, url, port=tester.SOCKS_PORT):
-        ut.get_page(url, port=port)
+    def get_page(self, url, port=tester.SHIM_PORT):
+        return ut.get_page(url, port=port, timeout=GET_PAGE_TIMEOUT)
 
     def test_tor(self):
         sleep(5)
@@ -150,7 +158,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
         self.assertEqual(resp.status_code, 200,
                          "The status code (%s) is not OK."
                          % resp.status_code)
-        self.failUnless(resp.text)  # make sure it has body
+        self.failUnless(resp.text)  # make sure it has a body
         self.assertIn("using Tor successfully to reach the web", resp.text,
                       "Tor-check does not detect Tor: %s"
                       % resp.text)
@@ -159,12 +167,13 @@ class UnmanagedTorTest(tester.TransportsSetUp):
 class WFPadToolsTransportTests():
     """Test protection offered by transport against Website Fingerprinting."""
 
-    @unittest.skip("")
+    @unittest.skip("Not implemented yet.")
     def test_attacks(self):
+        # TODO: as future work, one could implement existing attacks and
+        # deploy them in this test.
         pass
 
 
-@unittest.skip("")
 class WFPadTorTest(UnmanagedTorTest, WFPadToolsTransportTests, STTest):
     transport = tester.DirectWFPad.transport
     client_args = list(tester.DirectWFPad.client_args)

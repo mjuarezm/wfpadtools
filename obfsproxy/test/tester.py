@@ -18,13 +18,13 @@ import re
 import shutil
 import signal
 import socket
-import struct
 import subprocess
 import tempfile
 import time
 import unittest
 
 import obfsproxy.common.log as logging
+from time import sleep
 
 log = logging.get_obfslogger()
 
@@ -52,7 +52,7 @@ class Obfsproxy(subprocess.Popen):
     """
     def __init__(self, *args, **kwargs):
         """Spawns obfsproxy with 'args'"""
-        logfile = join("/tmp", "obfsproxy_tester.log")
+        logfile = join("/tmp", "obfsproxy_tester_{}.log".format(args[0][1]))
         argv = ["/bin/obfsproxy", "--log-file", logfile, "--log-min-severity", "debug",]
         if len(args) == 1 and (isinstance(args[0], list) or
                                isinstance(args[0], tuple)):
@@ -177,12 +177,12 @@ class ReadWorker(object):
 # (except that I have fleshed out the SOCKS test a bit).
 # It will be made more general and parametric Real Soon.
 
-SHIM_PORT  = 4997
-SOCKS_PORT  = 4998
-TESTSHIM_PORT = -1
-ENTRY_PORT  = 4999
-SERVER_PORT = 5000
-EXIT_PORT   = 5001
+TESTSHIM_PORT   = -1
+SHIM_PORT       = 4997
+SOCKS_PORT      = 4998
+ENTRY_PORT      = 4999
+SERVER_PORT     = 5000
+EXIT_PORT       = 5001
 
 #
 # Test base classes.  They do _not_ inherit from unittest.TestCase
@@ -195,7 +195,7 @@ class TransportsSetUp(object):
 
     def setUp(self):
         self.obfs_server = Obfsproxy(self.server_args)
-        time.sleep(0.1)
+        time.sleep(0.2)
         self.obfs_client = Obfsproxy(self.client_args)
 
     def tearDown(self):
@@ -337,16 +337,16 @@ class DirectWFPad(DirectShimTest, unittest.TestCase):
            "127.0.0.1:%d" % SERVER_PORT,
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = ("wfpad", "client",
-            "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
+            "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
             "127.0.0.1:%d" % ENTRY_PORT,
             "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-class DirectTestServer(DirectTest, unittest.TestCase):
-    transport = "testserver"
-    server_args = ("testserver", "server",
+class DirectDummyTestServer(DirectTest, unittest.TestCase):
+    transport = "dummytest"
+    server_args = ("dummytest", "server",
            "127.0.0.1:%d" % SERVER_PORT,
            "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = ("testserver", "client",
+    client_args = ("dummytest", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
@@ -360,9 +360,25 @@ class DirectBuFLO(DirectShimTest, unittest.TestCase):
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = ("buflo", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
-           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
+           "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
            "--period=0.1",
            "--psize=1448",
+           "--mintime=2",
+           "--dest=127.0.0.1:%d" % SERVER_PORT)
+
+class DirectShimBuFLO(DirectShimTest, unittest.TestCase):
+    transport = "buflo"
+    server_args = ("buflo", "server",
+           "127.0.0.1:%d" % SERVER_PORT,
+           "--period=1",
+           "--psize=1443",
+           "--mintime=2",
+           "--dest=127.0.0.1:%d" % EXIT_PORT)
+    client_args = ("buflo", "client",
+           "127.0.0.1:%d" % ENTRY_PORT,
+           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
+           "--period=1",
+           "--psize=1443",
            "--mintime=2",
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
@@ -404,8 +420,9 @@ THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.
     "There are nine and sixty ways to disguise communiques
        And RATHER MORE THAN ONE OF THEM IS RIGHT"
 
-		    (apologies to Rudyard Kipling.)
+            (apologies to Rudyard Kipling.)
 """
+
 
 if __name__ == '__main__':
     unittest.main()
