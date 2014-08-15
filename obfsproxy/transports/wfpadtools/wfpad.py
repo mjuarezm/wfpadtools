@@ -368,7 +368,6 @@ class WFPadTransport(BaseTransport):
         padding deferreds are active, we cancel them and update the delay
         accordingly.
         """
-
         log.debug("[wfad] Pushing %d bytes of outgoing data." % len(data))
 
         # Cancel existing deferred calls to padding methods to prevent
@@ -407,7 +406,8 @@ class WFPadTransport(BaseTransport):
 
             # In case we the buffer is not currently being flushed,
             # make a delayed call to the flushing method
-            if self._deferData and self._deferData.called:
+            if not self._deferData or \
+                (self._deferData and self._deferData.called):
                 self._deferData = deferLater(delay, self.flushBuffer)
                 log.debug("[wfad] Delay buffer flush %s sec." % delay)
 
@@ -439,6 +439,7 @@ class WFPadTransport(BaseTransport):
         # encapsulate and send the message.
         if dataLen > payloadLen:
             self.sendDataMessage(self._buffer.read(payloadLen))
+
         # If data in buffer does not fill the message's payload,
         # pad so that it reaches the specified length.
         else:
@@ -543,8 +544,8 @@ class WFPadTransport(BaseTransport):
             return
         log.debug("[wfpad]  Wait for data, pad snd gap otherwise.")
         self._deferGap[when] = deferLater(gapDelay,
-                                                self.sendPaddingHisto,
-                                                self._deferGapCallback[when])
+                                          self.sendPaddingHisto,
+                                          self._deferGapCallback[when])
 
     def constantRatePaddingDistrib(self, t):
         self._delayDataProbdist = probdist.uniform(t)
@@ -598,8 +599,8 @@ class WFPadTransport(BaseTransport):
     #==========================================================================
     def receiveControlMessage(self, opcode, args=None):
         """Do operation indicated by the _opcode."""
-        log.debug("Received control message with opcode %d and args: %s"
-                  % (opcode, args))
+        log.debug("Received control message with opcode %s and args: %s"
+                  % (mes.getOpcodeNames(const.OP_SEND_PADDING), args))
 
         if self.weAreClient:
             raise Exception("Client cannot receive control messages.")
@@ -642,9 +643,6 @@ class WFPadTransport(BaseTransport):
         t : int
             Number of microseconds delay before sending.
         """
-        log.debug("[wfpad]  Sending %s padding cells after %s delay in "
-                  "response to a %s control message."
-                  % (N, t, mes.getOpcodeNames(const.OP_SEND_PADDING)))
         for _ in xrange(N):
             deferLater(t, self.sendIgnore)
 
@@ -658,11 +656,6 @@ class WFPadTransport(BaseTransport):
         status : bool
                  True or False, indicating session start and end respectively.
         """
-        log.debug("[wfpad]  Session %s will %s, "
-                  "in response to a %s control message."
-                  % (sessId,
-                     "start" if status else "stop",
-                     mes.getOpcodeNames(const.OP_APP_HINT)))
         self._visiting = status
         if status == True:
             self.onSessionStarts(sessId)
@@ -808,7 +801,7 @@ def deferLater(*args, **kargs):
     It allows to call twisted deferLater and add callback and errback methods.
     """
     delay, fn = args[0], args[1]
-    d = task.deferLater(reactor, delay, fn, args[2:], **kargs)
+    d = task.deferLater(reactor, delay, fn, *args[2:], **kargs)
     if 'cbk' in kargs:
         d.addCallback(kargs['cbk'])
 

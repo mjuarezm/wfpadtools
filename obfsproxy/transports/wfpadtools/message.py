@@ -248,7 +248,7 @@ class WFPadMessageExtractor(object):
         """Create a new WFPadMessageExtractor object."""
         self.totalLen = self.payloadLen = self.flags = self.opcode = None
         self.argsLen = self.argsParseLen = 0
-        self.recvBuf = self.args = totalArgs = ""
+        self.recvBuf = self.args = totalArgs = ""  # @UnusedVariable
 
     def getHeaderLen(self):
         if self.flags:

@@ -19,14 +19,15 @@ class BuFLOTransport(WFPadTransport):
     for time, and a constant probability distribution for packet lengths. The
     minimum time for which the link will be padded is also specified.
     """
-    # Defaults for BuFLO specifications.
-    _mintime = -1
-    _startTime = time.time()
-    _period = 0.01
-    _length = const.MTU
 
     def __init__(self):
         super(BuFLOTransport, self).__init__()
+        # Initialize start time
+        self._startTime = time.time()
+
+        # Set constant length for messages
+        self._lengthDataProbdist = probdist.uniform(self._length)
+
         # The stop condition in BuFLO:
         # BuFLO stops padding if the visit has finished and the
         # elapsed time has exceeded the minimum padding time.
@@ -63,6 +64,11 @@ class BuFLOTransport(WFPadTransport):
         BuFLO pads at a constant rate `period` and pads the packets to a
         constant size `psize`.
         """
+        # Defaults for BuFLO specifications.
+        cls._mintime = -1
+        cls._period = 0.01
+        cls._length = const.MPU
+
         super(BuFLOTransport, cls).validate_external_mode_cli(args)
 
         if args.mintime:
@@ -85,7 +91,6 @@ class BuFLOTransport(WFPadTransport):
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
         self._startTime = time.time()
-        self._lengthDataProbdist = probdist.uniform(self._length)
         self.constantRatePaddingDistrib(self._period)
 
 
