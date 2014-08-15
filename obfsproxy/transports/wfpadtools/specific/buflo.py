@@ -66,7 +66,7 @@ class BuFLOTransport(WFPadTransport):
         """
         # Defaults for BuFLO specifications.
         cls._mintime = -1
-        cls._period = 0.01
+        cls._period = 1
         cls._length = const.MPU
 
         super(BuFLOTransport, cls).validate_external_mode_cli(args)

@@ -9,8 +9,10 @@ from random import randint
 import random
 
 import const
+import obfsproxy.transports.wfpadtools.const as cons
 import obfsproxy.common.log as logging
 import bisect
+from obfsproxy.transports.base import PluggableTransportError
 
 
 log = logging.get_obfslogger()
@@ -39,8 +41,13 @@ class RandProbDist:
         self.interpolate = interpolate
         self.removeToks = removeToks
 
-        if self.histo:
+        if histo:
+            self.templateHisto = list(histo)
             assert(labels != None and interpolate != None and removeToks != None)
+            if sum(self.histo) <= 0:
+                raise PluggableTransportError("Use -1 bin label in the histo "
+                                              "to indicate that a sample can't"
+                                              " be drawn.")
         else:
             self.prng = random if (seed is None) else random.Random(seed)
             self.sampleList = []
@@ -95,17 +102,27 @@ class RandProbDist:
 
     def getIndexFromLabel(self, label):
         if self.interpolate:
-            return bisect.bisect_left(self.labels, label,
+            return bisect.bisect_right(self.labels, label,
                                       hi=len(self.labels) - 1)
         else:
             return self.labels.index(label)
 
+    def _removeTokIter(self, index):
+        for i, value in enumerate(self.histo[index:]):
+            if value > 0:
+                self.histo[index + i] -= 1
+                return
+
+    def refillHisto(self):
+        self.histo = list(self.templateHisto)
+
     def removeToken(self, label):
         if self.histo and self.removeToks == True:
             histo_i = self.getIndexFromLabel(label)
-            if self.histo[histo_i] > 0:
-                self.histo[histo_i] -= 1
-            log.debug("[probdist] Removed tokem from bin %s" % self.last_i)
+            if sum(self.histo) == 0:
+                self.refillHisto()
+            self._removeTokIter(histo_i)
+            log.debug("[probdist] Removed tokem from bin %s" % histo_i)
         else:
             pass
 
@@ -114,16 +131,21 @@ class RandProbDist:
         Draw and return a random sample from the probability distribution.
         """
         if self.histo:
-            sample = randint(0, sum(self.histo))  # between 0 and sum_tokens
+            sample = randint(1, sum(self.histo))  # between 0 and sum_tokens
             for i, b in enumerate(self.histo):
                 sample -= b
                 if sample <= 0:
                     if self.interpolate and i < len(self.histo) - 1:
                         if i == 0:
-                            return self.labels[i] * random()
+                            return self.labels[i] * random.random()
+                        elif i == len(self.histo) - 2:
+                            return self.labels[i - 1] + (cons.MAX_DELAY - \
+                                        self.labels[i - 1]) * random.random()
+                        elif i == len(self.histo):
+                            return cons.INF_LABEL
                         else:
                             return self.labels[i - 1] + (self.labels[i] - \
-                                            self.labels[i - 1]) * random()
+                                        self.labels[i - 1]) * random.random()
                     return self.labels[i]
         else:
             assert len(self.sampleList) > 0

@@ -167,7 +167,7 @@ class PostPrimitiveTest(ControlMessageCommunicationTest):
 
 class SendPaddingTest(ControlMessageCommunicationTest, STTest):
     opcode = const.OP_SEND_PADDING
-    N, t = 5, 0.1
+    N, t = 5, 1
     args = [N, t]
 
     def spectest_n_padding_messages(self):
@@ -184,13 +184,13 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
         controlMsg = self.serverDumps[0]
         firstPaddingMsg = sorted(self.clientDumps,
                                  key=lambda x: x['time'])[0]
-        expectedDelay = self.t
+        expectedDelay = self.t / 1000.0
         observedDelay = firstPaddingMsg['time'] - controlMsg['time']
         self.assertAlmostEqual(observedDelay, expectedDelay,
                                msg="The observed delay %s does not"
                                " match with the expected delay: %s"
                                % (observedDelay, expectedDelay),
-                               delta=0.05)
+                               delta=0.005)
 
 
 class AppHintTest(ControlMessageCommunicationTest, STTest):
@@ -218,58 +218,6 @@ class AppHintTest(ControlMessageCommunicationTest, STTest):
                           "The server's state (%s) does not match "
                           "the status indicated in the hint (%s)."
                           % (firstServerDumpMsg['visiting'], self.status))
-
-
-class RcvUnifHistoTest(PostPrimitiveTest, STTest):
-    sessId = 111
-    opcode = const.OP_BURST_HISTO
-    delay = 0.2
-    histo = [1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    labels_ms = [delay, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
-                 2048, 4096, 8192, 16384, 32768, 65536, -1]
-    removeTokens = True
-    interpolate = False
-    when = "rcv"
-    args = [histo, labels_ms, removeTokens, interpolate, when]
-
-    def do_instructions(self):
-        self.send_instruction(const.OP_GAP_HISTO, [self.histo,
-                                                   self.labels_ms,
-                                                   self.removeTokens,
-                                                   self.interpolate,
-                                                   "rcv"])
-        sleep(0.5)
-        self.send_instruction(0)
-        sleep(2)
-
-    def posttest_removetoks(self):
-        self.assertTrue(False, "")
-
-    def posttest_period(self):
-        clientPaddingMsgs = [msg for msg in self.postClientDumps
-                             if msg['flags'] == const.FLAG_PADDING]
-        for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
-            observedPeriod = msg2["time"] - msg1["time"]
-            expectedPeriod = self.delay
-            self.assertAlmostEqual(observedPeriod, expectedPeriod,
-                               msg="The observed period %s does not"
-                               " match with the expected period: %s"
-                               % (observedPeriod, expectedPeriod),
-                               delta=0.05)
-
-
-class SndHistoTest(ControlMessageCommunicationTest, STTest):
-    opcode = const.OP_GAP_HISTO
-    histo = [23, 10, 9, 7, 9, 8, 3, 7, 3, 10, 5, 2, 1, 2, 0, 1, 0]
-    labels_ms = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096,
-                 8192, 16384, 32768, 65536, -1]
-    removeTokens = False
-    interpolate = True
-    when = "rcv"
-    args = [histo, labels_ms, removeTokens, interpolate, when]
-
-    def spectest_receive(self):
-        pass
 
 
 class TotalPadTest(PostPrimitiveTest, STTest):
@@ -332,7 +280,50 @@ class BatchPadTest(PostPrimitiveTest, STTest):
                                delta=0.05)
 
 
-@unittest.skip("")
+class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
+    sessId = 111
+    opcode = const.OP_BURST_HISTO
+    delay = 0.2
+    histo = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    labels_ms = [delay, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+                 2048, 4096, 8192, 16384, 32768, 65536, -1]
+    removeTokens = True
+    interpolate = False
+    when = "rcv"
+    args = [histo, labels_ms, removeTokens, interpolate, when]
+
+    def do_instructions(self):
+        self.send_instruction(const.OP_GAP_HISTO, [self.histo,
+                                                   self.labels_ms,
+                                                   self.removeTokens,
+                                                   self.interpolate,
+                                                   "rcv"])
+        sleep(0.5)
+        self.send_instruction(0)
+        sleep(2)
+
+    def posttest_removetoks(self):
+        lastServerMsg = [msg for msg in self.postServerDumps][-1:][0]
+        obsHisto = lastServerMsg['burstDistr']['rcv']
+        expHisto = [0] * len(self.histo)
+        self.assertListEqual(obsHisto, expHisto,
+                             "Observed 'rcv' histogram: %s does not match "
+                             "the expected histogram: %s" % (obsHisto,
+                                                             expHisto))
+
+    def posttest_period(self):
+        clientPaddingMsgs = [msg for msg in self.postClientDumps
+                             if msg['flags'] == const.FLAG_PADDING]
+        for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
+            observedPeriod = msg2["time"] - msg1["time"]
+            expectedPeriod = self.delay / 1000.0
+            self.assertAlmostEqual(observedPeriod, expectedPeriod,
+                               msg="The observed period %s does not"
+                               " match with the expected period: %s"
+                               % (observedPeriod, expectedPeriod),
+                               delta=0.005)
+
+
 class ExternalBuFLOTests(TestSetUp, STTest):
     transport = "buflo"
     period = 1

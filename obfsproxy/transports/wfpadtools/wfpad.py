@@ -361,7 +361,7 @@ class WFPadTransport(BaseTransport):
     def pushData(self, data):
         """Push `data` to the buffer or send it over the wire.
 
-        Sample delay distribution for data messages. If we draw a 0 seconds
+        Sample delay distribution for data messages. If we draw a 0 ms
         delay, we encapsulate and send data directly. Otherwise, we push data
         to the buffer and make a delayed called to flush it. In case the
         padding deferreds are active, we cancel them and update the delay
@@ -408,11 +408,11 @@ class WFPadTransport(BaseTransport):
             if not self._deferData or \
                 (self._deferData and self._deferData.called):
                 self._deferData = deferLater(delay, self.flushBuffer)
-                log.debug("[wfad] Delay buffer flush %s sec." % delay)
+                log.debug("[wfad] Delay buffer flush %s ms." % delay)
 
     def elapsedSinceLastMsg(self):
         elapsed = reactor.seconds() - self._lastSndTimestamp
-        log.debug("[wfpad] Cancel padding. Elapsed = %s sec" % elapsed)
+        log.debug("[wfpad] Cancel padding. Elapsed = %s ms" % elapsed)
         return elapsed
 
     def flushBuffer(self):
@@ -644,8 +644,9 @@ class WFPadTransport(BaseTransport):
         t : int
             Number of microseconds delay before sending.
         """
+        microsec = t / 1000.0
         for _ in xrange(N):
-            deferLater(t, self.sendIgnore)
+            deferLater(microsec, self.sendIgnore)
 
     def relayAppHint(self, sessId, status):
         """A hint from the application layer for session start/end.
@@ -806,7 +807,8 @@ def deferLater(*args, **kargs):
     if 'cbk' in kargs:
         callback = kargs['cbk']
         del kargs['cbk']
-    d = task.deferLater(reactor, delay, fn, *args[2:], **kargs)
+    delayMiliseconds = delay / 1000.0
+    d = task.deferLater(reactor, delayMiliseconds, fn, *args[2:], **kargs)
     if callback:
         d.addCallback(callback)
 

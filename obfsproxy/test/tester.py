@@ -370,14 +370,14 @@ class DirectShimBuFLO(DirectShimTest, unittest.TestCase):
     transport = "buflo"
     server_args = ("buflo", "server",
            "127.0.0.1:%d" % SERVER_PORT,
-           "--period=0.1",
+           "--period=1",
            "--psize=1443",
            "--mintime=2",
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = ("buflo", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
            "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
-           "--period=0.1",
+           "--period=1",
            "--psize=1443",
            "--mintime=2",
            "--dest=127.0.0.1:%d" % SERVER_PORT)

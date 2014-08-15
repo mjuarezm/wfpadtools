@@ -129,6 +129,38 @@
 
 4. Primitives
 
+	In this section I'll give a short summary of the primitives implemented in the
+	WFPadTools transport. Signaling of primitives is implemented using control
+	messages, each operation code corresponds to a primitive:
+
+	--------------------+-----------------------------------------------------
+	   OP_SEND_PADDING  | Request N dummy messages after a delay of t seconds.
+	--------------------+-----------------------------------------------------
+	   OP_APP_HINT	    | Signal the start/end of a session.
+	--------------------+-----------------------------------------------------
+	   OP_BURST_HISTO   | Specifies probability distributions for delays after
+	   					| data in order to pad burst in traffic.
+	--------------------+-----------------------------------------------------
+	   OP_GAP_HISTO     | Specifies probability distributions for delays after
+	   					| a dummy message in order to pad gaps in traffic.
+	--------------------+-----------------------------------------------------
+	   OP_TOTAL_PAD     | Parse opcode and arguments and do operation.
+	--------------------+-----------------------------------------------------
+	   OP_PAYLOAD_PAD   | Parse opcode and arguments and do operation.
+	--------------------+-----------------------------------------------------
+	   OP_BATCH_PAD     | Parse opcode and arguments and do operation.
+	--------------------+-----------------------------------------------------
+
+	For further details about the primitives and references to the research papers,
+	see [3].
+
+4.1. Histograms
+
+	Histograms for the probability distributions MUST cover all interval values from
+	0 to infinity. For example, in this implementation histograms length cannot be
+	greater than 2, the last bin corresponds to the infinity label and the 0 delay is
+	implicitly specified (in the first position there is a positive delay).
+
 5. State machine
 
 6. Handshake

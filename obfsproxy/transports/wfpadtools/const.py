@@ -63,6 +63,9 @@ HDR_CTRL_LEN            = MIN_HDR_LEN + CONTROL_LEN + ARGS_TOTAL_LENGTH_LEN
 MPU                     = MTU - MIN_HDR_LEN
 MPU_CTRL                = MTU - HDR_CTRL_LEN
 
+# Max delay
+MAX_DELAY = 65536
+
 # Default shim ports
 SHIM_PORT       = 4997
 SOCKS_PORT      = 4998
