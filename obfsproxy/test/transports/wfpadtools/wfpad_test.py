@@ -20,8 +20,8 @@ from obfsproxy.transports.wfpadtools import wfpad
 from obfsproxy.transports.wfpadtools.message import getOpcodeNames
 
 
-DEBUG = True
-# DEBUG = False
+# DEBUG = True
+DEBUG = False
 
 # Logging settings:
 log = logging.get_obfslogger()

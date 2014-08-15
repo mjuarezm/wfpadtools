@@ -17,12 +17,25 @@
     to the stream between the OP and the bridge that are discarded at the
     each of the ends.
 
-2. Stack
+2.  WFPadTools protocol
 
+	The WFPadTools protocol lives in a layer between obfsproxy and SOCKS, as
+	depicted below.
+	
+						+-----------------+
+						|   Application   |
+						+-----------------+
+						|   	Tor  	  |
+						+-----------------+						
+						|      SOCKS 	  |						
+						+-----------------+
+						|   WFPadTools    |
+						+-----------------+
+						|       TCP       |
+						+-----------------+
+						|       IP        |
+						+-----------------+								
 
-
-3.  WFPadTools protocol
- 
 	Application data is transported wrapping them into WFPadTools messages (data
 	unit of the WFPadTools protocol) which structure is described next. WFPadTools
 	defines two message headers, one for data/dummy messages and the other to
@@ -127,7 +140,7 @@
     This protocol specification discusses the intention of the padding primitives
     based on [2].
 
-4. Primitives
+2.2. Primitives
 
 	In this section I'll give a short summary of the primitives implemented in the
 	WFPadTools transport. Signaling of primitives is implemented using control
@@ -154,25 +167,31 @@
 	For further details about the primitives and references to the research papers,
 	see [3].
 
-4.1. Histograms
+2.3. Histograms
 
 	Histograms for the probability distributions MUST cover all interval values from
 	0 to infinity. For example, in this implementation histograms length cannot be
 	greater than 2, the last bin corresponds to the infinity label and the 0 delay is
 	implicitly specified (in the first position there is a positive delay).
 
-5. State machine
+2.1. Handshaking
 
-6. Handshake
+	The WFPadTools client SHOULD be the only entity that is in full control
+	of the padding scheme. Developers of the final countermeasure SHOULD specify
+	the padding strategy in the server through control messages. For instance,
+	the circuitConnected method in WFPadTransport can be extended to implement
+	a particular handshaking that will specify the probability distributions to
+	be used in the server:
+		
+		    Client                         Server  Legend:
+		      |  	  (Bs, Gs, Br, Gr)       |      Bs: Burst send prob dist
+		      | ---------------------------> |      Gs: Gap send prob distribution
+		      |         SessId, start    	 |      Br: Burst recieve prob dist
+		      | ---------------------------> |      Gr: Burst recieve prob dist 
+		      |       	Padded comm.         |      
+		      | <--------------------------> |   
 
-    Client                         Server  Legend:
-      |  		prob. distrib    	 |     
-      | ---------------------------> |     
-      |           					 |     
-      | <--------------------------- |     
-      |       					     |     
-      | <--------------------------> |      
- 
+
 References
 
 	[1] https://www.torproject.org/projects/obfsproxy.html.en

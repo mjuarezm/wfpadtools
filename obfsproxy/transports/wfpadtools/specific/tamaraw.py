@@ -5,6 +5,7 @@ from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 
 import obfsproxy.common.log as logging
+from obfsproxy.transports.scramblesuit import probdist
 
 
 log = logging.get_obfslogger()
@@ -18,44 +19,61 @@ class TamarawTransport(WFPadTransport):
     minimum time for which the link will be padded is also specified.
     """
     def __init__(self):
-        self._mintime = 1
         super(TamarawTransport, self).__init__()
+        # Set constant length for messages
+        self._lengthDataProbdist = probdist.uniform(self._length)
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
-        """Register CLI arguments."""
-        subparser.add_argument("--mintime",
+        """Register CLI arguments for BuFLO parameters."""
+        subparser.add_argument("--period",
+                               required=False,
+                               type=float,
+                               help="Time rate at which transport sends "
+                                    "messages (Default: 1ms).",
+                               dest="period")
+        subparser.add_argument("--psize",
                                required=False,
                                type=int,
-                               help="Minimum padding time per visit. For"
-                                    " negative values the padding is constant"
-                                    " (Default: -1)",
-                               dest="mintime")
+                               help="Length of messages to be transmitted"
+                                    " (Default: MTU).",
+                               dest="psize")
+        subparser.add_argument("--batch",
+                               required=False,
+                               type=int,
+                               help="Number of messages that define the min."
+                                    " length of a batch"
+                                    " (Default: 20).",
+                               dest="batch")
         super(TamarawTransport, cls).register_external_mode_cli(subparser)
 
     @classmethod
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables.
 
-        Tamaraw pads at a constant rate `period` and pads the packets to a
+        BuFLO pads at a constant rate `period` and pads the packets to a
         constant size `psize`.
         """
+        # Defaults for BuFLO specifications.
+        cls._period = 1
+        cls._length = const.MPU
+        cls._batch = 20
+
         super(TamarawTransport, cls).validate_external_mode_cli(args)
-        # Defaults for Tamaraw specifications.
-        mintime = -1
-        if args.mintime:
-            mintime = int(args.mintime)
-        # Initialize minimum time for padding at each visit to a web page.
-        cls._mintime = mintime
 
-    def stopCondition(self):
-        """Returns the evaluation of the condition to stop padding.
+        if args.period:
+            cls._period = args.period
+        if args.psize:
+            cls._length = args.psize
+        if args.batch:
+            cls._batch = args.batch
 
-        Tamaraw stops padding if the visit has finished and the elapsed time has
-        exceeded the minimum padding time.
-        """
-        return self.getElapsed() > self._mintime \
-                and self._state is const.ST_PADDING
+    def onSessionStarts(self, sessId):
+        WFPadTransport.onSessionStarts(self, sessId)
+        self.constantRatePaddingDistrib(self._period)
+        self.sendControlMessage(const.OP_BATCH_PAD, [sessId,
+                                                     self._batch,
+                                                     self._period])
 
 
 class TamarawClient(TamarawTransport):
