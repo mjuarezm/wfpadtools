@@ -324,67 +324,6 @@ class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
                                delta=0.005)
 
 
-class ExternalBuFLOTests(TestSetUp, STTest):
-    transport = "buflo"
-    period = 1
-    psize = 1448
-    mintime = 2
-    server_args = ("dummytest", "server",
-                   "127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
-    client_args = ("buflo", "client",
-                   "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--socks-shim=%d,%d" % (tester.SHIM_PORT,
-                                           tester.TESTSHIM_PORT),
-                   "--period=%d" % period,
-                   "--psize=%d" % psize,
-                   "--mintime=%d" % mintime,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
-
-    def setUp(self):
-        super(ExternalBuFLOTests, self).setUp()
-        # Make request to shim
-        self.shim_chan = tester.connect_with_retry(("127.0.0.1",
-                                                    tester.SHIM_PORT))
-        self.shim_chan.settimeout(tester.SOCKET_TIMEOUT)
-
-    def tearDown(self):
-        self.shim_chan.close()
-        super(ExternalBuFLOTests, self).tearDown()
-
-    def test_timing(self):
-        super(ExternalBuFLOTests, self).direct_transfer()
-        for wrapper in self.load_wrapper():
-            if len(wrapper) > 2:
-                iats = [wrapper[i + 1][1] - wrapper[i][1]
-                            for i in range(len(wrapper[1:]))]
-                for obsIat in iats:
-                    self.assertAlmostEqual(self.period, obsIat,
-                                       None,
-                                       "The observed period %s does not match"
-                                       " with the expected period %s"
-                                       % (obsIat, self.period),
-                                       delta=0.05)
-
-    def test_sizes(self):
-        super(ExternalBuFLOTests, self).direct_transfer()
-        for wrapper in self.load_wrapper():
-            print wrapper
-            for length, iat in wrapper:
-                print length, iat
-                self.assertEqual(self.psize, length,
-                                       "The observed size %s does not match"
-                                       " with the expected size %s"
-                                       % (length, self.psize))
-
-    @unittest.skip("")
-    def test_pad_when_visiting(self):
-        wrapper = self.load_wrapper()
-        self.test_sizes()
-        self.assertTrue(wrapper, "The number of messages received is not"
-                        "sufficient: %d messages" % len(wrapper))
-
-
 class WFPadShimObserver(STTest):
 
     def setUp(self):
