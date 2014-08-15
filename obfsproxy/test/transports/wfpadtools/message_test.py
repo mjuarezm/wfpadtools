@@ -71,11 +71,11 @@ class WFPadMessageExtractorTest(unittest.TestCase):
                          "First extracted messages do not match with"
                          " first original messages.")
 
-        obsPigBckdData = extractedMsgs[:-1].payload
+        obsPigBckdData = extractedMsgs[-1:][0].payload
         self.assertEqual(obsPigBckdData, piggybackedData,
                          "Observed piggybacked data: %s and expected"
-                         " data do not match" % (obsPigBckdData,
-                                                 piggybackedData))
+                         " data: %s, do not match" % (obsPigBckdData,
+                                                      piggybackedData))
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
