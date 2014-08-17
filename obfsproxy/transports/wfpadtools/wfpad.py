@@ -22,7 +22,7 @@ designs within the research community, such as Tamaraw, CS-BuFLO and Adaptive
 Padding. They have been generalized in order to allow for a broader set of
 possible strategies.
 
-For further details see /doc/wfpadtools/wfpadtools-spec.txt.
+For further details on the protocol see /doc/wfpadtools/wfpadtools-spec.txt.
 
 Important features of the WFPadTools design:
 
@@ -410,9 +410,9 @@ class WFPadTransport(BaseTransport):
                 log.debug("[wfad] Delay buffer flush %s ms." % delay)
 
     def elapsedSinceLastMsg(self):
-        elapsed = reactor.seconds() - self._lastSndTimestamp
-        log.debug("[wfpad] Cancel padding. Elapsed = %s ms" % elapsed)
-        return elapsed
+        elap = reactor.seconds() - self._lastSndTimestamp  # @UndefinedVariable
+        log.debug("[wfpad] Cancel padding. Elapsed = %s ms" % elap)
+        return elap
 
     def flushBuffer(self):
         """Encapsulate data from buffer in messages and send over the link.
@@ -528,7 +528,7 @@ class WFPadTransport(BaseTransport):
         self.sendIgnore()
         if when is 'snd':
             self._consecPaddingMsgs += 1
-            self._lastSndTimestamp = reactor.seconds()
+            self._lastSndTimestamp = reactor.seconds()  # @UndefinedVariable
         delay = self._gapHistoProbdist[when].randomSample()
         if delay is const.INF_LABEL:
             return
