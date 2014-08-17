@@ -74,7 +74,6 @@ following limitations:
   than Tor, for instance).
 
 """
-import json
 from obfsproxy.transports.base import BaseTransport, PluggableTransportError
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
@@ -482,29 +481,21 @@ class WFPadTransport(BaseTransport):
                           "messages from stream: %s" % str(e))
 
         for msg in msgs:
-            if msg.flags == const.FLAG_CONTROL:
+            if msg.flags & const.FLAG_CONTROL:
                 # Process control messages
-                args = None
-                if msg.args:
-                    log.debug("[wfad] Message with control data received.")
-                    self._msgExtractor.totalArgs += msg.args
-                    # We need to wait until we have all the args
-                    if msg.argsLen == len(self._msgExtractor.totalArgs):
-                        args = json.loads(self._msgExtractor.totalArgs)
-                        self._msgExtractor.totalArgs = ""
                 self.circuit.upstream.write(msg.payload)
-                self.receiveControlMessage(msg.opcode, args)
+                self.receiveControlMessage(msg.opcode, msg.args)
 
             else:
                 self.deferBurstPadding('rcv')
                 self._numMessages['rcv'] += 1
                 # Forward data to the application.
-                if msg.flags == const.FLAG_DATA:
+                if not msg.flags & const.FLAG_PADDING:
                     log.debug("[wfad] Data flag detected, relaying upstream")
                     self.circuit.upstream.write(msg.payload)
 
                 # Filter padding messages out.
-                elif msg.flags == const.FLAG_PADDING:
+                elif msg.flags & const.FLAG_PADDING:
                     log.debug("[wfad] Padding message ignored.")
 
                 # Otherwise, flag not recognized

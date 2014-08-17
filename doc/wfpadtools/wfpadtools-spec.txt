@@ -14,35 +14,36 @@
     obfuscation framework [1]. It implements the necessary building blocks
     for the development of link padding-based website fingerprinting [2]
     countermeasures in Tor. The protocol allows to insert dummy messages
-    to the stream between the OP and the bridge that are discarded at the
-    each of the ends.
+    to the stream between the OP and the bridge, which are then discarded at
+    each end. WFPadTools is not a website fingerprinting defense itself and
+    is intended for research purposes.
 
 2.  WFPadTools protocol
 
 	The WFPadTools protocol lives in a layer between obfsproxy and SOCKS, as
 	depicted below.
-	
-						+-----------------+
-						|   Application   |
-						+-----------------+
-						|   	Tor  	  |
-						+-----------------+						
-						|      SOCKS 	  |						
-						+-----------------+
-						|   WFPadTools    |
-						+-----------------+
-						|       TCP       |
-						+-----------------+
-						|       IP        |
-						+-----------------+								
+		
+							+-----------------+
+							|   Application   |
+							+-----------------+
+							|   	Tor  	  |
+							+-----------------+						
+							|      SOCKS 	  |						
+							+-----------------+
+							|   WFPadTools    |
+							+-----------------+
+							|       TCP       |
+							+-----------------+
+							|       IP        |
+							+-----------------+								
 
 	Application data is transported wrapping them into WFPadTools messages (data
 	unit of the WFPadTools protocol) which structure is described next. WFPadTools
 	defines two message headers, one for data/dummy messages and the other to
 	signal control operations to the other end of the transport.
 	
-	The data/dummy message is depicted below and has a 5-byte header. The fields
-	of the header are: total length, payload length and flags.
+	The data/dummy message structure is depicted below and has a 5-byte header. The
+	fields of the header are: total length, payload length and flags.
 	
 			   <-------------------  MTU  ------------------->
 			    2 Bytes  2 Bytes  1 Byte  <--- Up to MPU ---->
@@ -52,7 +53,7 @@
 			  +--------+---------+-------+----------+---------+
 			   <------ Min. Header -----> <-- Min. Payload -->
 	
-	The 2-byte total length refers to the overall length of the message excluding
+	The 2-byte total length field refers to the overall length of the message excluding
 	the header, whereas the 2-byte payload length refers to the payload only. The
 	difference between total length and payload length is the length of the payload
 	padding that can be optionally used for modifying the distribution of packet
@@ -69,39 +70,38 @@
 	allows to specify opcode and arguments of the control operation. The structure
 	of the control message is depicted below.
 	
-			  <-------------------  MTU  ---------------------->
+			  <---------------------  MTU  -------------------->
 			  5 Bytes  1 Byte   2 Bytes  <----- Up to MPU ----->
-			 +--------+---------+-------+--------+--------------+
-			 |  Min.  | Opcode  | Args  |  Args  | Min. payload |
-			 | Header |         | len.  |  (opt) |     (opt)    |
-			 +--------+---------+-------+--------+--------------+
-			  <--------- Header -------> <------ Payload ------>
+			 +--------+---------+-------+-------+---------------+
+			 |  Min.  | Opcode  | Args  | Args  |  Min. payload |
+			 | Header |         | len.  | (opt) |     (opt)     |
+			 +--------+---------+-------+-------+---------------+
+			  <------------- Header -----------> <-- Payload -->
 	
 	WFPadTools Maximum Transmission Unit (MTU) size is 1448 bytes. Excluding the
 	headers, this results in 1443 bytes of transported data in data messages. Control
 	messages MAY also piggyback 1440 - len(args) bytes of application data.
 
-	The extra fields in this header are: opcode and args length. The opcode is the
-	number of operation and args length is the total length of the arguments.
-	The arguments might be too long to fit in one single message, in that case, we
-	can send control messages with len(args) > len(MPU). Since TCP is the underlying
-	transport protocol, there is no need for integrity or order checks and we can obtain
-	the arguments by parsing control messages until the amount of args parsed equals
-	args length.
+	The extra fields in this header are: opcode, args length and flag last. The opcode
+	is the number of the control operation and args length is the length of the arguments.
+	The arguments might be too long to fit in one single message. We use FLAG_LAST in the
+	flags field	to signal the last control message. Since TCP is the underlying transport
+	protocol, there is no need for integrity or order checking and we can obtain the 
+	arguments by continuously parsing control messages until the we fins a constrol message
+	with the FLAG_LAST on.
 
 	The 1-byte flag field in the headers is used for protocol signaling. Below, all
 	defined flags along with their semantics are explained.
 	
     Flag name       | Bit # | Description
     ----------------+-------+--------------------------------------------------
-    FLAG_DATA	    |   1   | The payload consists of application data which
-                    |       | must be forwarded to the application.
+    FLAG_PADDING    |   1   | The payload holds padding that must be discarded.
     ----------------+-------+--------------------------------------------------
-    FLAG_PADDING    |   2   | The payload holds padding that must be discarded.
+    FLAG_CONTROL    |   2   | The payload holds arguments for the control
+                    |       | operation.
     ----------------+-------+--------------------------------------------------
-    FLAG_CONTROL    |   3   | The payload holds arguments for the control
-                    |       | operation and can hold the same payload as 
-                    |       | FLAG_DATA and FLAG_PADDING.
+    FLAG_LAST       |   3   | Indicates the control message is the last one
+    				|		| and triggers the operation.
     ----------------+-------+--------------------------------------------------
     
     There is a precedence of flags. When FLAG_PADDING is signaled to the other end,
@@ -114,17 +114,21 @@
 	
 	Flag value      | Description
 	----------------+-----------------------------------------------------
-	   001		    | Parse the payload and forward it.
+	   000		    | Parse the payload and forward it.
 	----------------+-----------------------------------------------------
-	   010	        | Discard the message.
+	   001	        | Discard the message.
 	----------------+-----------------------------------------------------
-	   100          | Parse opcode and arguments and do operation.
+	   010          | Parse opcode, arguments and payload. Relay payload.
+	   				| Wait for more control messages.
 	----------------+-----------------------------------------------------
-	   101          | Parse opcode, arguments and payload. Run control
-	   				| operation and forward the payload.
+	   011          | Parse opcode and arguments. Discard payload.
+	   				| Wait for more control messages.
 	----------------+-----------------------------------------------------
-	   110          | Parse opcode and arguments and do operation.
-	   				| Discard the payload.  
+	   110          | Parse opcode and arguments and payload. Do control
+	   				| operation and forward payload.
+	----------------+-----------------------------------------------------
+	   111          | Parse opcode and arguments and do operation.
+	   				| Discard payload.  
 	----------------+-----------------------------------------------------
 
 	WFPadTools message contains the transported data which might be followed
