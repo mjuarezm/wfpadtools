@@ -181,13 +181,9 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
                           % (numPaddingMsgs, expNumPaddingMsgs))
 
     def spectest_delay(self):
-        controlMsg = self.serverDumps[0]
-        firstPaddingMsg = sorted(self.clientDumps,
-                                 key=lambda x: x['time'])[0]
         expectedDelay = self.t / 1000.0
         for msg0, msg1 in zip(self.clientDumps[:-1], self.clientDumps[1:]):
             obsPeriod = msg1['time'] - msg0['time']
-            print obsPeriod
             self.assertAlmostEqual(obsPeriod, expectedDelay,
                                    msg="The observed delay %s does not"
                                    " match with the expected delay: %s"
