@@ -20,7 +20,7 @@ class CSBuFLOTransport(WFPadTransport):
     minimum time for which the link will be padded is also specified.
     """
     def __init__(self):
-        super(BuFLOTransport, self).__init__()
+        super(CSBuFLOTransport, self).__init__()
         # Set constant length for messages
         self._lengthDataProbdist = probdist.uniform(self._length)
 
@@ -53,7 +53,7 @@ class CSBuFLOTransport(WFPadTransport):
         cls._period = 1
         cls._length = const.MPU
 
-        super(BuFLOTransport, cls).validate_external_mode_cli(args)
+        super(CSBuFLOTransport, cls).validate_external_mode_cli(args)
 
         if args.period:
             cls._period = args.period
