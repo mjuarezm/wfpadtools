@@ -45,9 +45,9 @@ class RandProbDist:
             self.templateHisto = list(histo)
             assert(labels != None and interpolate != None and removeToks != None)
             if sum(self.histo) <= 0:
-                raise PluggableTransportError("Use -1 bin label in the histo "
+                raise PluggableTransportError("Use %s bin label in the histo "
                                               "to indicate that a sample can't"
-                                              " be drawn.")
+                                              " be drawn." % cons.INF_LABEL)
         else:
             self.prng = random if (seed is None) else random.Random(seed)
             self.sampleList = []
