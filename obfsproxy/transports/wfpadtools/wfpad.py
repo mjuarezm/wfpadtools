@@ -562,7 +562,6 @@ class WFPadTransport(BaseTransport):
                                     [self.getSessId(), True])
         else:
             self._sessId = sessId
-            self._visiting = True
 
     def onSessionEnds(self, sessId):
         """Send hint for session end.
@@ -573,8 +572,6 @@ class WFPadTransport(BaseTransport):
         if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT,
                                 [self.getSessId(), False])
-        else:
-            self._visiting = False
 
     def getSessId(self):
         """Return current session Id."""
@@ -649,7 +646,8 @@ class WFPadTransport(BaseTransport):
         status : bool
                  True or False, indicating session start and end respectively.
         """
-        self._visiting = status
+        if self.weAreServer:
+            self._visiting = status
         if status == True:
             self.onSessionStarts(sessId)
         else:
@@ -751,12 +749,19 @@ class WFPadTransport(BaseTransport):
         self._period = t
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
+
         # Set the stop condition to satisfy that the number of messages
         # sent within the session is a power of 2 (otherwise it'll continue
         # padding until the closest one) and that the session has finished.
-        self.stopCondition = lambda self: \
-                (self._numMessages[0] & (self._numMessages[0] - 1)) == 0 \
-                and not self._visiting
+        def stopConditionTotalPad(s):
+            stopCond = self._numMessages['snd'] > 0 and \
+            (self._numMessages['snd'] & (self._numMessages['snd'] - 1)) == 0 \
+            and not self.isVisiting()
+            log.debug("[wfpad] - Total pad stop condition is %s."
+                          "\n Visiting: %s, Num snd msgs: %s"
+                          % (stopCond, self.isVisiting(), self._numMessages))
+            return stopCond
+        self.stopCondition = stopConditionTotalPad
 
     def relayPayloadPad(self):
         """TODO: we don't have enough info about the spec to implement it."""
@@ -781,11 +786,18 @@ class WFPadTransport(BaseTransport):
         self._period = t
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
+
         # Set the stop condition to satisfy that the number of messages
         # sent within the session is a multiple of parameter `L` and the
         # session has finished.
-        self.stopCondition = lambda self: self._numMessages[0] % L == 0 \
-                                    and not self._visiting
+        def stopConditionBatchPad(s):
+            stopCond = self._numMessages['snd'] > 0 and \
+            self._numMessages['snd'] % L == 0 and not self.isVisiting()
+            log.debug("[wfpad] - Batch pad stop condition is %s."
+                      "\n Visiting: %s, Num snd msgs: %s, L: %s"
+                      % (stopCond, self.isVisiting(), self._numMessages, L))
+            return stopCond
+        self.stopCondition = stopConditionBatchPad
 
 
 def deferLater(*args, **kargs):
@@ -803,11 +815,11 @@ def deferLater(*args, **kargs):
     if callback:
         d.addCallback(callback)
 
-    def errbackCancel(e):
-        if isinstance(e, CancelledError):
+    def errbackCancel(f):
+        if f.check(CancelledError):
             log.debug("[wfpad] A deferred was cancelled.")
         else:
-            raise e
+            raise f.raiseException()
     d.addErrback(errbackCancel)
     return d
 

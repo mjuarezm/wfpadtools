@@ -358,7 +358,7 @@ class WFPadShimObserver(STTest):
                             " with expected sessions %s."
                             % (obsSessions, expSessions))
 
-        self.assertTrue(self.shimObs._wfpad._visiting,
+        self.assertTrue(self.shimObs._visiting,
                          "The session has not started."
                          "The wfpad's `_visiting` flag is `False`.")
 
@@ -400,7 +400,7 @@ class WFPadShimObserver(STTest):
                             " with expected sessions %s."
                             % (obsSessions, expSessions))
 
-        self.assertFalse(self.shimObs._wfpad._visiting,
+        self.assertFalse(self.shimObs._visiting,
                          "The session has not ended."
                          "The wfpad's `_visiting` flag is `True`.")
 

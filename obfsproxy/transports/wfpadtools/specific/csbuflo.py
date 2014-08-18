@@ -63,7 +63,7 @@ class CSBuFLOTransport(WFPadTransport):
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
         self.constantRatePaddingDistrib(self._period)
-        self.sendControlMessage(const.OP_TOTAL_PAD, [sessId, self._period])
+        self.relayTotalPad(sessId, self._period)
 
 
 class CSBuFLOClient(CSBuFLOTransport):
