@@ -19,7 +19,7 @@ class TamarawTransport(WFPadTransport):
     minimum time for which the link will be padded is also specified.
     """
     def __init__(self):
-        super(TamarawTransport, self).__init__()
+        super(TamarawTransport, self).__init__(self._period, self._length)
         # Set constant length for messages
         self._lengthDataProbdist = probdist.uniform(self._length)
 
@@ -51,7 +51,7 @@ class TamarawTransport(WFPadTransport):
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables."""
         # Defaults for BuFLO specifications.
-        cls._period = 1
+        cls._period = 10
         cls._length = const.MPU
         cls._batch = 20
 

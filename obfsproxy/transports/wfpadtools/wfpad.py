@@ -164,7 +164,7 @@ class WFPadTransport(BaseTransport):
     that can also be used to generate new ones.
     """
 
-    def __init__(self):
+    def __init__(self, period=None, length=None, stopCond=None):
         """Initialize a WFPadTransport object."""
         log.debug("[wfad] Initializing %s (id=%s)."
                   % (const.TRANSPORT_NAME, str(id(self))))
@@ -181,8 +181,8 @@ class WFPadTransport(BaseTransport):
         self._msgExtractor = message.WFPadMessageExtractor()
 
         # Default message iat and length
-        self._period = 0.1
-        self._length = const.MPU
+        self._period = period if period else 10
+        self._length = length if length else const.MPU
 
         # Variables to keep track of past messages
         self._lastSndTimestamp = 0
@@ -214,7 +214,7 @@ class WFPadTransport(BaseTransport):
                                   'snd': lambda d: None}
 
         # This method is evaluated to decide when to stop padding
-        self.stopCondition = lambda Self: False
+        self.stopCondition = stopCond if stopCond else lambda Self: False
 
         # Get the global shim object
         if self.weAreClient:
@@ -524,7 +524,6 @@ class WFPadTransport(BaseTransport):
         delay.
         """
         if self.stopCondition(self):
-            print self._period
             return
         self.sendIgnore()
         if when is 'snd':

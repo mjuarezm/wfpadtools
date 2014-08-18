@@ -21,7 +21,7 @@ class BuFLOTransport(WFPadTransport):
     """
 
     def __init__(self):
-        super(BuFLOTransport, self).__init__()
+        super(BuFLOTransport, self).__init__(self._period, self._length)
         # Initialize start time
         self._startTime = time.time()
 
@@ -66,7 +66,7 @@ class BuFLOTransport(WFPadTransport):
         """
         # Defaults for BuFLO specifications.
         cls._mintime = -1
-        cls._period = 1000
+        cls._period = 10
         cls._length = const.MPU
 
         super(BuFLOTransport, cls).validate_external_mode_cli(args)
