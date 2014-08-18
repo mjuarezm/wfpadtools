@@ -26,7 +26,7 @@ class CSBuFLOTransport(WFPadTransport):
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
-        """Register CLI arguments for BuFLO parameters."""
+        """Register CLI arguments for CSBuFLO parameters."""
         subparser.add_argument("--period",
                                required=False,
                                type=float,
@@ -44,11 +44,7 @@ class CSBuFLOTransport(WFPadTransport):
 
     @classmethod
     def validate_external_mode_cli(cls, args):
-        """Assign the given command line arguments to local variables.
-
-        BuFLO pads at a constant rate `period` and pads the packets to a
-        constant size `psize`.
-        """
+        """Assign the given command line arguments to local variables."""
         # Defaults for BuFLO specifications.
         cls._period = 1
         cls._length = const.MPU

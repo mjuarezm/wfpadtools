@@ -524,6 +524,7 @@ class WFPadTransport(BaseTransport):
         delay.
         """
         if self.stopCondition(self):
+            print self._period
             return
         self.sendIgnore()
         if when is 'snd':
