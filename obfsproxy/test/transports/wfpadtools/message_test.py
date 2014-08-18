@@ -2,6 +2,7 @@ import unittest
 
 import obfsproxy.transports.wfpadtools.message as msg
 from obfsproxy.transports.wfpadtools import const
+from obfsproxy.transports.scramblesuit import probdist
 
 
 class WFPadMessageFactoryTest(unittest.TestCase):
@@ -39,6 +40,22 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         self.assertTrue(len(ctrlMsgsArgs) > 1,
                      "No more than one message for control without args "
                      "was created.")
+
+    def test_uniform_length(self):
+        # Test payload is padded to specified length
+        testData = "foo padded to MPU"
+        dataMsgs = self.msgFactory.encapsulate(data=testData,
+                                       lenProbdist=probdist.uniform(const.MPU))
+        self.assertEqual(len(dataMsgs), 1,
+                     "More than one message for control without args "
+                     "was created.")
+        dataMsg = dataMsgs[0]
+        obsLength = len(dataMsg)
+        expLength = const.MTU
+        self.assertEqual(obsLength, expLength,
+                         "Observed length (%s) and "
+                         "expected length (%s) do not match"
+                         % (obsLength, expLength))
 
 
 class WFPadMessageExtractorTest(unittest.TestCase):

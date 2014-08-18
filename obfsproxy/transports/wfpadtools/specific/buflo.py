@@ -32,7 +32,7 @@ class BuFLOTransport(WFPadTransport):
         # BuFLO stops padding if the visit has finished and the
         # elapsed time has exceeded the minimum padding time.
         self.stopCondition = lambda s: self.getElapsed() > self._mintime and \
-                                            not self._visiting
+                                            not self.isVisiting()
 
     @classmethod
     def register_external_mode_cli(cls, subparser):

@@ -48,7 +48,7 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
 
     def msg2dict(self, msg):
         """Return a dictionary representation of a wfpad message."""
-        return {"opcode": msg.opcode,
+        s = {"opcode": msg.opcode,
                 "payload": msg.payload,
                 "args": msg.args,
                 "flags": msg.flags,
@@ -64,6 +64,7 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
                              for k, v in self._gapHistoProbdist.iteritems()
                              if v.histo]),
                 }
+        return s
 
     def parseControl(self, data):
         if ":" in data:

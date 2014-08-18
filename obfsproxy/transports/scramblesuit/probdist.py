@@ -131,7 +131,8 @@ class RandProbDist:
         Draw and return a random sample from the probability distribution.
         """
         if self.histo:
-            sample = randint(1, sum(self.histo))  # between 0 and sum_tokens
+            sumHisto = sum(self.histo)
+            sample = randint(1, sumHisto) if sumHisto > 0 else 0
             for i, b in enumerate(self.histo):
                 sample -= b
                 if sample <= 0:
@@ -141,8 +142,6 @@ class RandProbDist:
                         elif i == len(self.histo) - 2:
                             return self.labels[i - 1] + (cons.MAX_DELAY - \
                                         self.labels[i - 1]) * random.random()
-                        elif i == len(self.histo):
-                            return cons.INF_LABEL
                         else:
                             return self.labels[i - 1] + (self.labels[i] - \
                                         self.labels[i - 1]) * random.random()

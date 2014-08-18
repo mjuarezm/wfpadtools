@@ -281,8 +281,9 @@ class BatchPadTest(PostPrimitiveTest, STTest):
 class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
     sessId = 111
     opcode = const.OP_BURST_HISTO
-    delay = 0.2
-    histo = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    delay = 2
+    tokens = 100000
+    histo = [tokens, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     labels_ms = [delay, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
                  2048, 4096, 8192, 16384, 32768, 65536, -1]
     removeTokens = True
@@ -298,20 +299,11 @@ class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
                                                    "rcv"])
         sleep(0.5)
         self.send_instruction(0)
-        sleep(2)
-
-    def posttest_removetoks(self):
-        lastServerMsg = [msg for msg in self.postServerDumps][-1:][0]
-        obsHisto = lastServerMsg['burstDistr']['rcv']
-        expHisto = [0] * len(self.histo)
-        self.assertListEqual(obsHisto, expHisto,
-                             "Observed 'rcv' histogram: %s does not match "
-                             "the expected histogram: %s" % (obsHisto,
-                                                             expHisto))
+        sleep(1)
 
     def posttest_period(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
-                             if msg['flags'] == const.FLAG_PADDING]
+                             if msg['flags'] == const.FLAG_PADDING][0:10]
         for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
             observedPeriod = msg2["time"] - msg1["time"]
             expectedPeriod = self.delay / 1000.0

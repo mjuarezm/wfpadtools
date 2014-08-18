@@ -256,7 +256,8 @@ class WFPadTransport(BaseTransport):
     @classmethod
     def setup(cls, transportConfig):
         """Called once when obfsproxy starts."""
-        log.info("\n\n"
+        if cls.__name__ is "WFPadTransport":
+            log.info("\n\n"
                   "########################################################\n"
                   " WFPad isn't a Website Fingerprinting defense by itself.\n"
                   "########################################################\n")
@@ -399,15 +400,15 @@ class WFPadTransport(BaseTransport):
         else:
             # Push data message to data buffer
             self._buffer.write(data)
-            log.debug("[wfad] Buffered %d bytes of outgoing data."
-                      % len(self._buffer))
+            log.debug("[wfad] Buffered %d bytes of outgoing data w/ delay %sms"
+                      % (len(self._buffer), delay))
 
             # In case we the buffer is not currently being flushed,
             # make a delayed call to the flushing method
             if not self._deferData or \
                 (self._deferData and self._deferData.called):
                 self._deferData = deferLater(delay, self.flushBuffer)
-                log.debug("[wfad] Delay buffer flush %s ms." % delay)
+                log.debug("[wfad] Delay buffer flush %s ms delay" % delay)
 
     def elapsedSinceLastMsg(self):
         elap = reactor.seconds() - self._lastSndTimestamp  # @UndefinedVariable
@@ -812,6 +813,8 @@ def deferLater(*args, **kargs):
         del kargs['cbk']
     delayMiliseconds = delay / 1000.0
     d = task.deferLater(reactor, delayMiliseconds, fn, *args[2:], **kargs)
+    log.debug("[wfpad] - Defer call to %s after %sms delay."
+              % (fn.__name__, delayMiliseconds))
     if callback:
         d.addCallback(callback)
 

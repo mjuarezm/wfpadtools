@@ -355,15 +355,14 @@ class DirectBuFLO(DirectShimTest, unittest.TestCase):
     server_args = ("buflo", "server",
            "127.0.0.1:%d" % SERVER_PORT,
            "--period=10",
-           "--psize=1448",
-           "--mintime=2",
+           "--psize=1443",
+           "--mintime=10",
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = ("buflo", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
-           "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
            "--period=10",
-           "--psize=1448",
-           "--mintime=2",
+           "--psize=1443",
+           "--mintime=10",
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
 class DirectShimBuFLO(DirectShimTest, unittest.TestCase):
@@ -372,14 +371,58 @@ class DirectShimBuFLO(DirectShimTest, unittest.TestCase):
            "127.0.0.1:%d" % SERVER_PORT,
            "--period=1",
            "--psize=1443",
-           "--mintime=2",
+           "--mintime=10",
            "--dest=127.0.0.1:%d" % EXIT_PORT)
     client_args = ("buflo", "client",
            "127.0.0.1:%d" % ENTRY_PORT,
            "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
            "--period=1",
            "--psize=1443",
-           "--mintime=2",
+           "--mintime=10",
+           "--dest=127.0.0.1:%d" % SERVER_PORT)
+
+class DirectShimCSBuFLO(DirectShimTest, unittest.TestCase):
+    transport = "csbuflo"
+    server_args = ("csbuflo", "server",
+           "127.0.0.1:%d" % SERVER_PORT,
+           "--period=1",
+           "--psize=1443",
+           "--dest=127.0.0.1:%d" % EXIT_PORT)
+    client_args = ("buflo", "client",
+           "127.0.0.1:%d" % ENTRY_PORT,
+           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
+           "--period=1",
+           "--psize=1443",
+           "--dest=127.0.0.1:%d" % SERVER_PORT)
+
+class DirectShimTamaraw(DirectShimTest, unittest.TestCase):
+    transport = "tamaraw"
+    server_args = ("tamaraw", "server",
+           "127.0.0.1:%d" % SERVER_PORT,
+           "--period=1",
+           "--psize=1443",
+           "--batch=1000",
+           "--dest=127.0.0.1:%d" % EXIT_PORT)
+    client_args = ("tamaraw", "client",
+           "127.0.0.1:%d" % ENTRY_PORT,
+           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
+           "--period=1",
+           "--psize=1443",
+           "--batch=1000",
+           "--dest=127.0.0.1:%d" % SERVER_PORT)
+
+class DirectShimAdaptivePadding(DirectShimTest, unittest.TestCase):
+    transport = "adaptive"
+    server_args = ("adaptive", "server",
+           "127.0.0.1:%d" % SERVER_PORT,
+           "--period=1",
+           "--psize=1443",
+           "--dest=127.0.0.1:%d" % EXIT_PORT)
+    client_args = ("adaptive", "client",
+           "127.0.0.1:%d" % ENTRY_PORT,
+           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
+           "--period=1",
+           "--psize=1443",
            "--dest=127.0.0.1:%d" % SERVER_PORT)
 
 TEST_FILE = """\
