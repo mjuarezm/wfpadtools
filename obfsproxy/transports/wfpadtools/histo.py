@@ -40,8 +40,8 @@ class Histo:
         self.removeToks = removeToks
 
     def getIndexFromLabel(self, l):
-        return bisect.bisect_right(self.labels, l, hi=len(self.labels) - 1) \
-               if self.interpolate else self.labels.index(l)
+        return self.labels.index(l) if l in self.labels \
+            else bisect.bisect_right(self.labels, l, hi=len(self.labels) - 1)
 
     def _removeTokIter(self, index):
         for i, value in enumerate(self.histo[index:]):

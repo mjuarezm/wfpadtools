@@ -372,13 +372,13 @@ class WFPadTransport(BaseTransport):
 
         # Cancel existing deferred calls to padding methods to prevent
         # callbacks that remove tokens from histograms
-        deferCancelled = False
+        deferBurstCancelled = deferGapCancelled = False
         if self._deferBurst['snd'] and not self._deferBurst['snd'].called:
             self._deferBurst['snd'].cancel()
-            deferCancelled = True
+            deferBurstCancelled = True
         if self._deferGap['snd'] and not self._deferGap['snd'].called:
             self._deferGap['snd'].cancel()
-            deferCancelled = True
+            deferGapCancelled = True
 
         # Draw delay for data message
         delay = self._delayDataProbdist.randomSample()
@@ -386,11 +386,16 @@ class WFPadTransport(BaseTransport):
         # Update delay according to elapsed time since last message
         # was sent. In case elapsed time is greater than current
         # delay, we sent the data message as soon as possible.
-        if deferCancelled:
+        if deferBurstCancelled or deferGapCancelled:
             elapsed = self.elapsedSinceLastMsg()
             newDelay = delay - elapsed
             delay = 0 if newDelay < 0 else newDelay
             log.debug("[wfpad] New delay is %s" % delay)
+        
+        if deferBurstCancelled:
+            self._deferBurst['snd'].removeToken(elapsed)
+        if deferGapCancelled:
+            self._deferGap['snd'].removeToken(elapsed)
 
         if delay == 0:
             # Send data message over the wire
