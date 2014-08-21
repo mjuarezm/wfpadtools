@@ -84,6 +84,7 @@ from twisted.internet import reactor, task
 from twisted.internet.defer import CancelledError
 
 import obfsproxy.common.log as logging
+import obfsproxy.transports.wfpadtools.histo as hist
 import obfsproxy.transports.wfpadtools.const as const
 from sets import Set
 
@@ -655,7 +656,7 @@ class WFPadTransport(BaseTransport):
             self.onSessionEnds(sessId)
 
     def relayBurstHistogram(self, histo, labels, removeToks=False,
-                                interpolate=True, when="rcv"):
+                                  interpolate=True, when="rcv"):
         """Specify histogram encoding the delay distribution.
 
         The delay distribution represents the probability of sending a single
@@ -685,10 +686,9 @@ class WFPadTransport(BaseTransport):
             arrives from upstream (the middle node). In both cases, the
             padding packet is sent in the direction of the client.
         """
-        self._burstHistoProbdist[when] = probdist.new(histo=histo,
-                                                      labels=labels,
-                                                      interpolate=interpolate,
-                                                      removeToks=removeToks)
+        self._burstHistoProbdist[when] = hist.new(histo, labels,
+                                                  interpolate=interpolate,
+                                                  removeToks=removeToks)
         self._deferBurstCallback[when] = self._burstHistoProbdist[when]\
                                                                 .removeToken
 
@@ -726,10 +726,9 @@ class WFPadTransport(BaseTransport):
             BURST_HISTOGRAM initiated padding into GAP_HISTOGRAM initiated
             padding.
         """
-        self._gapHistoProbdist[when] = probdist.new(histo=histo,
-                                                    labels=labels,
-                                                    interpolate=interpolate,
-                                                    removeToks=removeToks)
+        self._gapHistoProbdist[when] = hist.new(histo, labels,
+                                                interpolate=interpolate,
+                                                removeToks=removeToks)
         self._deferGapCallback[when] = self._gapHistoProbdist[when]\
                                                         .removeToken
 
