@@ -67,8 +67,8 @@ class AdaptiveTransport(WFPadTransport):
         #     i=len(histo)-1 -> delay=infinite
         #     i=len(histo)-2 -> [labels(len(histo)-2), MAX_DELAY]
         histo = [23, 10, 9, 7, 9, 8, 3, 7, 3, 10, 5, 2, 1, 2, 0, 1, 0, 0, 0]
-        labels = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
-                  16384, 32768, 65536, 131072, 131072, -1]
+        labels = [0, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
+                  16384, 32768, 65536, 131072, -1]
         removeToks = True
         interpolate = True
         self.relayBurstHistogram(histo, labels, removeToks, interpolate, "rcv")

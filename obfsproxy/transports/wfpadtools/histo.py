@@ -32,7 +32,7 @@ class Histo:
         removal strategy is applied or histograms are immutable.
         """
         self.histo = histo
-        assert(sum(self.histo) <= 0)
+        assert(sum(self.histo) > 0)
         self.templateHisto = list(histo)
 
         self.labels = labels
