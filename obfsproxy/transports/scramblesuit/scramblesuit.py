@@ -58,7 +58,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
         self.protoState = const.ST_WAIT_FOR_AUTH
 
         # Buffer for outgoing data.
-        self._sendBuf = ""
+        self.sendBuf = ""
 
         # Buffer for inter-arrival time obfuscation.
         self.choppingBuf = fifobuf.Buffer()
@@ -73,7 +73,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Inter-arrival time morpher to obfuscate inter arrival times.
         self.iatMorpher = self.srvState.iatDist if self.weAreServer else \
-                          probdist.new(lambda i, n, c: random.random() %
+                          probdist.new(lambda: random.random() %
                                        const.MAX_PACKET_DELAY)
 
         # Used to extract protocol messages from encrypted data.
@@ -212,7 +212,7 @@ class ScrambleSuitTransport( base.BaseTransport ):
             log.debug("No session ticket to redeem.  Running UniformDH.")
             self.circuit.downstream.write(self.uniformdh.createHandshake())
 
-    def pushData( self, data, flags=const.FLAG_PAYLOAD ):
+    def sendRemote( self, data, flags=const.FLAG_PAYLOAD ):
         """
         Send data to the remote end after a connection was established.
 
@@ -232,14 +232,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                                  msg in messages]))
 
         # If padding > header length, a single message will do...
-        if paddingLen > const.MIN_HDR_LEN:
+        if paddingLen > const.HDR_LENGTH:
             messages.append(message.new("", paddingLen=paddingLen -
-                                                       const.MIN_HDR_LEN))
+                                                       const.HDR_LENGTH))
 
         # ...otherwise, we use two padding-only messages.
         else:
             messages.append(message.new("", paddingLen=const.MPU -
-                                                       const.MIN_HDR_LEN))
+                                                       const.HDR_LENGTH))
             messages.append(message.new("", paddingLen=paddingLen))
 
         blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
@@ -319,11 +319,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 assert len(msg.payload) == const.PRNG_SEED_LENGTH
                 log.debug("Obtained PRNG seed.")
                 prng = random.Random(msg.payload)
-                pktDist = probdist.new(lambda i, n, c: prng.randint(const.MIN_HDR_LEN,
+                pktDist = probdist.new(lambda: prng.randint(const.HDR_LENGTH,
                                                             const.MTU),
                                        seed=msg.payload)
                 self.pktMorpher = packetmorpher.new(pktDist)
-                self.iatMorpher = probdist.new(lambda i, n, c: prng.random() %
+                self.iatMorpher = probdist.new(lambda: prng.random() %
                                                const.MAX_PACKET_DELAY,
                                                seed=msg.payload)
 
@@ -336,19 +336,19 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         The application could have sent data while we were busy authenticating
         the remote machine.  This method flushes the data which could have been
-        queued in the meanwhile in `self._sendBuf'.
+        queued in the meanwhile in `self.sendBuf'.
         """
 
-        if len(self._sendBuf) == 0:
+        if len(self.sendBuf) == 0:
             log.debug("Send buffer is empty; nothing to flush.")
             return
 
         # Flush the buffered data, the application is so eager to send.
         log.debug("Flushing %d bytes of buffered application data." %
-                  len(self._sendBuf))
+                  len(self.sendBuf))
 
-        self.pushData(self._sendBuf)
-        self._sendBuf = ""
+        self.sendRemote(self.sendBuf)
+        self.sendBuf = ""
 
     def receiveTicket( self, data ):
         """
@@ -425,13 +425,13 @@ class ScrambleSuitTransport( base.BaseTransport ):
         """
 
         if self.protoState == const.ST_CONNECTED:
-            self.pushData(data.read())
+            self.sendRemote(data.read())
 
         # Buffer data we are not ready to transmit yet.
         else:
-            self._sendBuf += data.read()
+            self.sendBuf += data.read()
             log.debug("Buffered %d bytes of outgoing data." %
-                      len(self._sendBuf))
+                      len(self.sendBuf))
 
     def sendTicketAndSeed( self ):
         """
@@ -444,9 +444,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
         log.debug("Sending a new session ticket and the PRNG seed to the " \
                   "client.")
 
-        self.pushData(ticket.issueTicketAndKey(self.srvState),
+        self.sendRemote(ticket.issueTicketAndKey(self.srvState),
                         flags=const.FLAG_NEW_TICKET)
-        self.pushData(self.srvState.prngSeed,
+        self.sendRemote(self.srvState.prngSeed,
                         flags=const.FLAG_PRNG_SEED)
         self.flushSendBuffer()
 
