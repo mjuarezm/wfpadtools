@@ -105,4 +105,4 @@ new = RandProbDist
 
 
 def uniform(x):
-    return new(lambda i, n, c: x, lambda: 1)
+    return new(lambda: x, lambda i, n, c: 1)
