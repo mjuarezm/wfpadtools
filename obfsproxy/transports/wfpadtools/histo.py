@@ -48,7 +48,12 @@ class Histo:
             if value > 0:
                 self.histo[index + i] -= 1
                 log.debug("[histo] Removed tokem from bin %s" % (index + i))
-                break
+                return
+        for i, value in enumerate(self.histo[:index]):
+            if value > 0:
+                self.histo[i] -= 1
+                log.debug("[histo] Removed tokem from bin %s" % (i))
+                return
 
     def refillHisto(self):
         self.histo = list(self.templateHisto)
