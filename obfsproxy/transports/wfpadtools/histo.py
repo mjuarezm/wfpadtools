@@ -26,7 +26,7 @@ class Histo:
 
         The parameter `histo` is a list which contains the number of tokens for
         each bin. The parameter `labels` contains the the delay values for each
-        bin. `ínterpolate` indicates whether the value is sampled uniformly
+        bin. `interpolate` indicates whether the value is sampled uniformly
         from the interval defined by the bin or the value of the label is
         returned. `removeToks` indicates if the the adaptive-padding token
         removal strategy is applied or histograms are immutable.
