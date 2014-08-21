@@ -36,7 +36,7 @@ class PacketMorpher( object ):
         if dist:
             self.dist = dist
         else:
-            self.dist = probdist.new(lambda i, n, c: random.randint(const.MIN_HDR_LEN,
+            self.dist = probdist.new(lambda: random.randint(const.HDR_LENGTH,
                                                             const.MTU))
 
     def calcPadding( self, dataLen ):
