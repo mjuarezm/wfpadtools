@@ -283,8 +283,8 @@ class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
     opcode = const.OP_BURST_HISTO
     delay = 2
     tokens = 100000
-    histo = [tokens, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    labels_ms = [0, delay, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+    histo = [tokens, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    labels_ms = [0, delay, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
                  2048, 4096, 8192, 16384, 32768, 65536, -1]
     removeTokens = True
     interpolate = False

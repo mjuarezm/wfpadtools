@@ -391,11 +391,11 @@ class WFPadTransport(BaseTransport):
             newDelay = delay - elapsed
             delay = 0 if newDelay < 0 else newDelay
             log.debug("[wfpad] New delay is %s" % delay)
-        
-        if deferBurstCancelled:
-            self._deferBurst['snd'].removeToken(elapsed)
-        if deferGapCancelled:
-            self._deferGap['snd'].removeToken(elapsed)
+
+        if deferBurstCancelled and hasattr(self._burstHistoProbdist['snd'], "histo"):
+            self._burstHistoProbdist['snd'].removeToken(elapsed)
+        if deferGapCancelled and hasattr(self._gapHistoProbdist['snd'], "histo"):
+            self._gapHistoProbdist['snd'].removeToken(elapsed)
 
         if delay == 0:
             # Send data message over the wire

@@ -48,22 +48,24 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
 
     def msg2dict(self, msg):
         """Return a dictionary representation of a wfpad message."""
-        s = {"opcode": msg.opcode,
-                "payload": msg.payload,
-                "args": msg.args,
-                "flags": msg.flags,
-                "time": time(),
-                "client": self.weAreClient,
-                "visiting": self.isVisiting(),
-                "sessid": self.getSessId(),
-                "numMessages": self._numMessages,
-                "burstDistr": dict([(k, v.histo)
+        s = {
+             "opcode": msg.opcode,
+             "payload": msg.payload,
+             "args": msg.args,
+             "flags": msg.flags,
+             "time": time(),
+             "client": self.weAreClient,
+             "visiting": self.isVisiting(),
+             "sessid": self.getSessId(),
+             "numMessages": self._numMessages,
+             "burstDistr": dict([(k, v.histo)
                                for k, v in self._burstHistoProbdist.iteritems()
-                               if v.histo]),
-                "gapDistr": dict([(k, v.histo)
-                             for k, v in self._gapHistoProbdist.iteritems()
-                             if v.histo]),
-                }
+                               if hasattr(v, 'histo')]),
+             "gapDistr": dict([(k, v.histo)
+                               for k, v in self._gapHistoProbdist.iteritems()
+                               if hasattr(v, 'histo')]),
+             }
+        print "[test-server] - wrapper: %s" % s
         return s
 
     def parseControl(self, data):

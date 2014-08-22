@@ -17,7 +17,7 @@ log = logging.get_obfslogger()
 class Histo:
 
     """
-    Provides code to generate and sample histograms of a prob distributions.
+    Provides code to generate and sample histograms of prob distributions.
     """
 
     def __init__(self, histo, labels, interpolate=False, removeToks=False):
