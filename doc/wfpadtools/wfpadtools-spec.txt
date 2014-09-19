@@ -47,19 +47,19 @@
 
 	The WFPadTools protocol lives in a layer between obfsproxy and SOCKS, as
 	depicted below.
-							+-----------------+
-							|   Application   |
-							+-----------------+
-							|   	Tor  	  |
-							+-----------------+						
-							|      SOCKS 	  |						
-							+-----------------+
-					----->  |   WFPadTools    |
-							+-----------------+
-							|       TCP       |
-							+-----------------+
-							|       IP        |
-							+-----------------+								
+				+-----------------+
+				|   Application   |
+				+-----------------+
+				|   	Tor  	  |
+				+-----------------+						
+				|      SOCKS 	  |						
+				+-----------------+
+		        ----->  |   WFPadTools    |
+				+-----------------+
+				|       TCP       |
+				+-----------------+
+				|       IP        |
+				+-----------------+								
 
 	Application data is transported wrapping them into WFPadTools messages (the data
 	unit of the WFPadTools protocol) which structure is described next. WFPadTools
@@ -69,13 +69,13 @@
 	The data/dummy message structure is depicted below. It has a 5-byte header with the
 	following fields: total length, payload length and flags.
 	
-			   <-------------------  MTU  ------------------->
-			    2 Bytes  2 Bytes  1 Byte  <--- Up to MPU ---->
-			  +--------+---------+-------+----------+---------+
-			  | Total  | Payload | Flags |  Payload | Padding |
-			  | length | length  |       |   (opt)  |  (opt)  |
-			  +--------+---------+-------+----------+---------+
-			   <------ Min. Header -----> <-- Min. Payload -->
+		   <-------------------  MTU  ------------------->
+		    2 Bytes  2 Bytes  1 Byte  <--- Up to MPU ---->
+		  +--------+---------+-------+----------+---------+
+		  | Total  | Payload | Flags |  Payload | Padding |
+		  | length | length  |       |   (opt)  |  (opt)  |
+		  +--------+---------+-------+----------+---------+
+		   <------ Min. Header -----> <-- Min. Payload -->
 	
 	The 2-byte total length field refers to the overall length of the message excluding
 	the header, whereas the 2-byte payload length refers to the payload only. The
@@ -94,13 +94,13 @@
 	allows to specify opcode and arguments for the control operation. The structure
 	of the control message is depicted below.
 	
-			  <--------------------  MTU  -------------------->
-			  5 Bytes  1 Byte   2 Bytes <----- Up to MPU ----->
-			 +--------+--------+-------+-------+---------------+
-			 |  Min.  | Opcode | Args  | Args  |  Min. payload |
-			 | Header |        | len.  | (opt) |     (opt)     |
-			 +--------+--------+-------+-------+---------------+
-			  <------------- Header ----------> <-- Payload -->
+		  <--------------------  MTU  -------------------->
+		  5 Bytes  1 Byte   2 Bytes <----- Up to MPU ----->
+		 +--------+--------+-------+-------+---------------+
+		 |  Min.  | Opcode | Args  | Args  |  Min. payload |
+		 | Header |        | len.  | (opt) |     (opt)     |
+		 +--------+--------+-------+-------+---------------+
+		  <------------- Header ----------> <-- Payload -->
 	
 	WFPadTools Maximum Transmission Unit (MTU) size is 1448 bytes. Excluding the
 	headers, this results in 1443 bytes of transported data in data messages. Control
@@ -124,7 +124,7 @@
                     |       | operation.
     ----------------+-------+--------------------------------------------------
     FLAG_LAST       |   3   | Flags the control message as containing the last
-    				|		| piece of arguments and piggybacked data.
+    		    |	    | piece of arguments and piggybacked data.
     ----------------+-------+--------------------------------------------------
     
     There is a precedence on flags. When FLAG_PADDING is signaled, the message is 
@@ -142,16 +142,16 @@
 	   001	        | Discard the message.
 	----------------+-----------------------------------------------------
 	   010          | Parse opcode, arguments and payload. Relay payload.
-	   				| Wait for more control messages.
+	   		| Wait for more control messages.
 	----------------+-----------------------------------------------------
 	   011          | Parse opcode and arguments. Discard payload.
-	   				| Wait for more control messages.
+	   		| Wait for more control messages.
 	----------------+-----------------------------------------------------
 	   110          | Parse opcode and arguments and payload. Do control
-	   				| operation and forward payload.
+	   		| operation and forward payload.
 	----------------+-----------------------------------------------------
 	   111          | Parse opcode and arguments and do operation.
-	   				| Discard payload.  
+	   		| Discard payload.  
 	----------------+-----------------------------------------------------
 
 	WFPadTools MUST be used in combination with another pluggable transport that
@@ -176,10 +176,10 @@
 	   OP_APP_HINT	    | Signal the start/end of a session.
 	--------------------+-----------------------------------------------------
 	   OP_BURST_HISTO   | Specifies probability distributions for delays after
-	   					| data in order to pad burst in traffic.
+	   		    | data in order to pad burst in traffic.
 	--------------------+-----------------------------------------------------
 	   OP_GAP_HISTO     | Specifies probability distributions for delays after
-	   					| a dummy message in order to pad gaps in traffic.
+	   		    | a dummy message in order to pad gaps in traffic.
 	--------------------+-----------------------------------------------------
 	   OP_TOTAL_PAD     | Parse opcode and arguments and do operation.
 	--------------------+-----------------------------------------------------
@@ -211,9 +211,9 @@
 	be used in the server as depicted below:
 		
 		    Client                         Server  Legend:
-		      |  	  (Bs, Gs, Br, Gr)       |      Bs: Burst send probability distribution
+		      |  	  (Bs, Gs, Br, Gr)   |      Bs: Burst send probability distribution
 		      | ---------------------------> |      Gs: Gap send probability distribution 
-		      |         SessId, start    	 |      Br: Burst receive probability distribution
+		      |         SessId, start        |      Br: Burst receive probability distribution
 		      | ---------------------------> |      Gr: Burst receive probability distribution 
 		      |     Padded communication     |      
 		      | <--------------------------> |   
@@ -226,4 +226,4 @@ References
 	[2] http://www.cypherpunks.ca/~iang/pubs/webfingerprint-wpes.pdf
 
  	[3] https://gitweb.torproject.org/user/mikeperry/torspec.git/blob/refs/heads/multihop-padding-primitives:/proposals/ideas/xxx-multihop-padding-primitives.txt
- 	
+ 
