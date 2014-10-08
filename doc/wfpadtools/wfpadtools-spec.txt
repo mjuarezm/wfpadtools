@@ -35,7 +35,7 @@
             Client PT                                       Server PT
                 |                                              |
                 |                                              |
-          Tor Onoin proxy                                Tor Onion Router
+          Tor Onion proxy                                Tor Onion Router
                 |
                 |
            SOCKS shim
@@ -54,7 +54,7 @@
 				+-----------------+						
 				|      SOCKS 	  |						
 				+-----------------+
-		        ----->  |   WFPadTools    |
+		----->  |   WFPadTools    |
 				+-----------------+
 				|       TCP       |
 				+-----------------+
