@@ -238,6 +238,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Conduct an authenticated UniformDH handshake if there's no ticket.
         else:
+            if self.uniformDHSecret is None:
+                log.warning("A UniformDH password is not set, most likely " \
+                            "a missing 'password' argument.")
+                self.circuit.close()
+                return
             log.debug("No session ticket to redeem.  Running UniformDH.")
             self.circuit.downstream.write(self.uniformdh.createHandshake())
 
