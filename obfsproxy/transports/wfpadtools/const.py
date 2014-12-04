@@ -12,7 +12,10 @@ TEST_SERVER_DIR         = join(TEMP_DIR, "test_server")
 BASE_DIR                = abspath(join(dirname(__file__), pardir, pardir))
 PYOBFSPROXY_PATH        = join(BASE_DIR, "pyobfsproxy.py")
 
-INF_LABEL = -1
+INF_LABEL               = -1
+
+# Scale is milliseconds
+SCALE                   = 1000.0
 
 # Protocol states
 ST_WAIT                 = 0

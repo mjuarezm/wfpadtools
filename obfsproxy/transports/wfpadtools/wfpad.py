@@ -126,9 +126,8 @@ class WFPadShimObserver(object):
 
     def onDisconnect(self, connId):
         """Remove id of connection to the set of open connections."""
-        if self._sessId in self._sessions and \
-            connId in self._sessions[self._sessId]:
-                self._sessions[self._sessId].remove(connId)
+        if self._sessId in self._sessions and connId in self._sessions[self._sessId]:
+            self._sessions[self._sessId].remove(connId)
         if self.getNumConnections(self._sessId) == 0:
             self.onSessionEnds(connId)
             if self._sessId in self._sessions:
@@ -259,9 +258,9 @@ class WFPadTransport(BaseTransport):
         """Called once when obfsproxy starts."""
         if cls.__name__ is "WFPadTransport":
             log.info("\n\n"
-                  "########################################################\n"
-                  " WFPad isn't a Website Fingerprinting defense by itself.\n"
-                  "########################################################\n")
+                     "########################################################\n"
+                     " WFPad isn't a Website Fingerprinting defense by itself.\n"
+                     "########################################################\n")
 
         # Check whether this object is the client or the server
         cls.weAreClient = transportConfig.weAreClient
@@ -357,7 +356,7 @@ class WFPadTransport(BaseTransport):
         log.debug("[wfpad] Sending control message: opcode=%s, args=%s."
                   % (opcode, args))
         self.sendDownstream(self._msgFactory.encapsulate("", opcode, args,
-                                        lenProbdist=self._lengthDataProbdist))
+                                                         lenProbdist=self._lengthDataProbdist))
 
     def pushData(self, data):
         """Push `data` to the buffer or send it over the wire.
@@ -411,8 +410,7 @@ class WFPadTransport(BaseTransport):
 
             # In case we the buffer is not currently being flushed,
             # make a delayed call to the flushing method
-            if not self._deferData or \
-                (self._deferData and self._deferData.called):
+            if not self._deferData or (self._deferData and self._deferData.called):
                 self._deferData = deferLater(delay, self.flushBuffer)
                 log.debug("[wfad] Delay buffer flush %s ms delay" % delay)
 
@@ -519,9 +517,9 @@ class WFPadTransport(BaseTransport):
         burstDelay = self._burstHistoProbdist[when].randomSample()
         if burstDelay is not const.INF_LABEL:
             self._deferBurst[when] = deferLater(burstDelay,
-                                         self.sendPaddingHisto,
-                                         when=when,
-                                         cbk=self._deferBurstCallback[when])
+                                                self.sendPaddingHisto,
+                                                when=when,
+                                                cbk=self._deferBurstCallback[when])
 
     def sendPaddingHisto(self, when):
         """Send ignore in response to up/downstream traffic and wait for data.
@@ -578,7 +576,7 @@ class WFPadTransport(BaseTransport):
         """
         if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT,
-                                [self.getSessId(), False])
+                                    [self.getSessId(), False])
 
     def getSessId(self):
         """Return current session Id."""
@@ -590,9 +588,9 @@ class WFPadTransport(BaseTransport):
         return self._visiting if self.weAreServer \
             else self._sessionObserver._visiting
 
-    #==========================================================================
+    # ==========================================================================
     # Deal with control messages
-    #==========================================================================
+    # ==========================================================================
     def receiveControlMessage(self, opcode, args=None):
         """Do operation indicated by the _opcode."""
         log.debug("Received control message with opcode %s and args: %s"
@@ -625,9 +623,9 @@ class WFPadTransport(BaseTransport):
         else:
             log.error("[wfpad] - The received opcode is not recognized.")
 
-    #==========================================================================
+    # ==========================================================================
     # WFPadTools Primitives
-    #==========================================================================
+    # ==========================================================================
 
     def relaySendPadding(self, N, t):
         """Send the requested number of padding cells in response.
@@ -637,11 +635,11 @@ class WFPadTransport(BaseTransport):
         N : int
             Number of padding cells to send in response to this cell.
         t : int
-            Number of microseconds delay before sending.
+            Number of milliseconds delay before sending.
         """
-        microsec = t / 1000.0
+        millisec = t / const.SCALE
         for _ in xrange(N):
-            deferLater(microsec, self.sendIgnore)
+            deferLater(millisec, self.sendIgnore)
 
     def relayAppHint(self, sessId, status):
         """A hint from the application layer for session start/end.
@@ -655,13 +653,13 @@ class WFPadTransport(BaseTransport):
         """
         if self.weAreServer:
             self._visiting = status
-        if status == True:
+        if status:
             self.onSessionStarts(sessId)
         else:
             self.onSessionEnds(sessId)
 
     def relayBurstHistogram(self, histo, labels, removeToks=False,
-                                  interpolate=True, when="rcv"):
+                            interpolate=True, when="rcv"):
         """Specify histogram encoding the delay distribution.
 
         The delay distribution represents the probability of sending a single
@@ -694,11 +692,10 @@ class WFPadTransport(BaseTransport):
         self._burstHistoProbdist[when] = hist.new(histo, labels,
                                                   interpolate=interpolate,
                                                   removeToks=removeToks)
-        self._deferBurstCallback[when] = self._burstHistoProbdist[when]\
-                                                                .removeToken
+        self._deferBurstCallback[when] = self._burstHistoProbdist[when].removeToken
 
     def relayGapHistogram(self, histo, labels, removeToks=False,
-                                interpolate=True, when="rcv"):
+                          interpolate=True, when="rcv"):
         """Specify histogram that encodes the delay distribution
 
         The delay distribution represents the probability of sending a
@@ -734,8 +731,7 @@ class WFPadTransport(BaseTransport):
         self._gapHistoProbdist[when] = hist.new(histo, labels,
                                                 interpolate=interpolate,
                                                 removeToks=removeToks)
-        self._deferGapCallback[when] = self._gapHistoProbdist[when]\
-                                                        .removeToken
+        self._deferGapCallback[when] = self._gapHistoProbdist[when].removeToken
 
     def relayTotalPad(self, sessId, t):
         """Pad all batches to nearest 2^K cells total or until session ends.
@@ -748,7 +744,7 @@ class WFPadTransport(BaseTransport):
         sessId : str
             The session ID from relayAppHint().
         t : int
-            The number of microseconds to wait between cells to consider them
+            The number of milliseconds to wait between cells to consider them
             part of the same batch.
         """
         self._period = t
@@ -760,11 +756,11 @@ class WFPadTransport(BaseTransport):
         # padding until the closest one) and that the session has finished.
         def stopConditionTotalPad(s):
             stopCond = self._numMessages['snd'] > 0 and \
-            (self._numMessages['snd'] & (self._numMessages['snd'] - 1)) == 0 \
-            and not self.isVisiting()
+                (self._numMessages['snd'] & (self._numMessages['snd'] - 1)) == 0 \
+                and not self.isVisiting()
             log.debug("[wfpad] - Total pad stop condition is %s."
-                          "\n Visiting: %s, Num snd msgs: %s"
-                          % (stopCond, self.isVisiting(), self._numMessages))
+                      "\n Visiting: %s, Num snd msgs: %s"
+                      % (stopCond, self.isVisiting(), self._numMessages))
             return stopCond
         self.stopCondition = stopConditionTotalPad
 
@@ -785,7 +781,7 @@ class WFPadTransport(BaseTransport):
         L : int
             The multiple of cells to pad to.
         t : int
-            The number of microseconds to wait between cells to consider them
+            The number of milliseconds to wait between cells to consider them
             part of the same batch.
         """
         self._period = t
@@ -797,7 +793,7 @@ class WFPadTransport(BaseTransport):
         # session has finished.
         def stopConditionBatchPad(s):
             stopCond = self._numMessages['snd'] > 0 and \
-            self._numMessages['snd'] % L == 0 and not self.isVisiting()
+                self._numMessages['snd'] % L == 0 and not self.isVisiting()
             log.debug("[wfpad] - Batch pad stop condition is %s."
                       "\n Visiting: %s, Num snd msgs: %s, L: %s"
                       % (stopCond, self.isVisiting(), self._numMessages, L))
@@ -815,7 +811,7 @@ def deferLater(*args, **kargs):
     if 'cbk' in kargs:
         callback = kargs['cbk']
         del kargs['cbk']
-    delayMiliseconds = delay / 1000.0
+    delayMiliseconds = delay / const.SCALE
     d = task.deferLater(reactor, delayMiliseconds, fn, *args[2:], **kargs)
     log.debug("[wfpad] - Defer call to %s after %sms delay."
               % (fn.__name__, delayMiliseconds))

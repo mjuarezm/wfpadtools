@@ -181,7 +181,7 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
                           % (numPaddingMsgs, expNumPaddingMsgs))
 
     def spectest_delay(self):
-        expectedDelay = self.t / 1000.0
+        expectedDelay = self.t / const.SCALE
         for msg0, msg1 in zip(self.clientDumps[:-1], self.clientDumps[1:]):
             obsPeriod = msg1['time'] - msg0['time']
             self.assertAlmostEqual(obsPeriod, expectedDelay,
@@ -306,7 +306,7 @@ class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
                              if msg['flags'] == const.FLAG_PADDING][0:10]
         for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
             observedPeriod = msg2["time"] - msg1["time"]
-            expectedPeriod = self.delay / 1000.0
+            expectedPeriod = self.delay / const.SCALE
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
                                msg="The observed period %s does not"
                                " match with the expected period: %s"
