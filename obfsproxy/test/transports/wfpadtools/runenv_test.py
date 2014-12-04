@@ -2,10 +2,14 @@ from os.path import join, exists
 import unittest
 
 from obfsproxy.test.transports.wfpadtools.sttest import STTest
+from obfsproxy.transports.wfpadtools import const
 
 
 class RunEnvTest(STTest):
-    """Makes sure the extra dependency requirements are satisfied."""
+    """Tests whether the extra dependency requirements are satisfied.
+
+    Eventually, these requirements could be added to obfsproxy/setup.py
+    """
 
     def test_tor(self):
         self.assert_is_installed('tor')
@@ -22,11 +26,14 @@ class RunEnvTest(STTest):
         This is necessary to run tester.py. We assume unix dir structure
         as it also is assumed in tester.py. Since we want to use pyobfsproxy
         to run our transports still under development, we can create a symbolic
-        link to obfsproxy's python version running the following command: 
-        sudo ln -s ~/git/obfsproxy-wfpadtools/obfsproxy/pyobfsproxy.py /bin/obfsproxy
+        link to obfsproxy's python version running the following command:
         """
-        self.assertTrue(exists(join("/bin", "obfsproxy")))
+        self.assertTrue(exists(join("/bin", "obfsproxy")),
+                        msg="The symbolic link to pyobfsproxy does not work."
+                            "Create one by running: sudo ln -s {} {}"
+                            .format(const.PYOBFSPROXY_PATH,
+                                    "/bin/obfsproxy"))
 
 if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
+    # import sys;sys.argv = ['', 'Test.testName']
     unittest.main()
