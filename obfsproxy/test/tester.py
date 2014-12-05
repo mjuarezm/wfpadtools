@@ -8,7 +8,6 @@ directory, and you need to have Python 2.6 or better (but not 3).
 You need to be able to make connections to arbitrary high-numbered
 TCP ports on the loopback interface.
 """
-
 import Queue
 import difflib
 import errno
@@ -24,9 +23,10 @@ import time
 import unittest
 
 import obfsproxy.common.log as logging
-from time import sleep
+
 
 log = logging.get_obfslogger()
+
 
 def diff(label, expected, received):
     """

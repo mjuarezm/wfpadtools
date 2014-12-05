@@ -1,3 +1,4 @@
+import os
 from os.path import join, exists
 import unittest
 
@@ -10,6 +11,19 @@ class RunEnvTest(STTest):
 
     Eventually, these requirements could be added to obfsproxy/setup.py
     """
+
+    def test_pythonpath_bashrc(self):
+        """Test base dir is loaded in the PYTHONPATH."""
+        load_instr = "export PYTHONPATH=$PYTHONPATH:{}".format(const.BASE_DIR)
+        bashrc_path = os.path.expanduser("~/.bashrc")
+        with open(bashrc_path) as f:
+            bashrc = f.read()
+        self.assertTrue(load_instr in bashrc,
+                        msg="The base dir is not loaded in the PYTHONPATH. "
+                        "You can solve this problem by running:\n"
+                        "echo \'export PYTHONPATH=$PYTHONPATH:{}\' >> {} "
+                        "&& source ~/.bashrc;"
+                        .format(const.BASE_DIR, bashrc_path))
 
     def test_tor(self):
         self.assert_is_installed('tor')

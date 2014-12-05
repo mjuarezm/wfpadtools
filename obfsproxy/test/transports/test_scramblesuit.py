@@ -280,7 +280,7 @@ class MessageTest( unittest.TestCase ):
     def test1_createProtocolMessages( self ):
         # An empty message consists only of a header.
         self.failUnless(len(message.createProtocolMessages("")[0]) == \
-                        const.MIN_HDR_LEN)
+                        const.HDR_LENGTH)
 
         msg = message.createProtocolMessages('X' * const.MPU)
         self.failUnless((len(msg) == 1) and (len(msg[0]) == const.MTU))
@@ -288,7 +288,7 @@ class MessageTest( unittest.TestCase ):
         msg = message.createProtocolMessages('X' * (const.MPU + 1))
         self.failUnless((len(msg) == 2) and \
                         (len(msg[0]) == const.MTU) and \
-                        (len(msg[1]) == (const.MIN_HDR_LEN + 1)))
+                        (len(msg[1]) == (const.HDR_LENGTH + 1)))
 
     def test2_getFlagNames( self ):
         self.failUnless(message.getFlagNames(0) == "Undefined")

@@ -9,8 +9,9 @@ TRANSPORT_NAME          = "wfpad"
 TEMP_DIR                = tempfile.gettempdir()
 TEST_SERVER_DIR         = join(TEMP_DIR, "test_server")
 
-BASE_DIR                = abspath(join(dirname(__file__), pardir, pardir))
-PYOBFSPROXY_PATH        = join(BASE_DIR, "pyobfsproxy.py")
+BASE_DIR               = abspath(join(dirname(__file__), pardir, pardir, pardir))
+OBFSPROXY_DIR           = join(BASE_DIR, "obfsproxy") 
+PYOBFSPROXY_PATH        = join(OBFSPROXY_DIR, "pyobfsproxy.py")
 
 INF_LABEL               = -1
 
