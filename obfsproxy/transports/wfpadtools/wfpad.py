@@ -258,9 +258,9 @@ class WFPadTransport(BaseTransport):
         """Called once when obfsproxy starts."""
         if cls.__name__ is "WFPadTransport":
             log.info("\n\n"
-                     "########################################################\n"
-                     " WFPad isn't a Website Fingerprinting defense by itself.\n"
-                     "########################################################\n")
+                     "####################################################\n"
+                     " WFPad alone isn't a Website Fingerprinting defense \n"
+                     "####################################################\n")
 
         # Check whether this object is the client or the server
         cls.weAreClient = transportConfig.weAreClient

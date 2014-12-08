@@ -21,3 +21,4 @@ MANIFEST
 # vim swap files:
 *.swp
 *.swo
+/TODO
