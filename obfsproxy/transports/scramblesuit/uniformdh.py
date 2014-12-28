@@ -156,7 +156,7 @@ class UniformDH( object ):
 
         return handshake[:const.PUBLIC_KEY_LENGTH]
 
-    def createHandshake( self ):
+    def createHandshake( self, srvState=None ):
         """
         Create and return a ready-to-be-sent UniformDH handshake.
 
@@ -194,6 +194,11 @@ class UniformDH( object ):
         # Authenticate the handshake including the current approximate epoch.
         mac = mycrypto.HMAC_SHA256_128(self.sharedSecret,
                                        publicKey + padding + mark + epoch)
+
+        if self.weAreServer and (srvState is not None):
+            log.debug("Adding the HMAC authenticating the server's UniformDH "
+                      "message to the replay table: %s." % mac.encode('hex'))
+            srvState.registerKey(mac)
 
         return publicKey + padding + mark + mac
 

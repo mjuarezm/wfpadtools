@@ -516,7 +516,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
             elif self.uniformdh.receivePublicKey(data, self.deriveSecrets,
                     self.srvState):
                 # Now send the server's UniformDH public key to the client.
-                handshakeMsg = self.uniformdh.createHandshake()
+                handshakeMsg = self.uniformdh.createHandshake(srvState=
+                                                              self.srvState)
 
                 log.debug("Sending %d bytes of UniformDH handshake and "
                           "session ticket." % len(handshakeMsg))
