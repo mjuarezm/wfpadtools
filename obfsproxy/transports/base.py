@@ -140,18 +140,18 @@ class BaseTransport(object):
         # If we are not 'socks', we need to have a static destination
         # to send our data to.
         if (args.mode != 'socks') and (not args.dest):
-            log.error("'client' and 'server' modes need a destination address.")
-            return False
+            err = "'client' and 'server' modes need a destination address."
 
-        if (args.mode != 'ext_server') and args.ext_cookie_file:
-            log.error("No need for --ext-cookie-file if not an ext_server.")
-            return False
+        elif (args.mode != 'ext_server') and args.ext_cookie_file:
+            err = "No need for --ext-cookie-file if not an ext_server."
 
-        if (args.mode == 'ext_server') and (not args.ext_cookie_file):
-            log.error("You need to specify --ext-cookie-file as an ext_server.")
-            return False
+        elif (args.mode == 'ext_server') and (not args.ext_cookie_file):
+            err = "You need to specify --ext-cookie-file as an ext_server."
 
-        return True
+        try:
+            raise argparse.ArgumentTypeError(err)
+        except NameError:
+            return True
 
 class PluggableTransportError(Exception): pass
 class SOCKSArgsError(Exception): pass

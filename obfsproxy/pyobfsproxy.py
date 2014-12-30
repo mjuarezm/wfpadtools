@@ -66,7 +66,11 @@ def set_up_cli_parsing():
     for transport, transport_class in transports.transports.items():
         subparser = subparsers.add_parser(transport, help='%s help' % transport)
         transport_class['base'].register_external_mode_cli(subparser)
-        subparser.set_defaults(validation_function=transport_class['base'].validate_external_mode_cli)
+        try:
+            subparser.set_defaults(validation_function=transport_class['base'].validate_external_mode_cli)
+        except ValueError, err:
+            log.error(err)
+            sys.exit(1)
 
     return parser
 
@@ -178,8 +182,10 @@ def pyobfsproxy():
         # they can initialize and setup themselves. Exit if the
         # provided arguments were corrupted.
 
-        # XXX use exceptions
-        if (args.validation_function(args) == False):
+        try: 
+            args.validation_function(args)
+        except Exception, err:
+            log.error(err)
             sys.exit(1)
 
         do_external_mode(args)
