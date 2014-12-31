@@ -136,6 +136,7 @@ class BaseTransport(object):
 
         Override for your own needs.
         """
+        err = None
 
         # If we are not 'socks', we need to have a static destination
         # to send our data to.
@@ -148,10 +149,10 @@ class BaseTransport(object):
         elif (args.mode == 'ext_server') and (not args.ext_cookie_file):
             err = "You need to specify --ext-cookie-file as an ext_server."
 
-        try:
-            raise argparse.ArgumentTypeError(err)
-        except NameError:
+        if not err: # We didn't encounter any errors during validation
             return True
+        else: # Ugh, something failed.
+            raise ValueError(err)
 
 class PluggableTransportError(Exception): pass
 class SOCKSArgsError(Exception): pass

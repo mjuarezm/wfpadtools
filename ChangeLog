@@ -3,6 +3,8 @@ Changes in version 0.2.13 - UNRELEASED:
    when running in managed mode. Patch by Yawning Angel. Fixes #13587.
  - Make ScrambleSuit servers cache the HMAC of their own UniformDH messages.
    Fixes #14038.
+ - Improve handling of failures during command line parsing.
+   Patch by Colin Teberg. Fixes #9823.
 
 
 Changes in version 0.2.12 - 2014-07-22:
