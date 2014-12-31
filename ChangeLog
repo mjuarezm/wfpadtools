@@ -1,4 +1,4 @@
-Changes in version 0.2.13 - UNRELEASED:
+Changes in version 0.2.13 - 2014-12-31:
  - Correctly handle the ScrambleSuit password being missing entirely
    when running in managed mode. Patch by Yawning Angel. Fixes #13587.
  - Make ScrambleSuit servers cache the HMAC of their own UniformDH messages.
