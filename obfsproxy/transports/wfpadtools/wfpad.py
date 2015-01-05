@@ -87,6 +87,7 @@ import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.histo as hist
 import obfsproxy.transports.wfpadtools.const as const
 from sets import Set
+import math
 
 
 log = logging.get_obfslogger()
@@ -187,6 +188,9 @@ class WFPadTransport(BaseTransport):
         # Variables to keep track of past messages
         self._lastSndTimestamp = 0
         self._consecPaddingMsgs = 0
+        self._sentDataBytes = 0
+        self._dataBytes = {'rcv': 0, 'snd': 0}
+        self._totalBytes = {'rcv': 0, 'snd': 0}
         self._numMessages = {'rcv': 0, 'snd': 0}
 
         # Initialize length distribution (don't pad by default)
@@ -327,6 +331,8 @@ class WFPadTransport(BaseTransport):
         elif isinstance(data, mes.WFPadMessage):
             self.circuit.downstream.write(str(data))
             self._numMessages['snd'] += 1
+            self._dataBytes['snd'] += len(data.payload)
+            self._totalBytes['snd'] += data.totalLen
         elif isinstance(data, list):
             for listElement in data:
                 self.sendDownstream(listElement)
@@ -494,9 +500,11 @@ class WFPadTransport(BaseTransport):
             else:
                 self.deferBurstPadding('rcv')
                 self._numMessages['rcv'] += 1
+                self._totalBytes['snd'] += msg.totalLen
                 # Forward data to the application.
                 if not msg.flags & const.FLAG_PADDING:
                     log.debug("[wfad] Data flag detected, relaying upstream")
+                    self._dataBytes['rcv'] += len(msg.payload)
                     self.circuit.upstream.write(msg.payload)
 
                 # Filter padding messages out.
@@ -733,11 +741,12 @@ class WFPadTransport(BaseTransport):
                                                 removeToks=removeToks)
         self._deferGapCallback[when] = self._gapHistoProbdist[when].removeToken
 
-    def relayTotalPad(self, sessId, t):
-        """Pad all batches to nearest 2^K cells total or until session ends.
+    def relayTotalPad(self, sessId, t, msg_level=True):
+        """Pad all batches to nearest 2^K cells total.
 
-        Pads all batches to nearest 2^K cells total or until it receives a
-        relayAppHint(sessId, False).
+        Set the stop condition to satisfy that the number of messages
+        sent within the session is a power of 2 (otherwise it will continue
+        padding until the closest one) and that the session has finished.
 
         Parameters
         ----------
@@ -746,33 +755,67 @@ class WFPadTransport(BaseTransport):
         t : int
             The number of milliseconds to wait between cells to consider them
             part of the same batch.
+        msg_level : bool
+            Sets whether the data to pad is at message level or at byte level.
         """
         self._period = t
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
+        to_pad = self._numMessages['snd'] \
+            if msg_level else self._totalBytes['snd']
 
-        # Set the stop condition to satisfy that the number of messages
-        # sent within the session is a power of 2 (otherwise it'll continue
-        # padding until the closest one) and that the session has finished.
         def stopConditionTotalPad(s):
-            stopCond = self._numMessages['snd'] > 0 and \
-                (self._numMessages['snd'] & (self._numMessages['snd'] - 1)) == 0 \
-                and not self.isVisiting()
+            if self.isVisiting():
+                log.debug("[wfpad] - False stop condition, still visiting...")
+                return False
+            stopCond = to_pad > 0 and (to_pad & (to_pad - 1)) == 0
             log.debug("[wfpad] - Total pad stop condition is %s."
                       "\n Visiting: %s, Num snd msgs: %s"
                       % (stopCond, self.isVisiting(), self._numMessages))
             return stopCond
         self.stopCondition = stopConditionTotalPad
 
-    def relayPayloadPad(self):
-        """TODO: we don't have enough info about the spec to implement it."""
-        pass
+    def relayPayloadPad(self, sessId, t, msg_level=True):
+        """Pad until the total sent data is multiple of 2^int(log(TOTAL_PAYLOAD))
 
-    def relayBatchPad(self, sessId, L, t):
-        """Pad all batches of cells to `L` cells total.
+        Set the stop condition to satisfy the number of messages (or bytes)
+        sent within the session is a multiple of the parameter `L` and that the
+        session has finished.
 
-        Pad all batches to `L` cells total or until it receives a
-        relayAppHint(sessId, False).
+        Parameters
+        ----------
+        sessId : str
+            The session ID from relayAppHint().
+        t : int
+            The number of milliseconds to wait between cells to consider them
+            part of the same batch.
+        msg_level : bool
+            Sets whether the data to pad is at message level or at byte level.
+        """
+        self._period = t
+        self._sessId = sessId
+        self.constantRatePaddingDistrib(t)
+        to_pad = self._numMessages['snd'] \
+            if msg_level else self._totalBytes['snd']
+
+        def stopConditionBatchPad(s):
+            if self.isVisiting():
+                log.debug("[wfpad] - False stop condition, still visiting...")
+                return False
+            L = math.pow(2, math.ceil(math.log(self._dataBytes['snd'], 2)))
+            stopCond = to_pad > 0 and to_pad % L == 0
+            log.debug("[wfpad] - Payload pad stop condition is %s."
+                      "\n Visiting: %s, Num snd msgs: %s, L: %s"
+                      % (stopCond, self.isVisiting(), self._numMessages, L))
+            return stopCond
+        self.stopCondition = stopConditionBatchPad
+
+    def relayBatchPad(self, sessId, L, t, msg_level=True):
+        """Pad all batches of cells to the nearest multiple of `L` cells/bytes total.
+
+        Set the stop condition to satisfy the number of messages (or bytes)
+        sent within the session is a multiple of the parameter `L` and that the
+        session has finished.
 
         Parameters
         ----------
@@ -783,17 +826,20 @@ class WFPadTransport(BaseTransport):
         t : int
             The number of milliseconds to wait between cells to consider them
             part of the same batch.
+        msg_level : bool
+            Sets whether the data to pad is at message level or at byte level.
         """
         self._period = t
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
+        to_pad = self._numMessages['snd'] \
+            if msg_level else self._totalBytes['snd']
 
-        # Set the stop condition to satisfy that the number of messages
-        # sent within the session is a multiple of parameter `L` and the
-        # session has finished.
         def stopConditionBatchPad(s):
-            stopCond = self._numMessages['snd'] > 0 and \
-                self._numMessages['snd'] % L == 0 and not self.isVisiting()
+            if self.isVisiting():
+                log.debug("[wfpad] - False stop condition, still visiting...")
+                return False
+            stopCond = to_pad > 0 and to_pad % L == 0
             log.debug("[wfpad] - Batch pad stop condition is %s."
                       "\n Visiting: %s, Num snd msgs: %s, L: %s"
                       % (stopCond, self.isVisiting(), self._numMessages, L))

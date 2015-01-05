@@ -5,7 +5,6 @@ from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 
 import obfsproxy.common.log as logging
-from obfsproxy.transports.wfpadtools.specific.buflo import BuFLOTransport
 from obfsproxy.transports.scramblesuit import probdist
 
 
@@ -48,6 +47,7 @@ class CSBuFLOTransport(WFPadTransport):
         # Defaults for BuFLO specifications.
         cls._period = 10
         cls._length = const.MPU
+        cls._padding_mode = 0
 
         super(CSBuFLOTransport, cls).validate_external_mode_cli(args)
 
@@ -55,12 +55,46 @@ class CSBuFLOTransport(WFPadTransport):
             cls._period = args.period
         if args.psize:
             cls._length = args.psize
+        if args.padding_mode:
+            cls._padding_mode = args.padding_mode
 
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
         self.constantRatePaddingDistrib(self._period)
-        self.relayTotalPad(sessId, self._period)
+        if self._padding_mode is const.TOTAL_PADDING:
+            self.relayTotalPad(sessId, self._period, False)
+        elif self._padding_mode is const.PAYLOAD_PADDING:
+            self.relayPayloadPad(sessId, self._period, False)
 
+    def relayBatchPad(self, sessId, L, t, msg_level=True):
+        """Pad all batches of cells to the nearest multiple of `L` cells/bytes total.
+
+        Set the stop condition to satisfy the number of messages (or bytes)
+        sent within the session is a multiple of the parameter `L` and that the
+        session has finished.
+
+        Parameters
+        ----------
+        sessId : str
+            The session ID from relayAppHint().
+        L : int
+            The multiple of cells to pad to.
+        t : int
+            The number of milliseconds to wait between cells to consider them
+            part of the same batch.
+        """
+        self._period = t
+        self._sessId = sessId
+        self.constantRatePaddingDistrib(t)
+        to_pad = self._numMessages['snd'] if msg_level else self._dataBytes['snd']
+
+        def stopConditionBatchPad(s):
+            stopCond = to_pad > 0 and to_pad % L == 0 and not self.isVisiting()
+            log.debug("[wfpad] - Batch pad stop condition is %s."
+                      "\n Visiting: %s, Num snd msgs: %s, L: %s"
+                      % (stopCond, self.isVisiting(), self._numMessages, L))
+            return stopCond
+        self.stopCondition = stopConditionBatchPad
 
 class CSBuFLOClient(CSBuFLOTransport):
     """Extend the CSBuFLOTransport class."""

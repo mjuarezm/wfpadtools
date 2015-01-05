@@ -14,16 +14,12 @@ class RunEnvTest(STTest):
 
     def test_pythonpath_bashrc(self):
         """Test base dir is loaded in the PYTHONPATH."""
-        load_instr = "export PYTHONPATH=$PYTHONPATH:{}".format(const.BASE_DIR)
-        bashrc_path = os.path.expanduser("~/.bashrc")
-        with open(bashrc_path) as f:
-            bashrc = f.read()
-        self.assertTrue(load_instr in bashrc,
+        self.assertTrue(const.BASE_DIR in os.environ['PYTHONPATH'],
                         msg="The base dir is not loaded in the PYTHONPATH. "
                         "You can solve this problem by running:\n"
-                        "echo \'export PYTHONPATH=$PYTHONPATH:{}\' >> {} "
-                        "&& source ~/.bashrc;"
-                        .format(const.BASE_DIR, bashrc_path))
+                        "echo \'export PYTHONPATH=$PYTHONPATH:{}\' >> "
+                        "~/.bashrc && source ~/.bashrc;"
+                        .format(const.BASE_DIR))
 
     def test_tor(self):
         self.assert_is_installed('tor')

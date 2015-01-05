@@ -9,7 +9,7 @@ TRANSPORT_NAME          = "wfpad"
 TEMP_DIR                = tempfile.gettempdir()
 TEST_SERVER_DIR         = join(TEMP_DIR, "test_server")
 
-BASE_DIR               = abspath(join(dirname(__file__), pardir, pardir, pardir))
+BASE_DIR                = abspath(join(dirname(__file__), pardir, pardir, pardir))
 OBFSPROXY_DIR           = join(BASE_DIR, "obfsproxy") 
 PYOBFSPROXY_PATH        = join(OBFSPROXY_DIR, "pyobfsproxy.py")
 
@@ -27,6 +27,10 @@ FLAG_DATA               = (0 << 0)
 FLAG_PADDING            = (1 << 0)
 FLAG_CONTROL            = (1 << 1)
 FLAG_LAST               = (1 << 2)
+
+# CS-BuFLO padding modes
+PAYLOAD_PADDING         = 0
+TOTAL_PADDING           = 1
 
 # Opcodes
 OP_SEND_PADDING         = 1
