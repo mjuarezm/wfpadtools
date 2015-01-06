@@ -19,7 +19,7 @@ class CSBuFLOTransport(WFPadTransport):
     minimum time for which the link will be padded is also specified.
     """
     def __init__(self):
-        super(CSBuFLOTransport, self).__init__(self._period, self._length)
+        super(CSBuFLOTransport, self).__init__()
         # Set constant length for messages
         self._lengthDataProbdist = probdist.uniform(self._length)
 
@@ -38,6 +38,17 @@ class CSBuFLOTransport(WFPadTransport):
                                help="Length of messages to be transmitted"
                                     " (Default: MTU).",
                                dest="psize")
+        subparser.add_argument("--padding",
+                               required=False,
+                               type=str,
+                               help="Padding mode for this endpoint. There"
+                                    " are two possible values: \n"
+                                    "- payload: pads to the closest multiple "
+                                    "of 2^N for N st 2^N closest power of two"
+                                    " greater than the payload size.\n"
+                                    "- total: pads to closest power of two.\n"
+                                    "(Default: total).",
+                               dest="psize")
 
         super(CSBuFLOTransport, cls).register_external_mode_cli(subparser)
 
@@ -47,7 +58,7 @@ class CSBuFLOTransport(WFPadTransport):
         # Defaults for BuFLO specifications.
         cls._period = 10
         cls._length = const.MPU
-        cls._padding_mode = 0
+        cls._padding_mode = const.TOTAL_PADDING
 
         super(CSBuFLOTransport, cls).validate_external_mode_cli(args)
 
@@ -55,8 +66,8 @@ class CSBuFLOTransport(WFPadTransport):
             cls._period = args.period
         if args.psize:
             cls._length = args.psize
-        if args.padding_mode:
-            cls._padding_mode = args.padding_mode
+        if args.padding:
+            cls._padding_mode = args.padding
 
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
@@ -65,6 +76,8 @@ class CSBuFLOTransport(WFPadTransport):
             self.relayTotalPad(sessId, self._period, False)
         elif self._padding_mode is const.PAYLOAD_PADDING:
             self.relayPayloadPad(sessId, self._period, False)
+        else:
+            raise RuntimeError("Value passed for padding mode is not valid")
 
     def relayBatchPad(self, sessId, L, t, msg_level=True):
         """Pad all batches of cells to the nearest multiple of `L` cells/bytes total.
@@ -83,7 +96,6 @@ class CSBuFLOTransport(WFPadTransport):
             The number of milliseconds to wait between cells to consider them
             part of the same batch.
         """
-        self._period = t
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
         to_pad = self._numMessages['snd'] if msg_level else self._dataBytes['snd']
@@ -95,6 +107,7 @@ class CSBuFLOTransport(WFPadTransport):
                       % (stopCond, self.isVisiting(), self._numMessages, L))
             return stopCond
         self.stopCondition = stopConditionBatchPad
+
 
 class CSBuFLOClient(CSBuFLOTransport):
     """Extend the CSBuFLOTransport class."""

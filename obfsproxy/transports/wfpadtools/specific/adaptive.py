@@ -20,7 +20,8 @@ class AdaptiveTransport(WFPadTransport):
     upstream and downstream directions.
     """
     def __init__(self):
-        super(AdaptiveTransport, self).__init__(self._period, self._length)
+        super(AdaptiveTransport, self).__init__()
+
         # Set constant length for messages
         self._lengthDataProbdist = probdist.uniform(self._length)
 

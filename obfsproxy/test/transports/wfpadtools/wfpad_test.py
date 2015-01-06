@@ -12,16 +12,17 @@ import unittest
 from obfsproxy.common import transport_config
 import obfsproxy.common.log as logging
 from obfsproxy.test import tester
-from obfsproxy.test.tester import TransportsSetUp
+from obfsproxy.test.tester import TransportsSetUp, TEST_FILE
 from obfsproxy.test.transports.wfpadtools.sttest import STTest
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools import util as ut
 from obfsproxy.transports.wfpadtools import wfpad
+from obfsproxy.transports.wfpadtools import wfpad_shim
 from obfsproxy.transports.wfpadtools.message import getOpcodeNames
 
 
 # DEBUG = True
-DEBUG = False
+DEBUG = True
 
 # Logging settings:
 log = logging.get_obfslogger()
@@ -81,9 +82,11 @@ class TestSetUp(TransportsSetUp):
     def print_output(self):
         report = ""
         report += self.obfs_client.check_completion("obfsproxy client (%s)"
-                                                % self.transport, report != "")
+                                                    % self.transport,
+                                                    report != "")
         report += self.obfs_server.check_completion("obfsproxy server (%s)"
-                                                % self.transport, report != "")
+                                                    % self.transport,
+                                                    report != "")
         log.debug(report)
 
     def send_to_transport(self, data):
@@ -93,17 +96,10 @@ class TestSetUp(TransportsSetUp):
     def load_wrapper(self):
         return sum([pickle.load(open(join(const.TEST_SERVER_DIR, f)))
                     for f in listdir(const.TEST_SERVER_DIR)
-                        if isfile(join(const.TEST_SERVER_DIR, f))], [])
+                    if isfile(join(const.TEST_SERVER_DIR, f))], [])
 
 
 class ControlMessageCommunicationTest(TestSetUp):
-    transport = "wfpadtest"
-    server_args = ("wfpadtest", "server",
-           "127.0.0.1:%d" % tester.SERVER_PORT,
-           "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
-    client_args = ("wfpadtest", "client",
-           "127.0.0.1:%d" % tester.ENTRY_PORT,
-           "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
 
     def send_instruction(self, opcode, args=None):
         """Send instruction to wfpadtest client."""
@@ -166,13 +162,23 @@ class PostPrimitiveTest(ControlMessageCommunicationTest):
 
 
 class SendPaddingTest(ControlMessageCommunicationTest, STTest):
+    # Config endpoints
+    transport = "wfpadtest"
+    server_args = ("wfpadtest", "server",
+                   "127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
+    client_args = ("wfpadtest", "client",
+                   "127.0.0.1:%d" % tester.ENTRY_PORT,
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+
+    # Arguments
     opcode = const.OP_SEND_PADDING
     N, t = 5, 1
     args = [N, t]
 
     def spectest_n_padding_messages(self):
         paddingMsgs = [msg for msg in self.clientDumps
-                        if msg['flags'] == const.FLAG_PADDING]
+                       if msg['flags'] == const.FLAG_PADDING]
         expNumPaddingMsgs = self.N
         numPaddingMsgs = len(paddingMsgs)
         self.assertEquals(numPaddingMsgs, expNumPaddingMsgs,
@@ -193,6 +199,16 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
 
 class AppHintTest(ControlMessageCommunicationTest, STTest):
     """Test server sends a hint to client."""
+    # Config endpoints
+    transport = "wfpadtest"
+    server_args = ("wfpadtest", "server",
+                   "127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
+    client_args = ("wfpadtest", "client",
+                   "127.0.0.1:%d" % tester.ENTRY_PORT,
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+
+    # Arguments    
     opcode = const.OP_APP_HINT
     sessId,  status = "id123", True
     args = [sessId, status]
@@ -219,21 +235,30 @@ class AppHintTest(ControlMessageCommunicationTest, STTest):
 
 
 class TotalPadTest(PostPrimitiveTest, STTest):
+    # Config endpoints
+    transport = "buflotest"
+    server_args = ("buflotest", "server",
+                   "127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
+    client_args = ("buflotest", "client",
+                   "127.0.0.1:%d" % tester.ENTRY_PORT,
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+
+    # Arguments    
     opcode = const.OP_TOTAL_PAD
     sessId, delay = "id123", 1
     args = [sessId, delay]
 
     def do_instructions(self):
-        pass
+        self.send_to_transport(TEST_FILE)
 
     def posttest_num_messages_is_power_of_2(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
                              if msg['flags'] == const.FLAG_PADDING]
         obsNumMessages = len(clientPaddingMsgs)
         self.assertTrue((obsNumMessages & (obsNumMessages - 1)) == 0,
-                         "The observed number of padding messages (%s) "
-                         "is not a power of 2."
-                         % obsNumMessages)
+                        "The observed number of padding messages (%s) "
+                        "is not a power of 2." % obsNumMessages)
 
     def posttest_period(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
@@ -242,19 +267,62 @@ class TotalPadTest(PostPrimitiveTest, STTest):
             observedPeriod = msg2["time"] - msg1["time"]
             expectedPeriod = self.delay
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
-                               msg="The observed period %s does not"
-                               " match with the expected period: %s"
-                               % (observedPeriod, expectedPeriod),
-                               delta=0.05)
+                                   msg="The observed period %s does not"
+                                   " match with the expected period: %s"
+                                   % (observedPeriod, expectedPeriod),
+                                   delta=0.05)
+
+
+class PayloadPadBytesTest(PostPrimitiveTest, STTest):
+    # Config endpoints
+    transport = "buflotest"
+    server_args = ("buflotest", "server",
+                   "127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
+    client_args = ("buflotest", "client",
+                   "127.0.0.1:%d" % tester.ENTRY_PORT,
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+
+    # Arguments
+    opcode = const.OP_PAYLOAD_PAD
+    sessId, delay, msg_level = "id123", 1, False
+    args = [sessId, delay, msg_level]
+
+    def do_instructions(self):
+        self.send_to_transport(TEST_FILE)
+
+    def posttest_num_data_bytes_correctly_padded(self):
+        lastMessage = self.postServerDumps[-1]
+        dataSentBytes = lastMessage['dataBytes']['rcv']
+        totalSentBytes = lastMessage['totalBytes']['rcv']
+        expectedNumBytes = ut.bytes_after_payload_padding(dataSentBytes,
+                                                          totalSentBytes)
+        self.assertEqual(expectedNumBytes, dataSentBytes,
+                         "The observed number of bytes (%s) "
+                         "does not match the expected (%s)."
+                         % (dataSentBytes, expectedNumBytes))
+
+    def posttest_period(self):
+        pass
 
 
 class BatchPadTest(PostPrimitiveTest, STTest):
+    # Config endpoints
+    transport = "buflotest"
+    server_args = ("buflotest", "server",
+                   "127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
+    client_args = ("buflotest", "client",
+                   "127.0.0.1:%d" % tester.ENTRY_PORT,
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+
+    # Arguments    
     opcode = const.OP_BATCH_PAD
     sessId, L, delay = "id123", 5, 1
     args = [sessId, L, delay]
 
     def do_instructions(self):
-        pass
+        self.send_to_transport(TEST_FILE)
 
     def posttest_num_messages_is_multiple_of_L(self):
         clientPaddingMsgs = [msg for msg in self.postClientDumps
@@ -272,13 +340,23 @@ class BatchPadTest(PostPrimitiveTest, STTest):
             observedPeriod = msg2["time"] - msg1["time"]
             expectedPeriod = self.delay
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
-                               msg="The observed period %s does not"
-                               " match with the expected period: %s"
-                               % (observedPeriod, expectedPeriod),
-                               delta=0.05)
+                                   msg="The observed period %s does not"
+                                   " match with the expected period: %s"
+                                   % (observedPeriod, expectedPeriod),
+                                   delta=0.05)
 
 
 class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
+    # Config endpoints
+    transport = "wfpadtest"
+    server_args = ("wfpadtest", "server",
+                   "127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
+    client_args = ("wfpadtest", "client",
+                   "127.0.0.1:%d" % tester.ENTRY_PORT,
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+
+    # Arguments    
     sessId = 111
     opcode = const.OP_BURST_HISTO
     delay = 2
@@ -308,10 +386,10 @@ class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
             observedPeriod = msg2["time"] - msg1["time"]
             expectedPeriod = self.delay / const.SCALE
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
-                               msg="The observed period %s does not"
-                               " match with the expected period: %s"
-                               % (observedPeriod, expectedPeriod),
-                               delta=0.005)
+                                   msg="The observed period %s does not"
+                                   " match with the expected period: %s"
+                                   % (observedPeriod, expectedPeriod),
+                                   delta=0.005)
 
 
 class WFPadShimObserver(STTest):
@@ -325,7 +403,7 @@ class WFPadShimObserver(STTest):
         wfpadClient = wfpad.WFPadClient()
 
         # Create an instace of the shim
-        self.shimObs = wfpad.WFPadShimObserver(wfpadClient)
+        self.shimObs = wfpad_shim.WFPadShimObserver(wfpadClient)
 
         # Open a few connections
         self.shimObs.onConnect(1)
@@ -346,13 +424,13 @@ class WFPadShimObserver(STTest):
         expSessions = {1: Set([1, 2, 3])}
 
         self.assertDictEqual(obsSessions, expSessions,
-                            "Observed sessions %s do not match"
-                            " with expected sessions %s."
-                            % (obsSessions, expSessions))
+                             "Observed sessions %s do not match"
+                             " with expected sessions %s."
+                             % (obsSessions, expSessions))
 
         self.assertTrue(self.shimObs._visiting,
-                         "The session has not started."
-                         "The wfpad's `_visiting` flag is `False`.")
+                        "The session has not started."
+                        "The wfpad's `_visiting` flag is `False`.")
 
     def test_closing_connections(self):
         """Test closing connections.
@@ -368,9 +446,9 @@ class WFPadShimObserver(STTest):
         expSessions = {1: Set([2, 3])}
 
         self.assertDictEqual(obsSessions, expSessions,
-                            "Observed sessions %s do not match"
-                            " with expected sessions %s."
-                            % (obsSessions, expSessions))
+                             "Observed sessions %s do not match"
+                             " with expected sessions %s."
+                             % (obsSessions, expSessions))
 
     def test_edge_cases(self):
         """Test the data structure is working properly in the edge cases.
@@ -388,9 +466,9 @@ class WFPadShimObserver(STTest):
         expSessions = {}
 
         self.assertDictEqual(obsSessions, expSessions,
-                            "Observed sessions %s do not match"
-                            " with expected sessions %s."
-                            % (obsSessions, expSessions))
+                             "Observed sessions %s do not match"
+                             " with expected sessions %s."
+                             % (obsSessions, expSessions))
 
         self.assertFalse(self.shimObs._visiting,
                          "The session has not ended."
@@ -412,15 +490,14 @@ class WFPadShimObserver(STTest):
         expSessions = {2: Set([1])}
 
         self.assertDictEqual(obsSessions, expSessions,
-                    "Observed sessions %s do not match"
-                    " with expected sessions %s."
-                    % (obsSessions, expSessions))
+                             "Observed sessions %s do not match"
+                             " with expected sessions %s."
+                             % (obsSessions, expSessions))
 
         self.assertTrue(self.shimObs._visiting,
-                         "The session has not started."
-                         "The wfpad's `_visiting` flag is `False`.")
+                        "The session has not started."
+                        "The wfpad's `_visiting` flag is `False`.")
 
 
 if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

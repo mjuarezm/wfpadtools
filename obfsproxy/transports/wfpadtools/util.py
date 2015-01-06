@@ -1,13 +1,15 @@
 import commands
 import hashlib
+import math
 from os import makedirs, remove, kill
 from os.path import exists, isdir, isfile
 from random import choice
 import shutil
 import signal
 from time import sleep
-import requesocks as requests
+
 from obfsproxy.transports.wfpadtools import const
+import requesocks as requests
 
 
 LOWERCASE_CHARS = 'abcdefghijklmnopqrstuvwxyz'
@@ -120,6 +122,38 @@ def hash_text(text, algo='sha1'):
 def timestamp():
     from time import time
     return time()
+
+
+def closest_multiple(n, k, ceil=True):
+    """Return closest greater multiple of `k` to `n`."""
+    if n == 0:
+        return 0
+    if n < k:
+        return k
+    if n % k == 0:
+        return n
+    return k * (n / k + (1 if ceil else 0))
+
+
+def closest_power_of_two(n, ceil=True):
+    """Return closest greater power of two to `n`."""
+    if n == 0:
+        return 0
+    k = math.ceil(math.log(n, 2))
+    return math.pow(2, k)
+
+
+def bytes_after_total_padding(total_bytes, psize=1):
+    """Return the total bytes transmitted after 'total' padding."""
+    n2 = closest_power_of_two(total_bytes)
+    return closest_multiple(n2, psize, ceil=False)
+
+
+def bytes_after_payload_padding(data_bytes, total_bytes, psize=1):
+    """Return the total bytes transmitted after 'payload' padding."""
+    n2 = closest_power_of_two(data_bytes)
+    m = closest_multiple(total_bytes, n2)
+    return closest_multiple(m, psize, ceil=False)
 
 
 def get_page(url, port, timeout):

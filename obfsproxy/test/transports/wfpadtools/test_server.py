@@ -8,6 +8,7 @@ import obfsproxy.transports.wfpadtools.util as ut
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.dummy import DummyTransport
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
+from obfsproxy.transports.wfpadtools.specific import buflo 
 
 import pickle
 from time import time
@@ -58,6 +59,8 @@ class WFPadTestTransport(WFPadTransport, DumpingInterface):
              "visiting": self.isVisiting(),
              "sessid": self.getSessId(),
              "numMessages": self._numMessages,
+             "totalBytes": self._totalBytes,
+             "dataBytes": self._dataBytes,
              "burstDistr": dict([(k, v.histo)
                                for k, v in self._burstHistoProbdist.iteritems()
                                if hasattr(v, 'histo')]),
@@ -122,6 +125,20 @@ class WFPadTestClient(WFPadTestTransport):
 
 
 class WFPadTestServer(WFPadTestTransport):
+    pass
+
+
+class BuFLOTestTransport(WFPadTestTransport, buflo.BuFLOTransport):
+
+    def __init__(self):
+        buflo.BuFLOTransport.__init__(self)
+
+
+class BuFLOTestClient(BuFLOTestTransport):
+    pass
+
+
+class BuFLOTestServer(BuFLOTestTransport):
     pass
 
 

@@ -18,6 +18,34 @@ class UtilTest(STTest):
         self.should_not_raise("Watchdog raised unexpected exception.",
                               ut.log_watchdog, testline, testfile, 5, 1)
 
+    def test_closest_multiple_n_lesser_than_k(self):
+        n, k = 3, 8
+        obs_result = ut.closest_multiple(n, k)
+        self.assertEqual(obs_result, k,
+                         "The closest multiple of {1} to {0} is not {2}"
+                         .format(n, k, obs_result))
+
+    def test_closest_multiple_n_multiple_of_k(self):
+        n, k = 16, 8
+        obs_result = ut.closest_multiple(n, k)
+        self.assertEqual(obs_result, n,
+                         "The closest multiple of {1} to {0} is not {2}"
+                         .format(n, k, obs_result))
+
+    def test_closest_multiple_n_greater_than_k(self):
+        n, k = 17, 8
+        obs_result = ut.closest_multiple(n, k)
+        self.assertEqual(obs_result, 3 * k,
+                         "The closest multiple of {1} to {0} is not {2}"
+                         .format(n, k, obs_result))
+
+    def test_closest_multiple_k_equals_1(self):
+        n, k = 17, 1
+        obs_result = ut.closest_multiple(n, k)
+        self.assertEqual(obs_result, n,
+                         "The closest multiple of {1} to {0} is not {2}"
+                         .format(n, k, obs_result))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,6 +22,7 @@ transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyCl
                'tamaraw': {'base': tamaraw.TamarawTransport, 'client': tamaraw.TamarawClient, 'server': tamaraw.TamarawServer},
                'adaptive': {'base': adaptive.AdaptiveTransport, 'client': adaptive.AdaptiveClient, 'server': adaptive.AdaptiveServer},
                'wfpadtest': {'base': test_serv.WFPadTestTransport, 'client': test_serv.WFPadTestClient, 'server': test_serv.WFPadTestServer},
+               'buflotest': {'base': test_serv.BuFLOTestTransport, 'client': test_serv.BuFLOTestClient, 'server': test_serv.BuFLOTestServer},
                'dummytest': {'base': test_serv.DummyTestTransport, 'client': test_serv.DummyTestClient, 'server': test_serv.DummyTestServer} }
 
 def get_transport_class(name, role):

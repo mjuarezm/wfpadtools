@@ -29,8 +29,8 @@ FLAG_CONTROL            = (1 << 1)
 FLAG_LAST               = (1 << 2)
 
 # CS-BuFLO padding modes
-PAYLOAD_PADDING         = 0
-TOTAL_PADDING           = 1
+PAYLOAD_PADDING         = 'payload'
+TOTAL_PADDING           = 'total'
 
 # Opcodes
 OP_SEND_PADDING         = 1
@@ -63,6 +63,7 @@ ARGS_POS                = 8
 # Length of WFPad's MTU in bytes.  Note that this is *not* the link MTU
 # which is probably 1500.
 MTU                     = 1448
+PSIZE                   = 600
 
 # Header length
 MIN_HDR_LEN             = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN

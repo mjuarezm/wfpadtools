@@ -79,82 +79,17 @@ from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message as mes
 from obfsproxy.transports.wfpadtools import message, socks_shim
-from obfsproxy.transports.wfpadtools import util as ut
+from obfsproxy.transports.wfpadtools import wfpad_shim
 from twisted.internet import reactor, task
 from twisted.internet.defer import CancelledError
 
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.histo as hist
 import obfsproxy.transports.wfpadtools.const as const
-from sets import Set
 import math
 
 
 log = logging.get_obfslogger()
-
-
-class WFPadShimObserver(object):
-    """Observer class for the SOCKS's shim.
-
-    This class provides methods to signal the start and end of web sessions.
-    It observes events from the proxy shim that indicate SOCKS requests from
-    FF, and it counts the alive connections to infer the life of a session.
-    """
-
-    def __init__(self, instanceWFPadTransport):
-        """Instantiates a new `WFPadShimObserver` object."""
-        log.debug("[wfpad - shim obs] New instance of the shim observer.")
-        self._wfpad = instanceWFPadTransport
-        self._sessions = {}
-        self._visiting = False
-        self._sessId = 0
-
-    def getNumConnections(self, sessId):
-        """Return the number of open connections for session `sessId`."""
-        if sessId not in self._sessions:
-            return 0
-        return len(self._sessions[sessId])
-
-    def onConnect(self, connId):
-        """Add id of new connection to the set of open connections."""
-        if self.getNumConnections(self._sessId) == 0:
-            self._sessId += 1
-            self.onSessionStarts(connId)
-        if self._sessId in self._sessions:
-            self._sessions[self._sessId].add(connId)
-        else:
-            self._sessions[self._sessId] = Set([connId])
-
-    def onDisconnect(self, connId):
-        """Remove id of connection to the set of open connections."""
-        if self._sessId in self._sessions and connId in self._sessions[self._sessId]:
-            self._sessions[self._sessId].remove(connId)
-        if self.getNumConnections(self._sessId) == 0:
-            self.onSessionEnds(connId)
-            if self._sessId in self._sessions:
-                del self._sessions[self._sessId]
-
-    def onSessionStarts(self, sessId):
-        """Sets wfpad's `_visiting` flag to `True`."""
-        log.debug("[wfpad - shim obs] Session %s begins." % self._sessId)
-        self._visiting = True
-        self._wfpad._numMessages = {'rcv': 0, 'snd': 0}
-        self._wfpad.onSessionStarts(self._sessId)
-
-    def onSessionEnds(self, sessId):
-        """Sets wfpad's `_visiting` flag to `False`."""
-        log.debug("[wfpad - shim obs] Session %s ends." % self._sessId)
-        self._visiting = False
-        self._wfpad.onSessionEnds(self._sessId)
-
-    def getSessId(self):
-        """Return a hash of the current session id.
-
-        We concatenate with a timestamp to get a unique session Id.
-        In the final countermeasure we can hash the URL to set particular
-        padding strategies for individual pages.
-        """
-        return ut.hash_text(str(self._sessId) + str(ut.timestamp()))
 
 
 class WFPadTransport(BaseTransport):
@@ -165,7 +100,7 @@ class WFPadTransport(BaseTransport):
     that can also be used to generate new ones.
     """
 
-    def __init__(self, period=None, length=None, stopCond=None):
+    def __init__(self):
         """Initialize a WFPadTransport object."""
         log.debug("[wfad] Initializing %s (id=%s)."
                   % (const.TRANSPORT_NAME, str(id(self))))
@@ -181,10 +116,6 @@ class WFPadTransport(BaseTransport):
         self._msgFactory = message.WFPadMessageFactory()
         self._msgExtractor = message.WFPadMessageExtractor()
 
-        # Default message iat and length
-        self._period = period if period else 10
-        self._length = length if length else const.MPU
-
         # Variables to keep track of past messages
         self._lastSndTimestamp = 0
         self._consecPaddingMsgs = 0
@@ -193,7 +124,7 @@ class WFPadTransport(BaseTransport):
         self._totalBytes = {'rcv': 0, 'snd': 0}
         self._numMessages = {'rcv': 0, 'snd': 0}
 
-        # Initialize length distribution (don't pad by default)
+        # Initialize length distribution
         self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
 
         # Initialize delay distributions (for data and gap/burst padding)
@@ -218,15 +149,15 @@ class WFPadTransport(BaseTransport):
                                   'snd': lambda d: None}
 
         # This method is evaluated to decide when to stop padding
-        self.stopCondition = stopCond if stopCond else lambda Self: False
+        self.stopCondition = lambda Self: False
 
         # Get the global shim object
         if self.weAreClient:
             if not socks_shim.get():
                 socks_shim.new(*self.shim_ports)
-            shim = socks_shim.get()
-            self._sessionObserver = WFPadShimObserver(self)
-            shim.registerObserver(self._sessionObserver)
+            _shim = socks_shim.get()
+            self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
+            _shim.registerObserver(self._sessionObserver)
         else:
             self._sessId = 0
             self._visiting = False
@@ -273,9 +204,9 @@ class WFPadTransport(BaseTransport):
     def circuitDestroyed(self, reason, side):
         """Unregister the shim observer."""
         if self.weAreClient:
-            shim = socks_shim.get()
-            if shim.isRegistered(self._sessionObserver):
-                shim.deregisterObserver(self._sessionObserver)
+            _shim = socks_shim.get()
+            if _shim.isRegistered(self._sessionObserver):
+                _shim.deregisterObserver(self._sessionObserver)
 
     def circuitConnected(self):
         """Initiate handshake.
@@ -500,7 +431,7 @@ class WFPadTransport(BaseTransport):
             else:
                 self.deferBurstPadding('rcv')
                 self._numMessages['rcv'] += 1
-                self._totalBytes['snd'] += msg.totalLen
+                self._totalBytes['rcv'] += msg.totalLen
                 # Forward data to the application.
                 if not msg.flags & const.FLAG_PADDING:
                     log.debug("[wfad] Data flag detected, relaying upstream")
@@ -623,7 +554,7 @@ class WFPadTransport(BaseTransport):
         elif opcode == const.OP_TOTAL_PAD:
             self.relayTotalPad(*args)
         elif opcode == const.OP_PAYLOAD_PAD:
-            self.relayPayloadPad()
+            self.relayPayloadPad(*args)
 
         # Tamaraw primitives
         elif opcode == const.OP_BATCH_PAD:
@@ -758,7 +689,6 @@ class WFPadTransport(BaseTransport):
         msg_level : bool
             Sets whether the data to pad is at message level or at byte level.
         """
-        self._period = t
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
         to_pad = self._numMessages['snd'] \
@@ -792,7 +722,6 @@ class WFPadTransport(BaseTransport):
         msg_level : bool
             Sets whether the data to pad is at message level or at byte level.
         """
-        self._period = t
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
         to_pad = self._numMessages['snd'] \
@@ -829,7 +758,6 @@ class WFPadTransport(BaseTransport):
         msg_level : bool
             Sets whether the data to pad is at message level or at byte level.
         """
-        self._period = t
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
         to_pad = self._numMessages['snd'] \

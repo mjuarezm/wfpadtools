@@ -26,6 +26,7 @@ import obfsproxy.common.log as logging
 
 log = logging.get_obfslogger()
 
+
 class _ShimClientProtocol(Protocol):
     _id = None
     _shim = None
@@ -50,6 +51,7 @@ class _ShimClientProtocol(Protocol):
         if data:
             self.transport.write(data)
 
+
 class _ShimClientFactory(Factory):
     _shim = None
     _server = None
@@ -60,6 +62,7 @@ class _ShimClientFactory(Factory):
 
     def buildProtocol(self, addr):
         return _ShimClientProtocol(self, self._shim, self._server)
+
 
 class _ShimServerProtocol(Protocol):
     _shim = None
@@ -91,6 +94,7 @@ class _ShimServerProtocol(Protocol):
         if data:
             self.transport.write(data)
 
+
 class _ShimServerFactory(Factory):
     _shim = None
     _socks_port = None
@@ -101,6 +105,7 @@ class _ShimServerFactory(Factory):
 
     def buildProtocol(self, addr):
         return _ShimServerProtocol(self, self._shim, self._socks_port)
+
 
 class _ShimTestServerProtocol(Protocol):
     _shim = None
@@ -114,6 +119,7 @@ class _ShimTestServerProtocol(Protocol):
     def connectionLost(self, reason):
         self._shim.notifyDisconnect(self._id)
 
+
 class _ShimTestFactory(Factory):
     _shim = None
 
@@ -122,6 +128,7 @@ class _ShimTestFactory(Factory):
 
     def buildProtocol(self, addr):
         return _ShimTestServerProtocol(self, self._shim)
+
 
 class SocksShim(object):
     _observers = None
@@ -159,11 +166,13 @@ class SocksShim(object):
 
 _instance = None
 
+
 def new(shim_port=9250, socks_port=9150):
     global _instance
     if _instance:
         raise RuntimeError('SOCKS shim already running')
     _instance = SocksShim(shim_port, socks_port)
+
 
 def get():
     global _instance
