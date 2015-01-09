@@ -7,8 +7,9 @@ from random import choice
 import shutil
 import signal
 from time import sleep
+from time import time
 
-from obfsproxy.transports.wfpadtools import const
+import cPickle as pick
 import requesocks as requests
 
 
@@ -65,19 +66,21 @@ def raise_signal(signum, frame):
     raise TimeExceededError("Timed Out!")
 
 
-def set_timeout(duration):
+def set_timeout(duration, callback=None):
     """Timeout after given duration."""
     # SIGALRM is only usable on a unix platform!
     signal.signal(signal.SIGALRM, raise_signal)
     signal.alarm(duration)  # alarm after X seconds
+    if callback:
+        callback()
 
 
 def cancel_timeout():
     signal.alarm(0)
 
 
-def log_watchdog(line, logfile, timeout, delay=1):
-    set_timeout(timeout)
+def log_watchdog(line, logfile, timeout, delay=1, callback=None):
+    set_timeout(timeout, callback)
     while not exists(logfile):
         sleep(delay)
     while line not in read_file(logfile):
@@ -120,7 +123,6 @@ def hash_text(text, algo='sha1'):
 
 
 def timestamp():
-    from time import time
     return time()
 
 
@@ -161,3 +163,25 @@ def get_page(url, port, timeout):
     session.proxies = {'http': 'socks5://127.0.0.1:{}'.format(port),
                        'https': 'socks5://127.0.0.1:{}'.format(port)}
     return session.get(url, timeout=timeout)
+
+
+def pick_dump(obj, path):
+    """Shorter method to dump objects."""
+    with open(path, "w+") as f:
+        pick.dump(obj, f)
+
+
+def pick_load(path):
+    """Shorter method to load objects."""
+    with open(path, "r+") as f:
+        return pick.load(f)
+
+
+def update_dump(obj, fstate):
+    """Updates dump file with new data."""
+    if isfile(fstate):
+        dump_dict = pick_load(fstate)
+    else:
+        dump_dict = {}
+    dump_dict[timestamp()] = obj
+    pick_dump(dump_dict, fstate)

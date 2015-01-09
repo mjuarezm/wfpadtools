@@ -2,6 +2,7 @@ from obfsproxy.test import tester
 from os.path import join, basename, exists
 from subprocess import Popen
 from time import sleep
+import psutil
 import unittest
 
 import obfsproxy.common.log as logging
@@ -10,19 +11,19 @@ from obfsproxy.transports.wfpadtools import const
 from obfsproxy.test.transports.wfpadtools.sttest import STTest
 
 
-# Test config
-DEBUG_FNAME = "debug.log"
-ORPORT = "65535"
-DATA_DIRS = {
-             "proxy": join(const.TEMP_DIR, "proxy"),
-             "router": join(const.TEMP_DIR, "router")
-             }
-FINISHED_BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done."
+# TEST CONFIGURATION
+DEBUG_FNAME      = "debug.log"
+ORPORT           = "65535"
+DATA_DIRS        = {
+                    "proxy": join(const.TEMP_DIR, "proxy"),
+                    "router": join(const.TEMP_DIR, "router")
+                   }
+BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done"
 WATCHDOG_TIMEOUT = 180
 GET_PAGE_TIMEOUT = 10
 
-# DEBUG = True
-DEBUG = False
+DEBUG = True
+# DEBUG = False
 
 # Switch to leave Tor running and speed-up tests
 LEAVE_TOR_RUNNING = False
@@ -94,7 +95,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
             log.exception("Exception raised tearing down class {}: {}"
                           .format(cls.__name__, exc))
 
-    def tor_log_watchdog(self, logfile, line=FINISHED_BOOTSRAP_LOGLINE):
+    def tor_log_watchdog(self, logfile, line=BOOTSRAP_LOGLINE):
         ut.log_watchdog(line, logfile, WATCHDOG_TIMEOUT, delay=3)
 
     def terminate_process_and_log(self, pid, msg=None):
@@ -125,6 +126,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
         try:
             self.tor_log_watchdog(logfile)
         except ut.TimeExceededError:
+            log.error("Attempt to run tor process has timedout!")
             self.tearDown()
             return
         ut.write_to_file(join(datadir, "pid"), str(process.pid))
@@ -144,7 +146,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
     def start_tor_proxy(self, socksport, client_port, server_port, datadir):
         return self.start_tor(datadir,
             ["--UseBridges", "1",
-             "--Bridge", "{} localhost:{}".format(self.transport, server_port),
+             "--Bridge", "{} 127.0.0.1:{}".format(self.transport, server_port),
              "--ClientTransportPlugin", "{} socks5 localhost:{}"
                     .format(self.transport, client_port),
              "--SOCKSPort", socksport])
@@ -192,6 +194,24 @@ class BuFLOTorTest(UnmanagedTorTest, WFPadToolsTransportTests, STTest):
     entry_port = tester.SHIM_PORT
 
 
+def clean_test_setting():
+    """Clean folders and processes."""
+    processes = ["tor", "obfsproxy"]
+    log.info("Cleaning test setting...")
+    for proc in psutil.process_iter():
+        if proc.name() in processes:
+            proc.kill()
+            log.info(proc.name() + " killed!")
+    for dirpath in DATA_DIRS.itervalues():
+        log.debug("Will remove old log directory: " + dirpath)
+        ut.removedir(dirpath)
+    obfs_log_prefix = "obfsproxy_tester_"
+    for end in ["client", "server"]:
+        dirpath = join(const.TEMP_DIR, obfs_log_prefix + end + ".log")
+        log.debug("Will remove old obfsproxy log file: " + dirpath)
+        ut.removefile(dirpath)
+
+clean_test_setting()
+
 if __name__ == "__main__":
-    # import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

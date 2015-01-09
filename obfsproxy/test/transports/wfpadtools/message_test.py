@@ -3,6 +3,7 @@ import unittest
 import obfsproxy.transports.wfpadtools.message as msg
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.scramblesuit import probdist
+import json
 
 
 class WFPadMessageFactoryTest(unittest.TestCase):
@@ -23,8 +24,8 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         ctrlMsgsArgs = self.msgFactory.encapsulate(opcode=const.OP_APP_HINT,
                                                    args=testArgs)
         self.assertEqual(len(ctrlMsgsArgs), 1,
-                     "More than one message for control without args "
-                     "was created.")
+                         "More than one message for control without args "
+                         "was created.")
         ctrlMsgArgs = ctrlMsgsArgs[0]
         obsArgs = ctrlMsgArgs.args
         self.assertEqual(obsArgs, expArgs,
@@ -38,17 +39,17 @@ class WFPadMessageFactoryTest(unittest.TestCase):
         ctrlMsgsArgs = self.msgFactory.encapsulate(opcode=const.OP_APP_HINT,
                                                    args=testArgs)
         self.assertTrue(len(ctrlMsgsArgs) > 1,
-                     "No more than one message for control without args "
-                     "was created.")
+                        "No more than one message for control without args "
+                        "was created.")
 
     def test_uniform_length(self):
         # Test payload is padded to specified length
         testData = "foo padded to MPU"
         dataMsgs = self.msgFactory.encapsulate(data=testData,
-                                       lenProbdist=probdist.uniform(const.MPU))
+                                               lenProbdist=probdist.uniform(const.MPU))
         self.assertEqual(len(dataMsgs), 1,
-                     "More than one message for control without args "
-                     "was created.")
+                         "More than one message for control without args "
+                         "was created.")
         dataMsg = dataMsgs[0]
         obsLength = len(dataMsg)
         expLength = const.MTU
@@ -56,6 +57,18 @@ class WFPadMessageFactoryTest(unittest.TestCase):
                          "Observed length (%s) and "
                          "expected length (%s) do not match"
                          % (obsLength, expLength))
+
+    def test_equality(self):
+        testArgs = [1, 2]
+        ctrlMsgsArgs1 = self.msgFactory.encapsulate(opcode=const.OP_APP_HINT,
+                                                    args=testArgs)
+        ctrlMsgsArgs2 = self.msgFactory.encapsulate(opcode=const.OP_APP_HINT,
+                                                    args=testArgs)
+        ctrlMsgsArgs3 = self.msgFactory.encapsulate(opcode=const.OP_APP_HINT)
+        self.assertTrue(ctrlMsgsArgs1 == ctrlMsgsArgs2,
+                        "Equal messages are seen as different.")  # TODO: this message sucks...
+        self.assertTrue(ctrlMsgsArgs1 != ctrlMsgsArgs3,
+                        "Different messages are seen as equal.")
 
 
 class WFPadMessageExtractorTest(unittest.TestCase):
@@ -100,7 +113,33 @@ class WFPadMessageExtractorTest(unittest.TestCase):
                          "Observed data: %s does not match with"
                          " expected data %s." % (obsData, piggybackedData))
 
+    def test_msg_from_string(self):
+        msgs = 5 * [None]
+        msgs[0] = self.msgFactory.new(payload="This is a custom "
+                                      " message for you to parse.")
+        msgs[1] = self.msgFactory.new(payload="This is a custom "
+                                      " message for you to parse.",
+                                      paddingLen=2)
+        msgs[2] = self.msgFactory.new(payload="This is a custom "
+                                      " message for you to parse.",
+                                      flags=const.FLAG_CONTROL,
+                                      opcode=const.OP_APP_HINT)
+        msgs[3] = self.msgFactory.new(payload="This is a custom "
+                                      " message for you to parse.",
+                                      flags=const.FLAG_CONTROL,
+                                      opcode=const.OP_APP_HINT,
+                                      args=json.dumps([1, 2, 3, 4]))
+        msgs[4] = self.msgFactory.new(payload="This is a custom "
+                                      " message for you to parse.",
+                                      paddingLen=1000,
+                                      flags=const.FLAG_CONTROL,
+                                      opcode=const.OP_APP_HINT,
+                                      args=json.dumps([range(500),
+                                                       range(500)]))
+        for i, msg in enumerate(msgs):
+            self.assertTrue(msg == self.msgExtractor.msg_from_string(str(msg)),
+                            "Messages do not match for message number %d!" % i)
+
 
 if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

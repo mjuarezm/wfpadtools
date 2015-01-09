@@ -30,6 +30,9 @@ class RunEnvTest(STTest):
     def test_requesocks(self):
         self.assert_package_is_installed('requesocks')
 
+    def test_psutil(self):
+        self.assert_package_is_installed('psutil')
+
     def test_bin_obfsproxy(self):
         """Checks obfsproxy executable/link is found in bin.
 

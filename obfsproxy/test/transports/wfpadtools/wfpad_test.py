@@ -1,8 +1,6 @@
 import json
 import multiprocessing
-from os import listdir
-from os.path import join, isfile, exists
-import pickle
+from os.path import join, exists
 from sets import Set
 import socket
 from time import sleep
@@ -30,6 +28,10 @@ log.set_log_severity('error')
 
 if DEBUG:
     log.set_log_severity('debug')
+
+
+CLIENT_DUMP = join(const.TEMP_DIR, "client.dump")
+SERVER_DUMP = join(const.TEMP_DIR, "server.dump")
 
 
 class DummyReadWorker(object):
@@ -93,11 +95,6 @@ class TestSetUp(TransportsSetUp):
         self.input_chan.sendall(data)
         time.sleep(2)
 
-    def load_wrapper(self):
-        return sum([pickle.load(open(join(const.TEST_SERVER_DIR, f)))
-                    for f in listdir(const.TEST_SERVER_DIR)
-                    if isfile(join(const.TEST_SERVER_DIR, f))], [])
-
 
 class ControlMessageCommunicationTest(TestSetUp):
 
@@ -115,6 +112,9 @@ class ControlMessageCommunicationTest(TestSetUp):
         for specTest in specTests:
             getattr(self, specTest)()
 
+    def messages(self, d):
+        return [elem[1] for elem in d.itervalues()]
+
     def test_control_msg_communication(self):
         """Test control messages communication."""
         # Send instruction to test server
@@ -122,17 +122,13 @@ class ControlMessageCommunicationTest(TestSetUp):
         log.debug("Test for " + getOpcodeNames(self.opcode) +
                   " with args: %s" % self.args)
 
-        # Load wrapper
-        self.wrapper = self.load_wrapper()
-        log.debug("Messages in wrappers: %s" % self.wrapper)
-
-        # Filter client and server messages
-        self.serverDumps = [msg for msg in self.wrapper if not msg['client']]
-        self.clientDumps = [msg for msg in self.wrapper if msg['client']]
+        # Load dumps
+        self.serverDumps = ut.pick_load(SERVER_DUMP)
+        self.clientDumps = ut.pick_load(CLIENT_DUMP)
 
         # Filter messages with `opcode`
-        opcodeMsgs = [msg['opcode'] for msg in self.serverDumps
-                      if msg['opcode'] == self.opcode]
+        opcodeMsgs = [msg.opcode for msg in self.messages(self.serverDumps)
+                      if msg.opcode == self.opcode]
 
         # Test the control message was received successfully
         self.assertTrue(opcodeMsgs, "Server did not receive the control "
@@ -149,12 +145,9 @@ class PostPrimitiveTest(ControlMessageCommunicationTest):
         self.send_instruction(const.OP_APP_HINT, [self.sessId, True])
         self.do_instructions()
         self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
-        self.postWrapper = self.load_wrapper()
-        log.debug("Post wrapper: %s" % self.postWrapper)
-        self.postClientDumps = [msg for msg in self.postWrapper
-                                if msg['client']]
-        self.postServerDumps = [msg for msg in self.postWrapper
-                                if not msg['client']]
+        # Load dumps
+        self.postServerDumps = ut.pick_load(SERVER_DUMP)
+        self.postClientDumps = ut.pick_load(CLIENT_DUMP)
         specTests = [testMethod for testMethod in dir(self)
                      if testMethod.startswith('posttest')]
         for specTest in specTests:
@@ -163,13 +156,15 @@ class PostPrimitiveTest(ControlMessageCommunicationTest):
 
 class SendPaddingTest(ControlMessageCommunicationTest, STTest):
     # Config endpoints
-    transport = "wfpadtest"
-    server_args = ("wfpadtest", "server",
+    transport = "wfpad"
+    server_args = ("wfpad", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
-    client_args = ("wfpadtest", "client",
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
+                   "--test=%s" % SERVER_DUMP)
+    client_args = ("wfpad", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--test=%s" % CLIENT_DUMP)
 
     # Arguments
     opcode = const.OP_SEND_PADDING
@@ -177,8 +172,8 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
     args = [N, t]
 
     def spectest_n_padding_messages(self):
-        paddingMsgs = [msg for msg in self.clientDumps
-                       if msg['flags'] == const.FLAG_PADDING]
+        paddingMsgs = [msg for msg in self.messages(self.clientDumps)
+                       if msg.flags == const.FLAG_PADDING]
         expNumPaddingMsgs = self.N
         numPaddingMsgs = len(paddingMsgs)
         self.assertEquals(numPaddingMsgs, expNumPaddingMsgs,
@@ -200,15 +195,17 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
 class AppHintTest(ControlMessageCommunicationTest, STTest):
     """Test server sends a hint to client."""
     # Config endpoints
-    transport = "wfpadtest"
-    server_args = ("wfpadtest", "server",
+    transport = "wfpad"
+    server_args = ("wfpad", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
-    client_args = ("wfpadtest", "client",
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
+                   "--test=%s" % SERVER_DUMP)
+    client_args = ("wfpad", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--test=%s" % CLIENT_DUMP)
 
-    # Arguments    
+    # Arguments
     opcode = const.OP_APP_HINT
     sessId,  status = "id123", True
     args = [sessId, status]
@@ -236,15 +233,17 @@ class AppHintTest(ControlMessageCommunicationTest, STTest):
 
 class TotalPadTest(PostPrimitiveTest, STTest):
     # Config endpoints
-    transport = "buflotest"
-    server_args = ("buflotest", "server",
+    transport = "buflo"
+    server_args = ("buflo", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
-    client_args = ("buflotest", "client",
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
+                   "--test=%s" % SERVER_DUMP)
+    client_args = ("buflo", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--test=%s" % CLIENT_DUMP)
 
-    # Arguments    
+    # Arguments
     opcode = const.OP_TOTAL_PAD
     sessId, delay = "id123", 1
     args = [sessId, delay]
@@ -275,13 +274,15 @@ class TotalPadTest(PostPrimitiveTest, STTest):
 
 class PayloadPadBytesTest(PostPrimitiveTest, STTest):
     # Config endpoints
-    transport = "buflotest"
-    server_args = ("buflotest", "server",
+    transport = "buflo"
+    server_args = ("buflo", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
-    client_args = ("buflotest", "client",
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
+                   "--test=%s" % SERVER_DUMP)
+    client_args = ("buflo", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--test=%s" % CLIENT_DUMP)
 
     # Arguments
     opcode = const.OP_PAYLOAD_PAD
@@ -308,15 +309,17 @@ class PayloadPadBytesTest(PostPrimitiveTest, STTest):
 
 class BatchPadTest(PostPrimitiveTest, STTest):
     # Config endpoints
-    transport = "buflotest"
-    server_args = ("buflotest", "server",
+    transport = "buflo"
+    server_args = ("buflo", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
-    client_args = ("buflotest", "client",
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
+                   "--test=%s" % SERVER_DUMP)
+    client_args = ("buflo", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--test=%s" % CLIENT_DUMP)
 
-    # Arguments    
+    # Arguments
     opcode = const.OP_BATCH_PAD
     sessId, L, delay = "id123", 5, 1
     args = [sessId, L, delay]
@@ -348,15 +351,17 @@ class BatchPadTest(PostPrimitiveTest, STTest):
 
 class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
     # Config endpoints
-    transport = "wfpadtest"
-    server_args = ("wfpadtest", "server",
+    transport = "wfpad"
+    server_args = ("wfpad", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT)
-    client_args = ("wfpadtest", "client",
+                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
+                   "--test=%s" % SERVER_DUMP)
+    client_args = ("wfpad", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT)
+                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
+                   "--test=%s" % CLIENT_DUMP)
 
-    # Arguments    
+    # Arguments
     sessId = 111
     opcode = const.OP_BURST_HISTO
     delay = 2

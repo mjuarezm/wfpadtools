@@ -85,6 +85,7 @@ from twisted.internet.defer import CancelledError
 
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.histo as hist
+import obfsproxy.transports.wfpadtools.util as ut
 import obfsproxy.transports.wfpadtools.const as const
 import math
 
@@ -99,6 +100,9 @@ class WFPadTransport(BaseTransport):
     different existing website fingerprinting countermeasures, and
     that can also be used to generate new ones.
     """
+
+    enable_test = False
+    dump_path = "/dev/null"
 
     def __init__(self):
         """Initialize a WFPadTransport object."""
@@ -169,6 +173,11 @@ class WFPadTransport(BaseTransport):
                                action='store',
                                dest='shim',
                                help='wfpad SOCKS shim (shim_port,socks_port)')
+        subparser.add_argument("--test",
+                               required=False,
+                               type=str,
+                               help="switch to enable test dumps.",
+                               dest="test")
         super(WFPadTransport, cls).register_external_mode_cli(subparser)
 
     @classmethod
@@ -187,6 +196,9 @@ class WFPadTransport(BaseTransport):
         cls.shim_ports = (const.SHIM_PORT, const.SOCKS_PORT)
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
+        if args.test:
+            cls.enable_test = True
+            cls.dump_path = args.test
 
     @classmethod
     def setup(cls, transportConfig):
@@ -245,6 +257,7 @@ class WFPadTransport(BaseTransport):
             log.debug("[wfad] Buffered %d bytes of outgoing data." %
                       len(self._buffer))
 
+    @ut.instrument_class_method
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
         d = data.read()
@@ -253,8 +266,9 @@ class WFPadTransport(BaseTransport):
                 self._deferBurst['rcv'].cancel()
             if self._deferGap['rcv'] and not self._deferGap['rcv'].called:
                 self._deferGap['rcv'].cancel()
-            self.processMessages(d)
+            return self.processMessages(d)
 
+    @ut.instrument_class_method
     def sendDownstream(self, data):
         """Sends `data` downstream over the wire."""
         if isinstance(data, str):
@@ -264,9 +278,14 @@ class WFPadTransport(BaseTransport):
             self._numMessages['snd'] += 1
             self._dataBytes['snd'] += len(data.payload)
             self._totalBytes['snd'] += data.totalLen
+            return [None]
         elif isinstance(data, list):
+            listMsgs = []
             for listElement in data:
-                self.sendDownstream(listElement)
+                msg = self.sendDownstream(listElement)
+                if msg:
+                    listMsgs += msg
+            return listMsgs
         else:
             raise RuntimeError("Attempted to send non-string data.")
 
@@ -335,8 +354,7 @@ class WFPadTransport(BaseTransport):
 
         if delay == 0:
             # Send data message over the wire
-            self.sendDownstream(self._msgFactory.encapsulate(data,
-                                 lenProbdist=self._lengthDataProbdist))
+            self.sendDownstream(self._msgFactory.encapsulate(data, lenProbdist=self._lengthDataProbdist))
             log.debug("[wfpad] Data message has been sent without delay.")
 
         else:
@@ -412,7 +430,7 @@ class WFPadTransport(BaseTransport):
 
         # Make sure there actually is data to be parsed
         if (data is None) or (len(data) == 0):
-            return
+            return None
 
         # Try to extract protocol messages
         msgs = []
@@ -427,7 +445,6 @@ class WFPadTransport(BaseTransport):
                 # Process control messages
                 self.circuit.upstream.write(msg.payload)
                 self.receiveControlMessage(msg.opcode, msg.args)
-
             else:
                 self.deferBurstPadding('rcv')
                 self._numMessages['rcv'] += 1
