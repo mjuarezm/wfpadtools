@@ -2,7 +2,7 @@ import commands
 import hashlib
 import math
 from os import makedirs, remove, kill
-from os.path import exists, isdir, isfile
+from os.path import exists, isdir, isfile, join
 from random import choice
 import shutil
 import signal
@@ -11,6 +11,7 @@ from time import time
 
 import cPickle as pick
 import requesocks as requests
+from obfsproxy.transports.wfpadtools import const
 
 
 LOWERCASE_CHARS = 'abcdefghijklmnopqrstuvwxyz'
@@ -165,23 +166,32 @@ def get_page(url, port, timeout):
     return session.get(url, timeout=timeout)
 
 
+def check_picleable(obj):
+    """Checks if object is can be cpickled."""
+    temp_file = join(const.TEMP_DIR, str(timestamp()) + "tmp")
+    try:
+        pick_dump(obj, temp_file)
+    except:
+        return False
+    return True
+
+
 def pick_dump(obj, path):
     """Shorter method to dump objects."""
-    with open(path, "w+") as f:
+    with open(path, "wb") as f:
         pick.dump(obj, f)
 
 
 def pick_load(path):
     """Shorter method to load objects."""
-    with open(path, "r+") as f:
+    with open(path, "rb") as f:
         return pick.load(f)
 
 
 def update_dump(obj, fstate):
     """Updates dump file with new data."""
+    dump_dict = {}
     if isfile(fstate):
         dump_dict = pick_load(fstate)
-    else:
-        dump_dict = {}
     dump_dict[timestamp()] = obj
     pick_dump(dump_dict, fstate)

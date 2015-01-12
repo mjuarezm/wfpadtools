@@ -25,7 +25,7 @@ def instrument_class_method(func):
         if enabled and data:
             dump_path = get_attr("dump_path", cls) if find_attr("dump_path", cls) \
                 else join(const.TEMP_DIR, "dump_file")
-            ut.update_dump((self.__dict__, data), dump_path)
+            ut.update_dump((only_pickleable(self), data), dump_path)
         return data
     return call_and_dump
 
@@ -84,6 +84,13 @@ def get_attr(attr, cls):
     return cls.__dict__[attr] if cls else None
 
 
-def get_attributes(C):
+def only_pickleable(C):
+    # TODO: refactor
     attributes = inspect.getmembers(C, lambda c: not(inspect.isroutine(c)))
-    return {k: v for k, v in attributes if '__' not in k}
+    return {k: v for k, v in attributes if not k.startswith("__") and ut.check_picleable(v)}
+
+
+# def only_pickleable(C):
+#     # TODO: yield
+#     attributes = get_attributes(C)
+#     return {k: v for k, v in attributes if ut.check_picleable(v)}

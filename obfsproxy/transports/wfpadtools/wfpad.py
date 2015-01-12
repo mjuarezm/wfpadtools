@@ -85,7 +85,7 @@ from twisted.internet.defer import CancelledError
 
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.histo as hist
-import obfsproxy.transports.wfpadtools.util as ut
+import obfsproxy.transports.wfpadtools.test_util as test_ut
 import obfsproxy.transports.wfpadtools.const as const
 import math
 
@@ -257,7 +257,7 @@ class WFPadTransport(BaseTransport):
             log.debug("[wfad] Buffered %d bytes of outgoing data." %
                       len(self._buffer))
 
-    @ut.instrument_class_method
+    @test_ut.instrument_class_method
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
         d = data.read()
@@ -268,7 +268,7 @@ class WFPadTransport(BaseTransport):
                 self._deferGap['rcv'].cancel()
             return self.processMessages(d)
 
-    @ut.instrument_class_method
+    @test_ut.instrument_class_method
     def sendDownstream(self, data):
         """Sends `data` downstream over the wire."""
         if isinstance(data, str):
@@ -278,7 +278,7 @@ class WFPadTransport(BaseTransport):
             self._numMessages['snd'] += 1
             self._dataBytes['snd'] += len(data.payload)
             self._totalBytes['snd'] += data.totalLen
-            return [None]
+            return [data]
         elif isinstance(data, list):
             listMsgs = []
             for listElement in data:
