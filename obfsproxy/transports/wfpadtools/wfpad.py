@@ -243,6 +243,7 @@ class WFPadTransport(BaseTransport):
             # distributions to be used at the server.
             pass
 
+    @test_ut.instrument_rcv_upstream
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream.
 
@@ -250,6 +251,7 @@ class WFPadTransport(BaseTransport):
         connected, or buffer it meanwhile otherwise.
         """
         d = data.read()
+        print "XXX", d
         if self._state >= const.ST_CONNECTED:
             self.pushData(d)
         else:
@@ -268,7 +270,6 @@ class WFPadTransport(BaseTransport):
                 self._deferGap['rcv'].cancel()
             return self.processMessages(d)
 
-    @test_ut.instrument_class_method
     def sendDownstream(self, data):
         """Sends `data` downstream over the wire."""
         if isinstance(data, str):

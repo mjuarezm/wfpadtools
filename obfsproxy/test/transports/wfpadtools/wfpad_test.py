@@ -29,9 +29,8 @@ log.set_log_severity('error')
 if DEBUG:
     log.set_log_severity('debug')
 
-
-CLIENT_DUMP = join(const.TEMP_DIR, "client.dump")
-SERVER_DUMP = join(const.TEMP_DIR, "server.dump")
+DUMPS = {"client": join(const.TEST_SERVER_DIR, "client.dump"),
+         "server": join(const.TEST_SERVER_DIR, "server.dump")}
 
 
 class DummyReadWorker(object):
@@ -113,7 +112,10 @@ class ControlMessageCommunicationTest(TestSetUp):
             getattr(self, specTest)()
 
     def messages(self, d):
-        return [elem[1] for elem in d.itervalues()]
+        return sum([elem[1] for elem in d.itervalues()], [])
+
+    def states(self, d):
+        return [elem[0] for elem in d.itervalues()]
 
     def test_control_msg_communication(self):
         """Test control messages communication."""
@@ -123,8 +125,8 @@ class ControlMessageCommunicationTest(TestSetUp):
                   " with args: %s" % self.args)
 
         # Load dumps
-        self.serverDumps = ut.pick_load(SERVER_DUMP)
-        self.clientDumps = ut.pick_load(CLIENT_DUMP)
+        self.serverDumps = self.load_wrapper("server")
+        self.clientDumps = self.load_wrapper("client")
 
         # Filter messages with `opcode`
         opcodeMsgs = [msg.opcode for msg in self.messages(self.serverDumps)
@@ -137,6 +139,13 @@ class ControlMessageCommunicationTest(TestSetUp):
         # Run specific tests
         self.specific_tests()
 
+    def load_wrapper(self, end):
+        try:
+            return ut.pick_load(DUMPS[end])
+        except:
+            # TODO: find the right exception
+            return {}
+
 
 class PostPrimitiveTest(ControlMessageCommunicationTest):
 
@@ -146,8 +155,8 @@ class PostPrimitiveTest(ControlMessageCommunicationTest):
         self.do_instructions()
         self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
         # Load dumps
-        self.postServerDumps = ut.pick_load(SERVER_DUMP)
-        self.postClientDumps = ut.pick_load(CLIENT_DUMP)
+        self.postServerDumps = ut.pick_load("server")
+        self.postClientDumps = ut.pick_load("client")
         specTests = [testMethod for testMethod in dir(self)
                      if testMethod.startswith('posttest')]
         for specTest in specTests:
@@ -160,11 +169,11 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
     server_args = ("wfpad", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
                    "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
-                   "--test=%s" % SERVER_DUMP)
+                   "--test=%s" % DUMPS["server"])
     client_args = ("wfpad", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--test=%s" % CLIENT_DUMP)
+                   "--test=%s" % DUMPS["client"])
 
     # Arguments
     opcode = const.OP_SEND_PADDING
@@ -199,11 +208,11 @@ class AppHintTest(ControlMessageCommunicationTest, STTest):
     server_args = ("wfpad", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
                    "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
-                   "--test=%s" % SERVER_DUMP)
+                   "--test=%s" % DUMPS["server"])
     client_args = ("wfpad", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--test=%s" % CLIENT_DUMP)
+                   "--test=%s" % DUMPS["client"])
 
     # Arguments
     opcode = const.OP_APP_HINT
@@ -212,23 +221,23 @@ class AppHintTest(ControlMessageCommunicationTest, STTest):
     tag = True
 
     def spectest_num_msgs(self):
-        self.assertEquals(len(self.serverDumps), 1,
+        self.assertEquals(len(self.messages(self.serverDumps)), 1,
                           "Number of tagged messages (%s) is not correct."
                           % (len(self.serverDumps)))
 
     def spectest_sessid(self):
-        firstServerDumpMsg = self.serverDumps[0]
-        self.assertEquals(firstServerDumpMsg['sessid'], self.sessId,
+        firstServerDumpMsg = self.states(self.serverDumps)[0]
+        self.assertEquals(firstServerDumpMsg['_sessId'], self.sessId,
                           "The server's session Id (%s) does not match "
                           "the session Id indicated in the hint (%s)."
-                          % (firstServerDumpMsg['sessid'], self.sessId))
+                          % (firstServerDumpMsg['_sessId'], self.sessId))
 
     def spectest_state(self):
-        firstServerDumpMsg = self.serverDumps[0]
-        self.assertEquals(firstServerDumpMsg['visiting'], self.status,
+        firstServerDumpMsg = self.states(self.serverDumps)[0]
+        self.assertEquals(firstServerDumpMsg['_visiting'], self.status,
                           "The server's state (%s) does not match "
                           "the status indicated in the hint (%s)."
-                          % (firstServerDumpMsg['visiting'], self.status))
+                          % (firstServerDumpMsg['_visiting'], self.status))
 
 
 class TotalPadTest(PostPrimitiveTest, STTest):
@@ -237,11 +246,11 @@ class TotalPadTest(PostPrimitiveTest, STTest):
     server_args = ("buflo", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
                    "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
-                   "--test=%s" % SERVER_DUMP)
+                   "--test=%s" % DUMPS["server"])
     client_args = ("buflo", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--test=%s" % CLIENT_DUMP)
+                   "--test=%s" % DUMPS["client"])
 
     # Arguments
     opcode = const.OP_TOTAL_PAD
@@ -278,11 +287,11 @@ class PayloadPadBytesTest(PostPrimitiveTest, STTest):
     server_args = ("buflo", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
                    "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
-                   "--test=%s" % SERVER_DUMP)
+                   "--test=%s" % DUMPS["server"])
     client_args = ("buflo", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--test=%s" % CLIENT_DUMP)
+                   "--test=%s" % DUMPS["client"])
 
     # Arguments
     opcode = const.OP_PAYLOAD_PAD
@@ -313,11 +322,11 @@ class BatchPadTest(PostPrimitiveTest, STTest):
     server_args = ("buflo", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
                    "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
-                   "--test=%s" % SERVER_DUMP)
+                   "--test=%s" % DUMPS["server"])
     client_args = ("buflo", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--test=%s" % CLIENT_DUMP)
+                   "--test=%s" % DUMPS["client"])
 
     # Arguments
     opcode = const.OP_BATCH_PAD
@@ -355,11 +364,11 @@ class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
     server_args = ("wfpad", "server",
                    "127.0.0.1:%d" % tester.SERVER_PORT,
                    "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
-                   "--test=%s" % SERVER_DUMP)
+                   "--test=%s" % DUMPS["server"])
     client_args = ("wfpad", "client",
                    "127.0.0.1:%d" % tester.ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--test=%s" % CLIENT_DUMP)
+                   "--test=%s" % DUMPS["client"])
 
     # Arguments
     sessId = 111

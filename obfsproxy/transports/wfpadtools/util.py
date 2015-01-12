@@ -10,8 +10,8 @@ from time import sleep
 from time import time
 
 import cPickle as pick
-import requesocks as requests
 from obfsproxy.transports.wfpadtools import const
+import requesocks as requests
 
 
 LOWERCASE_CHARS = 'abcdefghijklmnopqrstuvwxyz'
@@ -168,11 +168,14 @@ def get_page(url, port, timeout):
 
 def check_picleable(obj):
     """Checks if object is can be cpickled."""
+    # TODO: write a test
     temp_file = join(const.TEMP_DIR, str(timestamp()) + "tmp")
     try:
         pick_dump(obj, temp_file)
     except:
         return False
+    finally:
+        removefile(temp_file)
     return True
 
 

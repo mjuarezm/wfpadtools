@@ -10,7 +10,7 @@ class TestUtilTest(STTest):
 
     def test_instrument_class_method(self):
         enable_test_value = False
-        dump_path_value = "/tmp/test.dump" 
+        dump_path_value = "/tmp/test.dump"
         return_value = [1, 2, 3]
 
         class A(object):

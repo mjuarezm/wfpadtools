@@ -48,7 +48,7 @@ class CSBuFLOTransport(WFPadTransport):
                                     " greater than the payload size.\n"
                                     "- total: pads to closest power of two.\n"
                                     "(Default: total).",
-                               dest="psize")
+                               dest="padding")
 
         super(CSBuFLOTransport, cls).register_external_mode_cli(subparser)
 

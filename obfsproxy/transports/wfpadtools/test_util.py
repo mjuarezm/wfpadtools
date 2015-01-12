@@ -42,6 +42,7 @@ def instrument_rcv_upstream(func):
         - dump_path: str, will dump to the file specified by its value.
     """
     def parseControl(self, data):
+        data = data.read()
         if ":" in data:
             op, payload = data.split(":")
             if op == "TEST":
@@ -60,8 +61,8 @@ def instrument_rcv_upstream(func):
     def check_test_message(self, data):
         cls = self.__class__
         enabled = get_attr("enable_test", cls)
-        if enabled and data:
-            control = parseControl(data,
+        if enabled and data and self.weAreClient:
+            control = parseControl(self,
                                    copy.deepcopy(data))
             if control:
                 return
@@ -87,7 +88,8 @@ def get_attr(attr, cls):
 def only_pickleable(C):
     # TODO: refactor
     attributes = inspect.getmembers(C, lambda c: not(inspect.isroutine(c)))
-    return {k: v for k, v in attributes if not k.startswith("__") and ut.check_picleable(v)}
+    return {k: v for k, v in attributes if not k.startswith("__")
+            and ut.check_picleable(v)}
 
 
 # def only_pickleable(C):

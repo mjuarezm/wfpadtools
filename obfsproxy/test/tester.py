@@ -341,14 +341,17 @@ class DirectWFPad(DirectShimTest, unittest.TestCase):
             "127.0.0.1:%d" % ENTRY_PORT,
             "--dest=127.0.0.1:%d" % SERVER_PORT)
 
-class DirectDummyTestServer(DirectTest, unittest.TestCase):
-    transport = "dummytest"
-    server_args = ("dummytest", "server",
+class DirectWFPadTest(DirectTest, unittest.TestCase):
+    transport = "wfpad"
+    server_args = ("wfpad", "server",
            "127.0.0.1:%d" % SERVER_PORT,
-           "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = ("dummytest", "client",
-           "127.0.0.1:%d" % ENTRY_PORT,
-           "--dest=127.0.0.1:%d" % SERVER_PORT)
+           "--dest=127.0.0.1:%d" % EXIT_PORT,
+           "--test=/tmp/client.dump")
+    client_args = ("wfpad", "client",
+            "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
+            "127.0.0.1:%d" % ENTRY_PORT,
+            "--dest=127.0.0.1:%d" % SERVER_PORT,
+            "--test=/tmp/client.dump")
 
 class DirectBuFLO(DirectShimTest, unittest.TestCase):
     transport = "buflo"
