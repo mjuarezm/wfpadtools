@@ -32,6 +32,8 @@ class WFPadMessage(object):
         if (self.totalLen) > const.MPU:
             raise base.PluggableTransportError("No overly long messages.")
 
+        self.sndTime = 0
+        self.rcvTime = 0
         self.flags = flags
         self.opcode = opcode
         self.argsLen = len(args)

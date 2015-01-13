@@ -32,6 +32,8 @@ if DEBUG:
 DUMPS = {"client": join(const.TEST_SERVER_DIR, "client.dump"),
          "server": join(const.TEST_SERVER_DIR, "server.dump")}
 
+TEST_MSG = "foobar"
+
 
 class DummyReadWorker(object):
 
@@ -155,8 +157,8 @@ class PostPrimitiveTest(ControlMessageCommunicationTest):
         self.do_instructions()
         self.send_instruction(const.OP_APP_HINT, [self.sessId, False])
         # Load dumps
-        self.postServerDumps = ut.pick_load("server")
-        self.postClientDumps = ut.pick_load("client")
+        self.postServerDumps = self.load_wrapper("server")
+        self.postClientDumps = self.load_wrapper("client")
         specTests = [testMethod for testMethod in dir(self)
                      if testMethod.startswith('posttest')]
         for specTest in specTests:
@@ -181,8 +183,8 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
     args = [N, t]
 
     def spectest_n_padding_messages(self):
-        paddingMsgs = [msg for msg in self.messages(self.clientDumps)
-                       if msg.flags == const.FLAG_PADDING]
+        msgs = self.messages(self.clientDumps)
+        paddingMsgs = [msg for msg in msgs if msg.flags == const.FLAG_PADDING]
         expNumPaddingMsgs = self.N
         numPaddingMsgs = len(paddingMsgs)
         self.assertEquals(numPaddingMsgs, expNumPaddingMsgs,
@@ -191,9 +193,10 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
                           % (numPaddingMsgs, expNumPaddingMsgs))
 
     def spectest_delay(self):
+        msgs = self.messages(self.clientDumps)
         expectedDelay = self.t / const.SCALE
-        for msg0, msg1 in zip(self.clientDumps[:-1], self.clientDumps[1:]):
-            obsPeriod = msg1['time'] - msg0['time']
+        for msg0, msg1 in zip(msgs[:-1], msgs[1:]):
+            obsPeriod = msg1.rcvTime - msg0.rcvTime
             self.assertAlmostEqual(obsPeriod, expectedDelay,
                                    msg="The observed delay %s does not"
                                    " match with the expected delay: %s"
@@ -226,18 +229,18 @@ class AppHintTest(ControlMessageCommunicationTest, STTest):
                           % (len(self.serverDumps)))
 
     def spectest_sessid(self):
-        firstServerDumpMsg = self.states(self.serverDumps)[0]
-        self.assertEquals(firstServerDumpMsg['_sessId'], self.sessId,
+        firstServerState = self.states(self.serverDumps)[0]
+        self.assertEquals(firstServerState['_sessId'], self.sessId,
                           "The server's session Id (%s) does not match "
                           "the session Id indicated in the hint (%s)."
-                          % (firstServerDumpMsg['_sessId'], self.sessId))
+                          % (firstServerState['_sessId'], self.sessId))
 
     def spectest_state(self):
-        firstServerDumpMsg = self.states(self.serverDumps)[0]
-        self.assertEquals(firstServerDumpMsg['_visiting'], self.status,
+        firstServerState = self.states(self.serverDumps)[0]
+        self.assertEquals(firstServerState['_visiting'], self.status,
                           "The server's state (%s) does not match "
                           "the status indicated in the hint (%s)."
-                          % (firstServerDumpMsg['_visiting'], self.status))
+                          % (firstServerState['_visiting'], self.status))
 
 
 class TotalPadTest(PostPrimitiveTest, STTest):
@@ -258,21 +261,22 @@ class TotalPadTest(PostPrimitiveTest, STTest):
     args = [sessId, delay]
 
     def do_instructions(self):
-        self.send_to_transport(TEST_FILE)
+        pass
+#         self.send_to_transport(TEST_FILE)
 
     def posttest_num_messages_is_power_of_2(self):
-        clientPaddingMsgs = [msg for msg in self.postClientDumps
-                             if msg['flags'] == const.FLAG_PADDING]
+        clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)
+                             if msg.flags & const.FLAG_PADDING]
         obsNumMessages = len(clientPaddingMsgs)
         self.assertTrue((obsNumMessages & (obsNumMessages - 1)) == 0,
                         "The observed number of padding messages (%s) "
                         "is not a power of 2." % obsNumMessages)
 
     def posttest_period(self):
-        clientPaddingMsgs = [msg for msg in self.postClientDumps
-                             if msg['flags'] == const.FLAG_PADDING]
+        clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)
+                             if msg.flags & const.FLAG_PADDING]
         for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
-            observedPeriod = msg2["time"] - msg1["time"]
+            observedPeriod = msg2.rcvTime - msg1.rcvTime
             expectedPeriod = self.delay
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
                                    msg="The observed period %s does not"
@@ -299,12 +303,13 @@ class PayloadPadBytesTest(PostPrimitiveTest, STTest):
     args = [sessId, delay, msg_level]
 
     def do_instructions(self):
-        self.send_to_transport(TEST_FILE)
+        pass
+#         self.send_to_transport(TEST_MSG)
 
     def posttest_num_data_bytes_correctly_padded(self):
-        lastMessage = self.postServerDumps[-1]
-        dataSentBytes = lastMessage['dataBytes']['rcv']
-        totalSentBytes = lastMessage['totalBytes']['rcv']
+        lastState = self.states(self.postServerDumps)[-1]
+        dataSentBytes = lastState['_dataBytes']['rcv']
+        totalSentBytes = lastState['_totalBytes']['rcv']
         expectedNumBytes = ut.bytes_after_payload_padding(dataSentBytes,
                                                           totalSentBytes)
         self.assertEqual(expectedNumBytes, dataSentBytes,
@@ -334,11 +339,12 @@ class BatchPadTest(PostPrimitiveTest, STTest):
     args = [sessId, L, delay]
 
     def do_instructions(self):
-        self.send_to_transport(TEST_FILE)
+        pass
+#         self.send_to_transport(TEST_FILE)
 
     def posttest_num_messages_is_multiple_of_L(self):
-        clientPaddingMsgs = [msg for msg in self.postClientDumps
-                             if msg['flags'] == const.FLAG_PADDING]
+        clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)
+                             if msg.flags & const.FLAG_PADDING]
         obsNumMessages = len(clientPaddingMsgs)
         self.assertTrue(obsNumMessages % self.L == 0,
                         "The observed number of padding messages (%s) "
@@ -346,10 +352,10 @@ class BatchPadTest(PostPrimitiveTest, STTest):
                         % (obsNumMessages, self.L))
 
     def posttest_period(self):
-        clientPaddingMsgs = [msg for msg in self.postClientDumps
-                             if msg['flags'] == const.FLAG_PADDING]
+        clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)
+                             if msg.flags & const.FLAG_PADDING]
         for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
-            observedPeriod = msg2["time"] - msg1["time"]
+            observedPeriod = msg2.rcvTime - msg1.rcvTime
             expectedPeriod = self.delay
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
                                    msg="The observed period %s does not"
@@ -394,10 +400,10 @@ class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
         sleep(1)
 
     def posttest_period(self):
-        clientPaddingMsgs = [msg for msg in self.postClientDumps
-                             if msg['flags'] == const.FLAG_PADDING][0:10]
+        clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)
+                             if msg.flags & const.FLAG_PADDING][0:10]
         for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
-            observedPeriod = msg2["time"] - msg1["time"]
+            observedPeriod = msg2.rcvTime - msg1.rcvTime
             expectedPeriod = self.delay / const.SCALE
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
                                    msg="The observed period %s does not"

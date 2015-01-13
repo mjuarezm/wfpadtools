@@ -88,6 +88,7 @@ import obfsproxy.transports.wfpadtools.histo as hist
 import obfsproxy.transports.wfpadtools.test_util as test_ut
 import obfsproxy.transports.wfpadtools.const as const
 import math
+from time import time
 
 
 log = logging.get_obfslogger()
@@ -251,7 +252,6 @@ class WFPadTransport(BaseTransport):
         connected, or buffer it meanwhile otherwise.
         """
         d = data.read()
-        print "XXX", d
         if self._state >= const.ST_CONNECTED:
             self.pushData(d)
         else:
@@ -275,6 +275,7 @@ class WFPadTransport(BaseTransport):
         if isinstance(data, str):
             self.circuit.downstream.write(data)
         elif isinstance(data, mes.WFPadMessage):
+            data.sndTime = time()
             self.circuit.downstream.write(str(data))
             self._numMessages['snd'] += 1
             self._dataBytes['snd'] += len(data.payload)
@@ -442,6 +443,7 @@ class WFPadTransport(BaseTransport):
                           "messages from stream: %s" % str(e))
 
         for msg in msgs:
+            msg.rcvTime = time()
             if msg.flags & const.FLAG_CONTROL:
                 # Process control messages
                 self.circuit.upstream.write(msg.payload)
