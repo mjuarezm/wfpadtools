@@ -49,7 +49,7 @@ class DummyReadWorker(object):
             while True:
                 conn.recv(4096)
         except Exception, e:
-            print "Exception %s" % str(e)
+            print "[ReadWorker] Exception %s" % str(e)
         conn.close()
 
     def __init__(self, address):

@@ -49,13 +49,13 @@ def instrument_rcv_upstream(func):
                 opcode, args_str = payload.split(";")
                 opcode = int(opcode)
                 if opcode == 0:
-                    self.sendDataMessage("foo")
+                    self.sendDataMessage("foo\n")
                     return True
                 args = None
                 if args_str != "":
                     args = json.loads(args_str)
                 self.sendControlMessage(opcode, args)
-            return True
+                return True
         return False
 
     def check_test_message(self, data):
@@ -65,6 +65,7 @@ def instrument_rcv_upstream(func):
             control = parseControl(self,
                                    copy.deepcopy(data))
             if control:
+                data.read()
                 return
         return func(self, data)
     return check_test_message

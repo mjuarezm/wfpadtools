@@ -7,7 +7,6 @@ import obfsproxy.transports.scramblesuit.scramblesuit as scramblesuit
 import obfsproxy.transports.wfpadtools.wfpad as wfpad
 from obfsproxy.transports.wfpadtools.specific import buflo, csbuflo, tamaraw,\
     adaptive
-import obfsproxy.test.transports.wfpadtools.test_server as test_serv
 
 transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyClient, 'server' : dummy.DummyServer },
                'b64'   : {'base': b64.B64Transport, 'client' : b64.B64Client, 'server' : b64.B64Server },
@@ -20,10 +19,7 @@ transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyCl
                'buflo': {'base': buflo.BuFLOTransport, 'client': buflo.BuFLOClient, 'server': buflo.BuFLOServer},
                'csbuflo': {'base': csbuflo.CSBuFLOTransport, 'client': csbuflo.CSBuFLOClient, 'server': csbuflo.CSBuFLOServer},
                'tamaraw': {'base': tamaraw.TamarawTransport, 'client': tamaraw.TamarawClient, 'server': tamaraw.TamarawServer},
-               'adaptive': {'base': adaptive.AdaptiveTransport, 'client': adaptive.AdaptiveClient, 'server': adaptive.AdaptiveServer},
-               'wfpadtest': {'base': test_serv.WFPadTestTransport, 'client': test_serv.WFPadTestClient, 'server': test_serv.WFPadTestServer},
-               'buflotest': {'base': test_serv.BuFLOTestTransport, 'client': test_serv.BuFLOTestClient, 'server': test_serv.BuFLOTestServer},
-               'dummytest': {'base': test_serv.DummyTestTransport, 'client': test_serv.DummyTestClient, 'server': test_serv.DummyTestServer} }
+               'adaptive': {'base': adaptive.AdaptiveTransport, 'client': adaptive.AdaptiveClient, 'server': adaptive.AdaptiveServer} }
 
 def get_transport_class(name, role):
     # Rewrite equivalent roles.

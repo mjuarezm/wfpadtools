@@ -35,12 +35,6 @@ class TestUtilTest(STTest):
         dump = ut.pick_load(dump_path_value)
         values = [v for v in dump.itervalues()]
 
-        obs_state = values[0][0]
-        exp_state = a.__dict__
-        self.assertDictEqual(obs_state, exp_state,
-                             "States do not match: %s != %s"
-                             % (obs_state, exp_state))
-
         obs_value = values[0][1]
         exp_return = return_value
         self.assertEqual(obs_value, exp_return,
