@@ -1,3 +1,8 @@
+Changes in version 0.2.14 - UNRELEASED:
+ - Correct a mistake in the obfs2 spec. Found by David Fifield.
+   Fixes bug #14329.
+
+
 Changes in version 0.2.13 - 2014-12-31:
  - Correctly handle the ScrambleSuit password being missing entirely
    when running in managed mode. Patch by Yawning Angel. Fixes #13587.
