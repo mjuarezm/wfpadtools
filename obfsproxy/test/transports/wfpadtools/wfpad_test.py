@@ -1,8 +1,6 @@
 import json
-import multiprocessing
 from os.path import join, exists
 from sets import Set
-import socket
 from time import sleep
 import time
 import unittest
@@ -14,6 +12,7 @@ from obfsproxy.test.tester import TransportsSetUp, TEST_FILE
 from obfsproxy.test.transports.wfpadtools.sttest import STTest
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools import util as ut
+from obfsproxy.transports.wfpadtools import test_util as tu
 from obfsproxy.transports.wfpadtools import wfpad
 from obfsproxy.transports.wfpadtools import wfpad_shim
 from obfsproxy.transports.wfpadtools.message import getOpcodeNames
@@ -35,33 +34,6 @@ DUMPS = {"client": join(const.TEST_SERVER_DIR, "client.dump"),
 TEST_MSG = "foobar"
 
 
-class DummyReadWorker(object):
-
-    @staticmethod
-    def work(host, port):
-        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listener.bind((host, port))
-        listener.listen(1)
-        (conn, _) = listener.accept()
-        listener.close()
-        try:
-            while True:
-                conn.recv(4096)
-        except Exception, e:
-            print "[ReadWorker] Exception %s" % str(e)
-        conn.close()
-
-    def __init__(self, address):
-        self.worker = multiprocessing.Process(target=self.work,
-                                              args=(address))
-        self.worker.start()
-
-    def stop(self):
-        if self.worker.is_alive():
-            self.worker.terminate()
-
-
 class TestSetUp(TransportsSetUp):
 
     def setUp(self):
@@ -69,7 +41,8 @@ class TestSetUp(TransportsSetUp):
             ut.removedir(const.TEST_SERVER_DIR)
         ut.createdir(const.TEST_SERVER_DIR)
         super(TestSetUp, self).setUp()
-        self.output_reader = DummyReadWorker(("127.0.0.1", tester.EXIT_PORT))
+        self.output_reader = tu.DummyReadWorker(("127.0.0.1",
+                                                 tester.EXIT_PORT))
         self.input_chan = tester.connect_with_retry(("127.0.0.1",
                                                      tester.ENTRY_PORT))
         self.input_chan.settimeout(tester.SOCKET_TIMEOUT)

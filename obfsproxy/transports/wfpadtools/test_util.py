@@ -1,10 +1,39 @@
 import copy
 import inspect
 import json
+import multiprocessing
 from os.path import join
+import socket
 
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools import util as ut
+
+
+class DummyReadWorker(object):
+
+    @staticmethod
+    def work(host, port):
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind((host, port))
+        listener.listen(1)
+        (conn, _) = listener.accept()
+        listener.close()
+        try:
+            while True:
+                conn.recv(4096)
+        except Exception, e:
+            print "[ReadWorker] Exception %s" % str(e)
+        conn.close()
+
+    def __init__(self, address):
+        self.worker = multiprocessing.Process(target=self.work,
+                                              args=(address))
+        self.worker.start()
+
+    def stop(self):
+        if self.worker.is_alive():
+            self.worker.terminate()
 
 
 def instrument_class_method(func):

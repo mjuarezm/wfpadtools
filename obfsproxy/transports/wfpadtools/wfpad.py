@@ -364,11 +364,9 @@ class WFPadTransport(BaseTransport):
         if deferGapCancelled and hasattr(self._gapHistoProbdist['snd'], "histo"):
             self._gapHistoProbdist['snd'].removeToken(elapsed)
 
-        log.info("XXX")
         sock = self.get_handler()
         log.info("[info socket] %s" % sock)
-#         cap = estimate_write_capacity(sock)
-        cap = const.MTU
+        cap = estimate_write_capacity(sock)
         if cap >= const.MTU:
             # The link is congested either due to insufficient send
             # socket buffer space (unlikely), or the congestion window
