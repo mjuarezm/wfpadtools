@@ -1,7 +1,7 @@
 """The wfpad module implements the WFPadTools Tor pluggable transport.
 
 This module implements WFPadTools, a framework to develop link-padding-based
-website fingerprinting countermeasures in Tor. It implements a faming layer for
+website fingerprinting countermeasures in Tor. It implements a framing layer for
 the Tor protocol that allows to add cover traffic and provides a set of
 primitives that can be used to implement more specific anti-website
 fingerprinting strategies.
@@ -89,6 +89,7 @@ import obfsproxy.transports.wfpadtools.test_util as test_ut
 import obfsproxy.transports.wfpadtools.const as const
 import math
 from time import time
+from obfsproxy.transports.wfpadtools.kist import estimate_write_capacity
 
 
 log = logging.get_obfslogger()
@@ -324,6 +325,8 @@ class WFPadTransport(BaseTransport):
         to the buffer and make a delayed called to flush it. In case the
         padding deferreds are active, we cancel them and update the delay
         accordingly.
+
+        If the 
         """
         log.debug("[wfad] Pushing %d bytes of outgoing data." % len(data))
 
@@ -354,22 +357,34 @@ class WFPadTransport(BaseTransport):
         if deferGapCancelled and hasattr(self._gapHistoProbdist['snd'], "histo"):
             self._gapHistoProbdist['snd'].removeToken(elapsed)
 
-        if delay == 0:
-            # Send data message over the wire
-            self.sendDownstream(self._msgFactory.encapsulate(data, lenProbdist=self._lengthDataProbdist))
-            log.debug("[wfpad] Data message has been sent without delay.")
+        log.info("XXX")
+        sock = self.get_handler_downstream()
+        log.info("[info socket] %s" % sock)
+#         cap = estimate_write_capacity(sock)
+        cap = const.MTU
+        if cap >= const.MTU:
+            # The link is congested either due to insufficient send
+            # socket buffer space (unlikely), or the congestion window
+            # being full (likely). In either case, sleep for the random
+            # interval and try again.
 
-        else:
+# TODO: check whether this piece of code is useful or not
+#         if delay == 0:
+#             # Send data message over the wire
+#             self.sendDownstream(self._msgFactory.encapsulate(data, lenProbdist=self._lengthDataProbdist))
+#             log.debug("[wfpad] Data message has been sent without delay.")
+#         else:
+
             # Push data message to data buffer
             self._buffer.write(data)
             log.debug("[wfad] Buffered %d bytes of outgoing data w/ delay %sms"
                       % (len(self._buffer), delay))
 
-            # In case we the buffer is not currently being flushed,
-            # make a delayed call to the flushing method
-            if not self._deferData or (self._deferData and self._deferData.called):
-                self._deferData = deferLater(delay, self.flushBuffer)
-                log.debug("[wfad] Delay buffer flush %s ms delay" % delay)
+        # In case we the buffer is not currently being flushed,
+        # make a delayed call to the flushing method
+        if not self._deferData or (self._deferData and self._deferData.called):
+            self._deferData = deferLater(delay, self.flushBuffer)
+            log.debug("[wfad] Delay buffer flush %s ms delay" % delay)
 
     def elapsedSinceLastMsg(self):
         elap = reactor.seconds() - self._lastSndTimestamp  # @UndefinedVariable

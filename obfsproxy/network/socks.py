@@ -178,7 +178,7 @@ class OBFSSOCKSv5Factory(protocol.Factory):
 
     def buildProtocol(self, addr):
         log.debug("%s: New connection." % self.name)
-
-        circuit = network.Circuit(self.transport_class())
+        transport = self.transport_class()
+        circuit = network.Circuit(transport)
 
         return OBFSSOCKSv5Protocol(circuit, self.pt_config)

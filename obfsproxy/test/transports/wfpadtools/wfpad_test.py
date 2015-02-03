@@ -261,8 +261,7 @@ class TotalPadTest(PostPrimitiveTest, STTest):
     args = [sessId, delay]
 
     def do_instructions(self):
-        pass
-#         self.send_to_transport(TEST_FILE)
+        self.send_to_transport(TEST_FILE)
 
     def posttest_num_messages_is_power_of_2(self):
         clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)
@@ -303,8 +302,7 @@ class PayloadPadBytesTest(PostPrimitiveTest, STTest):
     args = [sessId, delay, msg_level]
 
     def do_instructions(self):
-        pass
-#         self.send_to_transport(TEST_MSG)
+        self.send_to_transport(TEST_MSG)
 
     def posttest_num_data_bytes_correctly_padded(self):
         lastState = self.states(self.postServerDumps)[-1]
@@ -339,8 +337,7 @@ class BatchPadTest(PostPrimitiveTest, STTest):
     args = [sessId, L, delay]
 
     def do_instructions(self):
-        pass
-#         self.send_to_transport(TEST_FILE)
+        self.send_to_transport(TEST_FILE)
 
     def posttest_num_messages_is_multiple_of_L(self):
         clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)

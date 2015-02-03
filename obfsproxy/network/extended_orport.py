@@ -355,11 +355,12 @@ class ExtORPortClientFactory(network.StaticDestinationClientFactory):
         return ExtORPortProtocol(self.circuit, addr, self.cookie_file, self.peer_addr, self.transport_name)
 
 class ExtORPortServerFactory(network.StaticDestinationClientFactory):
-    def __init__(self, ext_or_addrport, ext_or_cookie_file, transport_name, transport_class, pt_config):
+    def __init__(self, ext_or_addrport, ext_or_cookie_file, transport_name, transport_class, pt_config, transport=None):
         self.ext_or_host = ext_or_addrport[0]
         self.ext_or_port = ext_or_addrport[1]
         self.cookie_file = ext_or_cookie_file
 
+        self.transport = transport if transport else None
         self.transport_name = transport_name
         self.transport_class = transport_class
         self.pt_config = pt_config
@@ -371,13 +372,13 @@ class ExtORPortServerFactory(network.StaticDestinationClientFactory):
 
     def buildProtocol(self, addr):
         log.debug("%s: New connection from %s:%d." % (self.name, log.safe_addr_str(addr.host), addr.port))
-
-        circuit = network.Circuit(self.transport_class())
+        transport = self.transport if self.transport else self.transport_class()
+        circuit = network.Circuit(transport)
 
         # XXX instantiates a new factory for each client
         clientFactory = ExtORPortClientFactory(circuit, self.cookie_file, addr, self.transport_name)
-        reactor.connectTCP(self.ext_or_host, self.ext_or_port, clientFactory)
-
+        client = reactor.connectTCP(self.ext_or_host, self.ext_or_port, clientFactory)
+        transport.client = client
         return network.StaticDestinationProtocol(circuit, 'server', addr)
 
 # XXX Exceptions need more thought and work. Most of these can be generalized.
