@@ -1,0 +1,18 @@
+--- protocol.py.old	2015-02-03 11:43:49.401510381 +0100
++++ protocol.py	2015-02-03 11:45:02.841507346 +0100
+@@ -257,13 +257,13 @@
+             connection cannot be set up for some reason.
+         """
+         def cancelConnect(deferred):
+-            connector.disconnect()
++            self.connector.disconnect()
+             if f.pending is not None:
+                 f.pending.cancel()
+         d = defer.Deferred(cancelConnect)
+         f = _InstanceFactory(
+             self.reactor, self.protocolClass(*self.args, **self.kwargs), d)
+-        connector = method(factory=f, *args, **kwargs)
++        self.connector = method(factory=f, *args, **kwargs)
+         return d
+ 
+ 

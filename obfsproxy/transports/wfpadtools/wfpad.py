@@ -245,6 +245,13 @@ class WFPadTransport(BaseTransport):
             # distributions to be used at the server.
             pass
 
+    def get_handler(self):
+        """Return socket for downstream connection."""
+        if self.weAreClient:
+            return self.client.transport.socket
+        else:
+            return self.server.socket
+
     @test_ut.instrument_rcv_upstream
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream.
@@ -358,7 +365,7 @@ class WFPadTransport(BaseTransport):
             self._gapHistoProbdist['snd'].removeToken(elapsed)
 
         log.info("XXX")
-        sock = self.get_handler_downstream()
+        sock = self.get_handler()
         log.info("[info socket] %s" % sock)
 #         cap = estimate_write_capacity(sock)
         cap = const.MTU
