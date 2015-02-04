@@ -50,8 +50,7 @@ def estimate_write_capacity(sock):
 
     # Return the minimum of the two capacities.
     if tcp_space > socket_space:
-        print "[kist module] socket_space (%s) is smaller"
-        " than tcp_space (%s)" % (socket_space, tcp_space)
+        print "[kist module] socket_space (%s) is smaller than tcp_space" % socket_space
         return socket_space
     print "[kist module] tcp_space is: %s, socket space is: %s" % (tcp_space,
                                                                    socket_space)

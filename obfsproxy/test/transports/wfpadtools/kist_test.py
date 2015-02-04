@@ -20,15 +20,18 @@ class KistTest(unittest.TestCase):
         self.reader = DummyReadWorker((HOST, PORT))
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sleep(1)
+        print "CONNECT"
         self.client_socket.connect((HOST, PORT))
 
     def test_estimate_write_capacity(self):
-        buf_capacity = 1
-        while buf_capacity > 0:
+        buf_capacity = estimate_write_capacity(self.client_socket)
+        i = 0
+        while buf_capacity > const.MTU:
             self.client_socket.sendall('\0' * const.MTU)
             buf_capacity = estimate_write_capacity(self.client_socket)
-            print buf_capacity
-        self.assertTrue(buf_capacity == 0)
+            print i, buf_capacity
+            i += 1
+        self.assertTrue(buf_capacity > const.MTU)
         self.client_socket.close()
 
 
