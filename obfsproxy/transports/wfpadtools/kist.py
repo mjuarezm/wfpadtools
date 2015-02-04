@@ -22,7 +22,7 @@ def estimate_write_capacity(sock):
 
     The amount that can be sent any time can be estimated as:
         socket_space = sndbufcap - sndbuflen
-        socket_space = sndbufcap - sndbuflen
+        tcp_space = (cwnd - unacked) * mss
         limit = min(socket_space, tcp_space)
     """
     # Determine the total capacity of the send socket buffer "sndbufcap",
@@ -38,6 +38,9 @@ def estimate_write_capacity(sock):
     # Determine the tcp_space via a TCP_INFO getsockopt() call.
     # The struct fmt is 7 bytes followed by 24 unsig ints, for more detail
     # see: http://lxr.free-electrons.com/source/include/uapi/linux/tcp.h#L149
+    # snd_cwnd = TCP congestion window size (number of segments we can send)
+    # unacked = number of segments that have been sent but haven't been acked
+    # snd_mss = maximum segment size specified by the sender
     tcp_info = struct.unpack("B"*7+"I"*24, sock.getsockopt(socket.SOL_TCP,
                                                            socket.TCP_INFO,
                                                            104))
@@ -45,6 +48,4 @@ def estimate_write_capacity(sock):
     tcp_space = (snd_cwnd - unacked) * snd_mss
 
     # Return the minimum of the two capacities.
-    if tcp_space > socket_space:
-        return socket_space
-    return socket_space
+    return socket_space if tcp_space > socket_space else tcp_space
