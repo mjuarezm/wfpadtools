@@ -11,7 +11,7 @@ from obfsproxy.transports.wfpadtools.test_util import DummyReadWorker
 
 
 HOST = "127.0.0.1"
-PORT = 9891
+PORT = 6666
 
 
 class KistTest(unittest.TestCase):
