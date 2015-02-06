@@ -27,14 +27,15 @@ setup(
             'obfsproxy = obfsproxy.pyobfsproxy:run'
             ]
         },
-
+    test_suite="obfsproxy/test",
     install_requires = [
         'setuptools',
         'PyCrypto',
         'Twisted',
         'argparse',
         'pyptlib >= 0.0.6',
-        'pyyaml'
+        'pyyaml',
+        'requesocks'
         ],
 
     extras_require = {
