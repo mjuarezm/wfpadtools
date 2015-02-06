@@ -1,15 +1,11 @@
 WFPadTools
 ==========
 
-The wfpad module implements the WFPadTools Tor pluggable transport.
+The WFPadTools framework is a framework implemented as an Obfsproxy Pluggable Transport to develop lin-padding-based website fingerprinting strategies in Tor. It was forked from the obfsproxy master branch at the torproject git.
 
 [![Build Status](https://drone.io/bitbucket.org/mjuarezm/obfsproxy_wfpadtools/status.png)](https://drone.io/bitbucket.org/mjuarezm/obfsproxy_wfpadtools/latest)
 
-This module implements WFPadTools, a framework to develop link-padding-based
-website fingerprinting countermeasures in Tor. It implements a framing layer for
-the Tor protocol that allows to add cover traffic and provides a set of
-primitives that can be used to implement more specific anti-website
-fingerprinting strategies.
+It implements a framing layer for the Tor protocol that allows to add cover traffic and provides a set of primitives that can be used to implement more specific anti-website fingerprinting strategies.
 
 To use this framework, developers can extend the WFPadTransport, WFPadClient
 and WFPadServer classes included in this module and use their methods to
@@ -29,7 +25,8 @@ possible strategies.
 
 For further details on the protocol see /doc/wfpadtools/wfpadtools-spec.txt.
 
-Important features of the WFPadTools design:
+Features of WFPadTools
+----------------------
 
 - It allows to pad each specific message to a specified length or to specify
   a probability distribution to draw a value for the length each time.
@@ -47,6 +44,9 @@ Important features of the WFPadTools design:
 - It allows to add padding in response to traffic coming upstream (e.g., web
   server or Tor) and/or in response to downstream traffic (coming from the
   other end). Distributions governing these two can be specified independently.
+
+Limitations
+-----------
 
 Important note: this framework is intended for research purposes and it has the
 following limitations:
