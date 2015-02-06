@@ -1,8 +1,4 @@
-WFPadTools 
-==========
 Obfsproxy is a pluggable transport proxy written in Python.
-
-[![Build Status](https://drone.io/bitbucket.org/mjuarezm/obfsproxy_wfpadtools/status.png)](https://drone.io/bitbucket.org/mjuarezm/obfsproxy_wfpadtools/latest)
 
 See doc/HOWTO.txt for installation instructions.
 
