@@ -11,7 +11,7 @@ To use this framework, developers can extend the WFPadTransport, WFPadClient and
 
 In addition to a protocol to insert dummy messages in a stream of Tor data, WFPadTools implements a set of primitives that have been proposed by Mike Perry in:
 
-gitweb.torproject.org/user/mikeperry/torspec.git/blob/refs/heads/multihop-padding-primitives:/proposals/ideas/xxx-multihop-padding-primitives.txt
+[Multihop padding primitives specification](https://gitweb.torproject.org/user/mikeperry/torspec.git/plain/proposals/ideas/xxx-multihop-padding-primitives.txt?h=multihop-padding-primitives)
 
 These primitives have been extracted from existing website fingerprinting designs within the research community, such as Tamaraw, CS-BuFLO and Adaptive Padding. They have been generalized in order to allow for a broader set of possible strategies.
 
