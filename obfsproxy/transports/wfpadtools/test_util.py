@@ -7,6 +7,32 @@ import socket
 
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools import util as ut
+from time import sleep
+
+
+class DummyWriteWorker(object):
+
+    @staticmethod
+    def work(host, port):
+        writer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sleep(2)
+        writer.connect((host, port))
+
+        try:
+            while True:
+                writer.sendall('\0')
+        except Exception, e:
+            print "[ReadWorker] Exception %s" % str(e)
+        writer.close()
+
+    def __init__(self, address):
+        self.worker = multiprocessing.Process(target=self.work,
+                                              args=(address))
+        self.worker.start()
+
+    def stop(self):
+        if self.worker.is_alive():
+            self.worker.terminate()
 
 
 class DummyReadWorker(object):

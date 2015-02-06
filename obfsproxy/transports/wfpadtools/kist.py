@@ -13,6 +13,11 @@ import socket
 import struct
 import termios  # @UnresolvedImport
 
+import obfsproxy.common.log as logging
+
+
+log = logging.get_obfslogger()
+
 
 def estimate_write_capacity(sock):
     """Attempt to figure out how much can be written to `sock` without blocking.
@@ -28,10 +33,12 @@ def estimate_write_capacity(sock):
     # Determine the total capacity of the send socket buffer "sndbufcap",
     # with a SO_SNDBUF getsockopt() call, and the current amount of data in
     # the send socket buffer "sndbuflen" with a TIOCOUTQ ioctl.
-    sndbufcap = sock.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF)
     buf = array.array('h', [0])  # signed short array
+    print sock, termios.TIOCOUTQ, buf, 1
+    log.debug("[arguments] sock: %s, termios: %s, buf: %s, last: %s" % (sock, termios.TIOCOUTQ, buf, 1))
     fcntl.ioctl(sock, termios.TIOCOUTQ, buf, 1)
     sndbuflen = buf[0]
+    sndbufcap = sock.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF)
     socket_space = sndbufcap - sndbuflen
     print "socket_space", socket_space
 

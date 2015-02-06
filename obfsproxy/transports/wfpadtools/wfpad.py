@@ -74,22 +74,25 @@ following limitations:
   than Tor, for instance).
 
 """
+import math
+import os
+import psutil
+import socket
+from time import time
+from twisted.internet import reactor, task
+from twisted.internet.defer import CancelledError
+
+import obfsproxy.common.log as logging
 from obfsproxy.transports.base import BaseTransport, PluggableTransportError
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message as mes
 from obfsproxy.transports.wfpadtools import message, socks_shim
 from obfsproxy.transports.wfpadtools import wfpad_shim
-from twisted.internet import reactor, task
-from twisted.internet.defer import CancelledError
-
-import obfsproxy.common.log as logging
-import obfsproxy.transports.wfpadtools.histo as hist
-import obfsproxy.transports.wfpadtools.test_util as test_ut
 import obfsproxy.transports.wfpadtools.const as const
-import math
-from time import time
+import obfsproxy.transports.wfpadtools.histo as hist
 from obfsproxy.transports.wfpadtools.kist import estimate_write_capacity
+import obfsproxy.transports.wfpadtools.test_util as test_ut
 
 
 log = logging.get_obfslogger()
@@ -157,6 +160,12 @@ class WFPadTransport(BaseTransport):
         # This method is evaluated to decide when to stop padding
         self.stopCondition = lambda Self: False
 
+        # Get pid and process
+        self.pid = os.getpid()
+        self.process = psutil.Process(self.pid)
+        self.connections = []
+        self.downstreamSocket = None
+
         # Get the global shim object
         if self.weAreClient:
             if not socks_shim.get():
@@ -194,6 +203,9 @@ class WFPadTransport(BaseTransport):
         if not parentalApproval:
             raise PluggableTransportError(
                 "Pluggable Transport args invalid: %s" % args)
+
+        cls.listen_addr = args.listen_addr
+        cls.dest = args.dest if args.dest else None
 
         cls.shim_ports = (const.SHIM_PORT, const.SOCKS_PORT)
         if args.shim:
@@ -238,19 +250,25 @@ class WFPadTransport(BaseTransport):
         if len(self._buffer) > 0:
             self.flushBuffer()
 
+        # Load sockets
+        self.connections = self.process.get_connections()
+        if self.weAreClient:
+                for pconn in self.connections:
+                    if pconn.status == 'ESTABLISHED' and pconn.raddr[1] == self.dest[1]:
+                        self.downstreamSocket = socket.fromfd(pconn.fd, pconn.family, pconn.type)
+                        break
+        elif self.weAreServer:
+                for pconn in self.connections:
+                    if pconn.status == 'ESTABLISHED' and pconn.laddr[1] == self.listen_addr[1]:
+                        self.downstreamSocket = socket.fromfd(pconn.fd, pconn.family, pconn.type)
+                        break
+
         if self.weAreClient:
             # To be implemented in the method that overrides `circuitConnected`
             # in the child class of the final countermeasure. We can use
             # primitives in this transport to initialize the probability
             # distributions to be used at the server.
             pass
-
-    def get_handler(self):
-        """Return socket for downstream connection."""
-        if self.weAreClient:
-            return self.client.transport.socket
-        else:
-            return self.server.socket
 
     @test_ut.instrument_rcv_upstream
     def receivedUpstream(self, data):
@@ -302,10 +320,18 @@ class WFPadTransport(BaseTransport):
     def sendIgnore(self, paddingLength=None):
         """Send padding message.
 
-        By default we send ignores at MTU size.
+        By default we send ignores at MTU size. We also check whether
+        the link is congested due to insufficient send socket buffer
+        space, the TCP congestion window being full. In either case, we
+        don't send the padding message.
         """
         if not paddingLength:
             paddingLength = const.MPU
+        cap = estimate_write_capacity(self.downstreamSocket)
+        if cap < paddingLength:
+            log.debug("[wfpad] We skipped sending padding because the"
+                      " link was congested. The free space is %s", cap)
+            return
         log.debug("[wfpad] Sending ignore message.")
         self.sendDownstream(self._msgFactory.newIgnore(paddingLength))
 
@@ -364,26 +390,10 @@ class WFPadTransport(BaseTransport):
         if deferGapCancelled and hasattr(self._gapHistoProbdist['snd'], "histo"):
             self._gapHistoProbdist['snd'].removeToken(elapsed)
 
-        sock = self.get_handler()
-        log.info("[info socket] %s" % sock)
-        cap = estimate_write_capacity(sock)
-        if cap >= const.MTU:
-            # The link is congested either due to insufficient send
-            # socket buffer space (unlikely), or the congestion window
-            # being full (likely). In either case, sleep for the random
-            # interval and try again.
-
-# TODO: check whether this piece of code is useful or not
-#         if delay == 0:
-#             # Send data message over the wire
-#             self.sendDownstream(self._msgFactory.encapsulate(data, lenProbdist=self._lengthDataProbdist))
-#             log.debug("[wfpad] Data message has been sent without delay.")
-#         else:
-
-            # Push data message to data buffer
-            self._buffer.write(data)
-            log.debug("[wfad] Buffered %d bytes of outgoing data w/ delay %sms"
-                      % (len(self._buffer), delay))
+        # Push data message to data buffer
+        self._buffer.write(data)
+        log.debug("[wfad] Buffered %d bytes of outgoing data w/ delay %sms"
+                  % (len(self._buffer), delay))
 
         # In case we the buffer is not currently being flushed,
         # make a delayed call to the flushing method
