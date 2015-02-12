@@ -125,14 +125,19 @@ class WFPadTransport(BaseTransport):
         self._msgFactory = message.WFPadMessageFactory()
         self._msgExtractor = message.WFPadMessageExtractor()
 
-        # Variables to keep track of past messages
-        self._lastSndTimestamp = 0
-        self._lastSndDataTs = 0
+        # Statistics to keep track of past messages
+        # Used for congestion sensitivity
+        self._lastSndDownstreamTs = 0
+        self._lastSndDataDownstreamTs = 0
+        self._lastRcvUpstreamTs = 0
         self._consecPaddingMsgs = 0
         self._sentDataBytes = 0
+
         self._dataBytes = {'rcv': 0, 'snd': 0}
         self._totalBytes = {'rcv': 0, 'snd': 0}
         self._numMessages = {'rcv': 0, 'snd': 0}
+
+        self._rho_stats = []
 
         # Initialize length distribution
         self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
@@ -286,7 +291,7 @@ class WFPadTransport(BaseTransport):
         connected, or buffer it meanwhile otherwise.
         """
         d = data.read()
-
+        self._lastRcvUpstreamTs = reactor.seconds()
         # Start session when getting data and not previously started
         if self.weAreClient and not self._visiting:
             self.startSession(const.DEFAULT_SESSION)
@@ -422,7 +427,7 @@ class WFPadTransport(BaseTransport):
                 log.debug("[wfad] Delay buffer flush %s ms delay" % delay)
 
     def elapsedSinceLastMsg(self):
-        elap = reactor.seconds() - self._lastSndTimestamp  # @UndefinedVariable
+        elap = reactor.seconds() - self._lastSndDownstreamTs  # @UndefinedVariable
         log.debug("[wfpad] Cancel padding. Elapsed = %s ms" % elap)
         return elap
 
@@ -460,7 +465,7 @@ class WFPadTransport(BaseTransport):
 
         log.debug("[wfad] Sent data message of length %d." % msgTotalLen)
 
-        self._lastSndDataTs = self._lastSndTimestamp = reactor.seconds()  # @UndefinedVariable
+        self._lastSndDataDownstreamTs = self._lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
 
         # If buffer is empty, generate padding messages.
         if len(self._buffer) > 0:
@@ -502,11 +507,13 @@ class WFPadTransport(BaseTransport):
                 self.deferBurstPadding('rcv')
                 self._numMessages['rcv'] += 1
                 self._totalBytes['rcv'] += msg.totalLen
+
                 # Forward data to the application.
                 if not msg.flags & const.FLAG_PADDING:
                     log.debug("[wfad] Data flag detected, relaying upstream")
                     self._dataBytes['rcv'] += len(msg.payload)
                     self.circuit.upstream.write(msg.payload)
+                    self._rho_stats += [',']
 
                 # Filter padding messages out.
                 elif msg.flags & const.FLAG_PADDING:
@@ -521,23 +528,23 @@ class WFPadTransport(BaseTransport):
         """Sample delay from corresponding distribution and wait for data.
 
         In case we have not received data after delay, we call the method
-        `sendPaddingHisto` to send ignore packets and sample next delay.
+        `timeout` to send ignore packets and sample next delay.
         """
         burstDelay = self._burstHistoProbdist[when].randomSample()
         if burstDelay is not const.INF_LABEL:
             self._deferBurst[when] = deferLater(burstDelay,
-                                                self.sendPaddingHisto,
+                                                self.timeout,
                                                 when=when,
                                                 cbk=self._deferBurstCallback[when])
 
-    def sendPaddingHisto(self, when):
+    def timeout(self, when):
         """Send ignore in response to up/downstream traffic and wait for data.
 
         We sample the delay to wait from the `when` gap prob distribution.
         We call this method again in case we don't receive data after the
         delay.
         """
-        if reactor.seconds() - self._lastSndDataTs > const.MAX_LAST_DATA_TIME:
+        if reactor.seconds() - self._lastSndDataDownstreamTs > const.MAX_LAST_DATA_TIME:
             self.endSession(const.DEFAULT_SESSION)
         if self.stopCondition(self):
             log.debug("[wfpad] -  Padding was stopped!!")
@@ -545,13 +552,13 @@ class WFPadTransport(BaseTransport):
         self.sendIgnore()
         if when is 'snd':
             self._consecPaddingMsgs += 1
-            self._lastSndTimestamp = reactor.seconds()  # @UndefinedVariable
+            self._lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
         delay = self._gapHistoProbdist[when].randomSample()
         if delay is const.INF_LABEL:
             return
         log.debug("[wfpad]  Wait for data, pad snd gap otherwise.")
         self._deferGap[when] = deferLater(delay,
-                                          self.sendPaddingHisto,
+                                          self.timeout,
                                           when=when,
                                           cbk=self._deferGapCallback[when])
         return delay
