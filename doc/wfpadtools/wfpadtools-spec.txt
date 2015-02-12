@@ -47,19 +47,19 @@
 
 	The WFPadTools protocol lives in a layer between obfsproxy and SOCKS, as
 	depicted below.
-				+-----------------+
-				|   Application   |
-				+-----------------+
-				|   	Tor  	  |
-				+-----------------+						
-				|      SOCKS 	  |						
-				+-----------------+
+                +-----------------+
+                |   Application   |
+                +-----------------+
+                |   	Tor  	  |
+                +-----------------+						
+                |      SOCKS 	  |						
+                +-----------------+
 		----->  |   WFPadTools    |
-				+-----------------+
-				|       TCP       |
-				+-----------------+
-				|       IP        |
-				+-----------------+								
+                +-----------------+
+                |       TCP       |
+                +-----------------+
+                |       IP        |
+                +-----------------+								
 
 	Application data is transported wrapping them into WFPadTools messages (the data
 	unit of the WFPadTools protocol) which structure is described next. WFPadTools
