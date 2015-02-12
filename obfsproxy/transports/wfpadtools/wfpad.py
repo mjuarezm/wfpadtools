@@ -127,6 +127,7 @@ class WFPadTransport(BaseTransport):
 
         # Variables to keep track of past messages
         self._lastSndTimestamp = 0
+        self._lastSndDataTs = 0
         self._consecPaddingMsgs = 0
         self._sentDataBytes = 0
         self._dataBytes = {'rcv': 0, 'snd': 0}
@@ -168,13 +169,18 @@ class WFPadTransport(BaseTransport):
 
         # Get the global shim object
         if self.weAreClient:
-            if not socks_shim.get():
-                socks_shim.new(*self.shim_ports)
-            _shim = socks_shim.get()
-            self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
-            _shim.registerObserver(self._sessionObserver)
+            self._sessionObserver = False
+            if self.shim:
+                if not socks_shim.get():
+                    socks_shim.new(*self.shim_ports)
+                _shim = socks_shim.get()
+                self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
+                _shim.registerObserver(self._sessionObserver)
+            else:
+                self._sessId = const.DEFAULT_SESSION
+                self._visiting = False
         else:
-            self._sessId = 0
+            self._sessId = const.DEFAULT_SESSION
             self._visiting = False
 
     @classmethod
@@ -207,7 +213,9 @@ class WFPadTransport(BaseTransport):
         cls.listen_addr = args.listen_addr
         cls.dest = args.dest if args.dest else None
 
-        cls.shim_ports = (const.SHIM_PORT, const.SOCKS_PORT)
+        cls.shim_ports = (const.SHIM_PORT,
+                          const.SOCKS_PORT)
+        cls.shim = True if args.shim else False 
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
         if args.test:
@@ -229,7 +237,7 @@ class WFPadTransport(BaseTransport):
 
     def circuitDestroyed(self, reason, side):
         """Unregister the shim observer."""
-        if self.weAreClient:
+        if self.weAreClient and self._sessionObserver:
             _shim = socks_shim.get()
             if _shim.isRegistered(self._sessionObserver):
                 _shim.deregisterObserver(self._sessionObserver)
@@ -278,6 +286,11 @@ class WFPadTransport(BaseTransport):
         connected, or buffer it meanwhile otherwise.
         """
         d = data.read()
+
+        # Start session when getting data and not previously started
+        if self.weAreClient and not self._visiting:
+            self.startSession(const.DEFAULT_SESSION)
+
         if self._state >= const.ST_CONNECTED:
             self.pushData(d)
         else:
@@ -356,12 +369,10 @@ class WFPadTransport(BaseTransport):
         Sample delay distribution for data messages. If we draw a 0 ms
         delay, we encapsulate and send data directly. Otherwise, we push data
         to the buffer and make a delayed called to flush it. In case the
-        padding deferreds are active, we cancel them and update the delay
+        padding deferrers are active, we cancel them and update the delay
         accordingly.
-
-        If the 
         """
-        log.debug("[wfad] Pushing %d bytes of outgoing data." % len(data))
+        log.debug("[wfpad] Pushing %d bytes of outgoing data." % len(data))
 
         # Cancel existing deferred calls to padding methods to prevent
         # callbacks that remove tokens from histograms
@@ -369,9 +380,11 @@ class WFPadTransport(BaseTransport):
         if self._deferBurst['snd'] and not self._deferBurst['snd'].called:
             self._deferBurst['snd'].cancel()
             deferBurstCancelled = True
+            log.debug("[wfpad] - Burst deferrer was cancelled.")
         if self._deferGap['snd'] and not self._deferGap['snd'].called:
             self._deferGap['snd'].cancel()
             deferGapCancelled = True
+            log.debug("[wfpad] - Gap deferrer was cancelled.")
 
         # Draw delay for data message
         delay = self._delayDataProbdist.randomSample()
@@ -385,21 +398,28 @@ class WFPadTransport(BaseTransport):
             delay = 0 if newDelay < 0 else newDelay
             log.debug("[wfpad] New delay is %s" % delay)
 
-        if deferBurstCancelled and hasattr(self._burstHistoProbdist['snd'], "histo"):
+        if deferBurstCancelled and hasattr(self._burstHistoProbdist['snd'],"histo"):
             self._burstHistoProbdist['snd'].removeToken(elapsed)
         if deferGapCancelled and hasattr(self._gapHistoProbdist['snd'], "histo"):
             self._gapHistoProbdist['snd'].removeToken(elapsed)
 
-        # Push data message to data buffer
-        self._buffer.write(data)
-        log.debug("[wfad] Buffered %d bytes of outgoing data w/ delay %sms"
-                  % (len(self._buffer), delay))
+        if delay == 0:
+            # Send data message over the wire
+            self.sendDownstream(self._msgFactory.encapsulate(data,
+                                lenProbdist=self._lengthDataProbdist))
+            log.debug("[wfpad] Data message has been sent without delay.")
 
-        # In case we the buffer is not currently being flushed,
-        # make a delayed call to the flushing method
-        if not self._deferData or (self._deferData and self._deferData.called):
-            self._deferData = deferLater(delay, self.flushBuffer)
-            log.debug("[wfad] Delay buffer flush %s ms delay" % delay)
+        else:
+            # Push data message to data buffer
+            self._buffer.write(data)
+            log.debug("[wfad] Buffered %d bytes of outgoing data w/ delay %sms"
+                      % (len(self._buffer), delay))
+
+            # In case there is no scheduled flush of the buffer,
+            # make a delayed call to the flushing method.
+            if not self._deferData or (self._deferData and self._deferData.called):
+                self._deferData = deferLater(delay, self.flushBuffer)
+                log.debug("[wfad] Delay buffer flush %s ms delay" % delay)
 
     def elapsedSinceLastMsg(self):
         elap = reactor.seconds() - self._lastSndTimestamp  # @UndefinedVariable
@@ -440,7 +460,7 @@ class WFPadTransport(BaseTransport):
 
         log.debug("[wfad] Sent data message of length %d." % msgTotalLen)
 
-        self._lastSndTimestamp = reactor.seconds()  # @UndefinedVariable
+        self._lastSndDataTs = self._lastSndTimestamp = reactor.seconds()  # @UndefinedVariable
 
         # If buffer is empty, generate padding messages.
         if len(self._buffer) > 0:
@@ -517,7 +537,10 @@ class WFPadTransport(BaseTransport):
         We call this method again in case we don't receive data after the
         delay.
         """
+        if reactor.seconds() - self._lastSndDataTs > const.MAX_LAST_DATA_TIME:
+            self.endSession(const.DEFAULT_SESSION)
         if self.stopCondition(self):
+            log.debug("[wfpad] -  Padding was stopped!!")
             return
         self.sendIgnore()
         if when is 'snd':
@@ -556,6 +579,7 @@ class WFPadTransport(BaseTransport):
                                     [self.getSessId(), True])
         else:
             self._sessId = sessId
+        log.info("[wfpad] - Session has started!(sessid = %s)" % sessId)
 
     def onSessionEnds(self, sessId):
         """Send hint for session end.
@@ -566,16 +590,35 @@ class WFPadTransport(BaseTransport):
         if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT,
                                     [self.getSessId(), False])
+        log.info("[wfpad] - Session has ended! (sessid = %s)" % sessId)
 
     def getSessId(self):
         """Return current session Id."""
-        return self._sessId if self.weAreServer \
-            else self._sessionObserver.getSessId()
+        if self.weAreServer:
+            return self._sessId
+        if self._sessionObserver:
+            return self._sessionObserver.getSessId()
+        return const.DEFAULT_SESSION
 
     def isVisiting(self):
-        """Return current session Id."""
-        return self._visiting if self.weAreServer \
-            else self._sessionObserver._visiting
+        """Return a bool indicating if we're in the middle of a session."""
+        if self.weAreServer:
+            return self._visiting
+        if self._sessionObserver:
+            return self._sessionObserver._visiting
+        return self._visiting
+
+    def startSession(self, sessId):
+        """Set visiting flag to `True` and sends AppHint to server."""
+        if self.weAreClient and not self._sessionObserver:
+            self._visiting = True
+            self.onSessionStarts(sessId)
+
+    def endSession(self, sessId):
+        """Set visiting flag to `True` and sends AppHint to server."""
+        if self.weAreClient and not self._sessionObserver:
+            self._visiting = False
+            self.onSessionEnds(sessId)
 
     # ==========================================================================
     # Deal with control messages

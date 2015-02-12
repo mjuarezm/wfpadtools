@@ -79,3 +79,6 @@ MAX_DELAY               = 262144
 # Default shim ports
 SHIM_PORT               = 4997
 SOCKS_PORT              = 4998
+
+DEFAULT_SESSION         = 0
+MAX_LAST_DATA_TIME      = 5
