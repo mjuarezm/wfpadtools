@@ -12,6 +12,7 @@ from time import time
 import cPickle as pick
 from obfsproxy.transports.wfpadtools import const
 import requesocks as requests
+import json
 
 
 LOWERCASE_CHARS = 'abcdefghijklmnopqrstuvwxyz'
@@ -67,6 +68,11 @@ def raise_signal(signum, frame):
     raise TimeExceededError("Timed Out!")
 
 
+def load_json(exp_spec_file):
+    with open(exp_spec_file, "r") as f:
+        return json.loads(f.read())
+
+
 def set_timeout(duration, callback=None):
     """Timeout after given duration."""
     # SIGALRM is only usable on a unix platform!
@@ -74,6 +80,11 @@ def set_timeout(duration, callback=None):
     signal.alarm(duration)  # alarm after X seconds
     if callback:
         callback()
+
+
+def flatten_list(l):
+    """Return a flattened list of lists."""
+    return [item for sublist in l for item in sublist]
 
 
 def cancel_timeout():
@@ -144,6 +155,11 @@ def closest_power_of_two(n, ceil=True):
         return 0
     k = math.ceil(math.log(n, 2))
     return math.pow(2, k)
+
+
+def apply_consecutive_elements(l, fn):
+    """Apply `fn` taking as arguments consecutive elements of `l`."""
+    return [fn(i, j) for i, j in zip(l[:-1], l[1:])]
 
 
 def bytes_after_total_padding(total_bytes, psize=1):

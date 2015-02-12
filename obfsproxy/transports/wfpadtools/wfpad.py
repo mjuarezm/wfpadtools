@@ -137,8 +137,6 @@ class WFPadTransport(BaseTransport):
         self._totalBytes = {'rcv': 0, 'snd': 0}
         self._numMessages = {'rcv': 0, 'snd': 0}
 
-        self._rho_stats = []
-
         # Initialize length distribution
         self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
 
@@ -298,21 +296,31 @@ class WFPadTransport(BaseTransport):
 
         if self._state >= const.ST_CONNECTED:
             self.pushData(d)
+            self.whenReceivedUpstream()
         else:
             self._buffer.write(d)
             log.debug("[wfad] Buffered %d bytes of outgoing data." %
                       len(self._buffer))
+
+    def whenReceivedUpstream(self):
+        """Template pattern for child WF defense transport."""
+        pass
 
     @test_ut.instrument_class_method
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
         d = data.read()
         if self._state >= const.ST_CONNECTED:
+            self.whenReceivedDownstream()
             if self._deferBurst['rcv'] and not self._deferBurst['rcv'].called:
                 self._deferBurst['rcv'].cancel()
             if self._deferGap['rcv'] and not self._deferGap['rcv'].called:
                 self._deferGap['rcv'].cancel()
             return self.processMessages(d)
+
+    def whenReceivedDownstream(self):
+        """Template pattern for child WF defense transport."""
+        pass
 
     def sendDownstream(self, data):
         """Sends `data` downstream over the wire."""
@@ -513,7 +521,6 @@ class WFPadTransport(BaseTransport):
                     log.debug("[wfad] Data flag detected, relaying upstream")
                     self._dataBytes['rcv'] += len(msg.payload)
                     self.circuit.upstream.write(msg.payload)
-                    self._rho_stats += [',']
 
                 # Filter padding messages out.
                 elif msg.flags & const.FLAG_PADDING:
@@ -594,6 +601,11 @@ class WFPadTransport(BaseTransport):
         Interface to be extended at child classes that implement
         final website fingerprinting countermeasures.
         """
+        # Restart statistics
+        self._dataBytes = {'rcv': 0, 'snd': 0}
+        self._totalBytes = {'rcv': 0, 'snd': 0}
+        self._numMessages = {'rcv': 0, 'snd': 0}
+
         if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT,
                                     [self.getSessId(), False])
@@ -729,8 +741,8 @@ class WFPadTransport(BaseTransport):
             padding packet is sent in the direction of the client.
         """
         self._burstHistoProbdist[when] = hist.new(histo, labels,
-                                                  interpolate=interpolate,
-                                                  removeToks=removeToks)
+                                                  interpolate=bool(interpolate),
+                                                  removeToks=bool(removeToks))
         self._deferBurstCallback[when] = self._burstHistoProbdist[when].removeToken
 
     def relayGapHistogram(self, histo, labels, removeToks=False,
@@ -768,8 +780,8 @@ class WFPadTransport(BaseTransport):
             padding.
         """
         self._gapHistoProbdist[when] = hist.new(histo, labels,
-                                                interpolate=interpolate,
-                                                removeToks=removeToks)
+                                                interpolate=bool(interpolate),
+                                                removeToks=bool(removeToks))
         self._deferGapCallback[when] = self._gapHistoProbdist[when].removeToken
 
     def relayTotalPad(self, sessId, t, msg_level=True):

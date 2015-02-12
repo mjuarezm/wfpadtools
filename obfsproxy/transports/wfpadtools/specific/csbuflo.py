@@ -5,6 +5,11 @@ import obfsproxy.common.log as logging
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
+from obfsproxy.transports.wfpadtools.util import apply_consecutive_elements,\
+    flatten_list
+import math
+import numpy
+from random import uniform
 
 
 log = logging.get_obfslogger()
@@ -19,6 +24,10 @@ class CSBuFLOTransport(WFPadTransport):
     """
     def __init__(self):
         super(CSBuFLOTransport, self).__init__()
+
+        self._rho_stats = [[]]
+        self._rho_star = const.INIT_RHO
+
         # Set constant length for messages
         self._lengthDataProbdist = probdist.uniform(self._length)
 
@@ -69,6 +78,7 @@ class CSBuFLOTransport(WFPadTransport):
             cls._padding_mode = args.padding
 
     def onSessionStarts(self, sessId):
+        # Initialize rho stats
         WFPadTransport.onSessionStarts(self, sessId)
         self.constantRatePaddingDistrib(self._period)
         if self._padding_mode is const.TOTAL_PADDING:
@@ -77,6 +87,54 @@ class CSBuFLOTransport(WFPadTransport):
             self.relayPayloadPad(sessId, self._period, False)
         else:
             raise RuntimeError("Value passed for padding mode is not valid")
+
+    def onSessionEnds(self, sessId):
+        super(CSBuFLOTransport, self).onSessionEnds(sessId)
+
+        # Reset rho stats
+        self._rho_stats = [[]]
+        self._rho_star = const.INIT_RHO
+
+    def whenReceivedUpstream(self):
+        self._rho_stats += []
+        self.whenReceived()
+
+    def whenReceivedDownstream(self):
+        self.whenReceived()
+
+    def whenReceived(self):
+        if self._rho_star == 0:
+            self._rho_star = const.INIT_RHO
+        else:
+            self._rho_star = self.estimate_rho(self._rho_star)
+
+    def crossed_threshold(self, total_sent_bytes):
+        """Return boolean whether we need to update the transmission rate
+
+        total_sent_bytes: amount of bytes sent downstream, namely,
+        junk bytes + real data bytes.
+        """
+        return math.log(total_sent_bytes - const.MTU, 2) < math.log(total_sent_bytes, 2)
+
+    def sendDataMessage(self, payload="", paddingLen=0):
+        """Send data message."""
+        super(CSBuFLOTransport, self).sendDataMessage(payload, paddingLen)
+        self._rho_stats[-1].append(reactor.seconds())
+        self.update_transmission_rate()
+
+    def estimate_rho(self, rho_star):
+        """Estimate new value of rho based on past network performance."""
+        time_intervals = flatten_list([apply_consecutive_elements(burst_list,
+                                                                  lambda x, y: y - x)
+                                       for burst_list in self._rho_stats])
+        if len(time_intervals) == 0:
+            return rho_star
+        else:
+            return math.pow(2, math.floor(math.log(numpy.median(time_intervals), 2)))
+
+    def update_transmission_rate(self):
+        self._period = uniform(0, 2 * self._rho_star)
+        self.constantRatePaddingDistrib(self._period)
 
     def relayBatchPad(self, sessId, L, t, msg_level=True):
         """Pad all batches of cells to the nearest multiple of `L` cells/bytes total.

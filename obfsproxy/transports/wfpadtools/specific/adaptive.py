@@ -2,11 +2,14 @@
 This module implements the Adaptive Padding countermeasure proposed
 by Shmatikov and Wang.
 """
+import json
+
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 
 import obfsproxy.common.log as logging
 from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.wfpadtools.util import load_json
 
 
 log = logging.get_obfslogger()
@@ -19,6 +22,30 @@ class AdaptiveTransport(WFPadTransport):
     delay probabilities in response to dummy and data messages coming from
     upstream and downstream directions.
     """
+    _histograms = {"burst": {"snd": {"histo": [1],
+                                     "labels": [1],
+                                     "removeToks": False,
+                                     "interpolate": True
+                                     },
+                             "rcv": {"histo": [1],
+                                     "labels": [1],
+                                     "removeToks": False,
+                                     "interpolate": True
+                                     }
+                             },
+                   "gap": {"snd": {"histo": [1],
+                                   "labels": [1],
+                                   "removeToks": False,
+                                   "interpolate": True
+                                   },
+                           "rcv": {"histo": [1],
+                                   "labels": [1],
+                                   "removeToks": False,
+                                   "interpolate": True
+                                   }
+                           }
+                   }
+
     def __init__(self):
         super(AdaptiveTransport, self).__init__()
 
@@ -40,89 +67,12 @@ class AdaptiveTransport(WFPadTransport):
                                help="Length of messages to be transmitted"
                                     " (Default: MTU).",
                                dest="psize")
-
-        # Parameters governing padding
-        # Burst padding
-        # Sending
-        subparser.add_argument("--burst-histo-snd",
+        subparser.add_argument("--histo-file",
                                required=False,
-                               type=list,
-                               help="Histogram for burst padding (snd)."
-                                    " (Default: uniform).", default=[1],
-                               dest="burst_histo_snd")
-        subparser.add_argument("--burst-histo-snd-labels",
-                               required=False,
-                               type=list,
-                               help="Labels for the burst padding histo (snd)."
-                                    " (Default: --period).",
-                               dest="burst_histo_snd_labels")
-        subparser.add_argument("--burst-removetoks-snd",
-                               required=False,
-                               type=list,
-                               help="Remove tokens from distribution (snd)."
-                                    " (Default: False).", default=False,
-                               dest="burst_removetoks_snd")
-
-        # Receiving
-        subparser.add_argument("--burst-histo-rcv",
-                               required=False,
-                               type=list,
-                               help="Histogram for burst padding (rcv)."
-                                    " (Default: uniform).", default=[1],
-                               dest="burst_histo_rcv")
-        subparser.add_argument("--burst-histo-rcv-labels",
-                               required=False,
-                               type=list,
-                               help="Labels for the burst padding histo (rcv)."
-                                    " (Default: --period).",
-                               dest="burst_histo_rcv_labels")
-        subparser.add_argument("--burst-removetoks-rcv",
-                               required=False,
-                               type=list,
-                               help="Remove tokens from distribution (rcv)."
-                                    " (Default: False).", default=False,
-                               dest="burst_removetoks_rcv")
-
-        # Gap padding
-        # Sending
-        subparser.add_argument("--gap-histo-snd",
-                               required=False,
-                               type=list,
-                               help="Histogram for gap padding (snd)."
-                                    " (Default: uniform).", default=[1],
-                               dest="gap_histo_snd")
-        subparser.add_argument("--gap-histo-snd-labels",
-                               required=False,
-                               type=list,
-                               help="Labels for the gap padding histo (snd)."
-                                    " (Default: --period).",
-                               dest="gap_histo_snd_labels")
-        subparser.add_argument("--gap-removetoks-snd",
-                               required=False,
-                               type=list,
-                               help="Remove tokens from distribution (snd)."
-                                    " (Default: False).", default=False,
-                               dest="gap_removetoks_snd")
-
-        # Receiving
-        subparser.add_argument("--gap-histo-rcv",
-                               required=False,
-                               type=list,
-                               help="Histogram for gap padding (rcv)."
-                                    " (Default: uniform).", default=[1],
-                               dest="gap_histo_rcv")
-        subparser.add_argument("--gap-histo-rcv-labels",
-                               required=False,
-                               type=list,
-                               help="Labels for the gap padding histo (rcv)."
-                                    " (Default: --period).",
-                               dest="gap_histo_rcv_labels")
-        subparser.add_argument("--gap-removetoks-rcv",
-                               required=False,
-                               type=list,
-                               help="Remove tokens from distribution (rcv)."
-                                    " (Default: False).", default=False,
-                               dest="gap_removetoks_rcv")
+                               type=str,
+                               help="Fail containing histograms governing "
+                                    "padding. (Default: uniform histograms).",
+                               dest="histo_file")
 
         super(AdaptiveTransport, cls).register_external_mode_cli(subparser)
 
@@ -130,7 +80,7 @@ class AdaptiveTransport(WFPadTransport):
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables."""
         # Defaults for Adaptive Padding specifications.
-        cls._period = 10
+        cls._period = 1
         cls._length = const.MPU
 
         super(AdaptiveTransport, cls).validate_external_mode_cli(args)
@@ -139,35 +89,8 @@ class AdaptiveTransport(WFPadTransport):
             cls._period = args.period
         if args.psize:
             cls._length = args.psize
-
-        # Padding parameters
-        cls.burst_histo_snd = args.burst_histo_snd
-        cls.burst_removetoks_snd = args.burst_removetoks_snd
-        if args.burst_histo_snd_labels:
-            cls.burst_histo_snd_labels = args.burst_histo_snd_labels
-        else:
-            cls.burst_histo_snd_labels = [cls._period]
-
-        cls.burst_histo_rcv = args.burst_histo_rcv
-        cls.burst_removetoks_rcv = args.burst_removetoks_rcv
-        if args.burst_histo_rcv_labels:
-            cls.burst_histo_rcv_labels = args.burst_histo_rcv_labels
-        else:
-            cls.burst_histo_rcv_labels = [cls._period]
-
-        cls.gap_histo_snd = args.gap_histo_snd
-        cls.gap_removetoks_snd = args.gap_removetoks_snd
-        if args.gap_histo_snd_labels:
-            cls.gap_histo_snd_labels = args.gap_histo_snd_labels
-        else:
-            cls.gap_histo_snd_labels = [cls._period]
-
-        cls.gap_histo_rcv = args.gap_histo_rcv
-        cls.gap_removetoks_rcv = args.gap_removetoks_rcv
-        if args.gap_histo_rcv_labels:
-            cls.gap_histo_rcv_labels = args.gap_histo_rcv_labels
-        else:
-            cls.gap_histo_rcv_labels = [cls._period]
+        if args.histo_file:
+            cls._histograms = load_json(args.histo_file)
 
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
@@ -179,23 +102,14 @@ class AdaptiveTransport(WFPadTransport):
         #     i=0 -> [0, labels(0)]
         #     i=len(histo)-1 -> delay=infinite
         #     i=len(histo)-2 -> [labels(len(histo)-2), MAX_DELAY]
-        interpolate = True
-        self.relayBurstHistogram(self.burst_histo_snd,
-                                 self.burst_histo_snd_labels,
-                                 self.burst_removetoks_snd,
-                                 interpolate, "snd")
-        self.relayBurstHistogram(self.burst_histo_rcv,
-                                 self.burst_histo_rcv_labels,
-                                 self.burst_removetoks_rcv,
-                                 interpolate, "rcv")
-        self.relayGapHistogram(self.gap_histo_snd,
-                               self.gap_histo_snd_labels,
-                               self.gap_removetoks_snd,
-                               interpolate, "snd")
-        self.relayGapHistogram(self.gap_histo_rcv,
-                               self.gap_histo_rcv_labels,
-                               self.gap_removetoks_rcv,
-                               interpolate, "rcv")
+        self.relayBurstHistogram(**dict(self._histograms["burst"]["snd"],
+                                        **{"when": "snd"}))
+        self.relayBurstHistogram(**dict(self._histograms["burst"]["rcv"],
+                                        **{"when": "rcv"}))
+        self.relayGapHistogram(**dict(self._histograms["gap"]["snd"],
+                                      **{"when": "snd"}))
+        self.relayGapHistogram(**dict(self._histograms["gap"]["rcv"],
+                                      **{"when": "rcv"}))
 
 
 class AdaptiveClient(AdaptiveTransport):

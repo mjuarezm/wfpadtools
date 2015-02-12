@@ -53,17 +53,21 @@ class Obfsproxy(subprocess.Popen):
     def __init__(self, *args, **kwargs):
         """Spawns obfsproxy with 'args'"""
         argv = ["/bin/obfsproxy"]
+        print args
         if len(args) == 1 and (isinstance(args[0], list) or
                                isinstance(args[0], tuple)):
             argv.extend(args[0])
         else:
             argv.extend(args)
         log.debug("COMMAND: %s" % " ".join(argv))
-        subprocess.Popen.__init__(self, argv,
+        try:
+            subprocess.Popen.__init__(self, argv,
                                   stdin=open("/dev/null", "r"),
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE,
                                   **kwargs)
+        except Exception as e:
+            log.error("Exception on running process: %s" % e)
 
     severe_error_re = re.compile(r"\[(?:warn|err(?:or)?)\]")
 

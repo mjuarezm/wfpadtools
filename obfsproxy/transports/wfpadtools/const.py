@@ -63,6 +63,7 @@ ARGS_POS                = 8
 # Length of WFPad's MTU in bytes.  Note that this is *not* the link MTU
 # which is probably 1500 (we substract 52 bytes = TCP+IP headers)
 MTU                     = 1448
+MSS                     = 1460
 PSIZE                   = 600
 
 # Header length
@@ -75,6 +76,7 @@ MPU_CTRL                = MTU - HDR_CTRL_LEN
 
 # Max delay
 MAX_DELAY               = 262144
+INIT_RHO                = 1
 
 # Default shim ports
 SHIM_PORT               = 4997

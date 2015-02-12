@@ -14,6 +14,7 @@ import struct
 import termios  # @UnresolvedImport
 
 import obfsproxy.common.log as logging
+from obfsproxy.transports.wfpadtools import const
 
 
 log = logging.get_obfslogger()
@@ -53,7 +54,9 @@ def estimate_write_capacity(sock):
                                              socket.TCP_INFO, 104))
     snd_cwnd, unacked, snd_mss = tcp_info[25], tcp_info[11], tcp_info[9]
 #     print "snd_cwnd", snd_cwnd, "unacked", unacked, "snd_mss", snd_mss
-    tcp_space = (snd_cwnd - unacked) * snd_mss
+# FIXME: snd_mss returns very weird values!! So far we use the typical MSS
+#     tcp_space = (snd_cwnd - unacked) * snd_mss
+    tcp_space = (snd_cwnd - unacked) * const.MSS
 
     # Return the minimum of the two capacities.
     if tcp_space > socket_space:

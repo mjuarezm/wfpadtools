@@ -15,8 +15,8 @@ transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyCl
                                  'client':scramblesuit.ScrambleSuitClient,
                                  'server':scramblesuit.ScrambleSuitServer },
                'obfs3' : {'base': obfs3.Obfs3Transport, 'client' : obfs3.Obfs3Client, 'server' : obfs3.Obfs3Server },
+               'buflo' : {'base': buflo.BuFLOTransport, 'client' : buflo.BuFLOClient, 'server' : buflo.BuFLOServer },
                'wfpad': {'base': wfpad.WFPadTransport, 'client': wfpad.WFPadClient, 'server': wfpad.WFPadServer},
-               'buflo': {'base': buflo.BuFLOTransport, 'client': buflo.BuFLOClient, 'server': buflo.BuFLOServer},
                'csbuflo': {'base': csbuflo.CSBuFLOTransport, 'client': csbuflo.CSBuFLOClient, 'server': csbuflo.CSBuFLOServer},
                'tamaraw': {'base': tamaraw.TamarawTransport, 'client': tamaraw.TamarawClient, 'server': tamaraw.TamarawServer},
                'adaptive': {'base': adaptive.AdaptiveTransport, 'client': adaptive.AdaptiveClient, 'server': adaptive.AdaptiveServer} }
