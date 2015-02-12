@@ -47,16 +47,18 @@ class Histo:
         for i, value in enumerate(self.histo[index:]):
             if value > 0:
                 self.histo[index + i] -= 1
-                log.debug("[histo] Removed tokem from bin %s" % (index + i))
+                log.debug("[histo] Removed token from bin %s, histo is: %s" % (index + i, self.histo))
                 return
         for i, value in enumerate(self.histo[:index]):
             if value > 0:
                 self.histo[i] -= 1
-                log.debug("[histo] Removed tokem from bin %s" % (i))
+                log.debug("[histo] Removed token from bin %s, histo is: %s" % (i, self.histo))
                 return
 
     def refillHisto(self):
         self.histo = list(self.templateHisto)
+        log.debug("[histo] Refilled histo: %s" % (self.histo))
+
 
     def removeToken(self, label):
         if self.removeToks:

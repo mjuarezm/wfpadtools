@@ -97,7 +97,6 @@ import obfsproxy.transports.wfpadtools.test_util as test_ut
 
 log = logging.get_obfslogger()
 
-
 class WFPadTransport(BaseTransport):
     """Implements the base class for the WFPadTools transport.
 
@@ -218,7 +217,7 @@ class WFPadTransport(BaseTransport):
 
         cls.shim_ports = (const.SHIM_PORT,
                           const.SOCKS_PORT)
-        cls.shim = True if args.shim else False 
+        cls.shim = True if args.shim else False
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
         if args.test:
