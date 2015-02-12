@@ -31,8 +31,12 @@ class BuFLOTransport(WFPadTransport):
         # The stop condition in BuFLO:
         # BuFLO stops padding if the visit has finished and the
         # elapsed time has exceeded the minimum padding time.
-        self.stopCondition = lambda s: self.getElapsed() > self._mintime and \
-            not self.isVisiting()
+        def stopConditionHandler(s):
+            elapsed = s.getElapsed()
+            log.debug("[BuFLO] - elapsed = {}, mintime = {}, visiting = {}"
+                      .format(elapsed, s._mintime, s.isVisiting()))
+            return elapsed > s._mintime and not s.isVisiting()
+        self.stopCondition = stopConditionHandler
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
@@ -83,14 +87,13 @@ class BuFLOTransport(WFPadTransport):
 
         If a session has not yet started, it returns time since __init__.
         """
-        elapsed = time.time() - self._startTime
-        log.debug("[buflo] Return elapsed time "
-                  "since start of session %d." % elapsed)
-        return elapsed
+        return time.time() - self._startTime
 
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
         self._startTime = time.time()
+        log.debug("[buflo] - params: mintime={}, period={}, psize={}"
+                  .format(self._mintime, self._period, self._length))
         self.constantRatePaddingDistrib(self._period)
 
 
