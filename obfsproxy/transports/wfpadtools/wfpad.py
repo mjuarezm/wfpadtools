@@ -97,6 +97,7 @@ import obfsproxy.transports.wfpadtools.test_util as test_ut
 
 log = logging.get_obfslogger()
 
+
 class WFPadTransport(BaseTransport):
     """Implements the base class for the WFPadTools transport.
 
@@ -112,6 +113,7 @@ class WFPadTransport(BaseTransport):
         """Initialize a WFPadTransport object."""
         log.debug("[wfad] Initializing %s (id=%s)."
                   % (const.TRANSPORT_NAME, str(id(self))))
+        # TODO: Define classes for all these variables
         super(WFPadTransport, self).__init__()
 
         # Initialize the protocol's state machine
@@ -128,6 +130,10 @@ class WFPadTransport(BaseTransport):
         # Used for congestion sensitivity
         self._lastSndDownstreamTs = 0
         self._lastSndDataDownstreamTs = 0
+
+        self._lastRcvDownstreamTs = 0
+        self._lastRcvDataDownstreamTs = 0
+
         self._lastRcvUpstreamTs = 0
         self._consecPaddingMsgs = 0
         self._sentDataBytes = 0
@@ -215,8 +221,7 @@ class WFPadTransport(BaseTransport):
         cls.listen_addr = args.listen_addr
         cls.dest = args.dest if args.dest else None
 
-        cls.shim_ports = (const.SHIM_PORT,
-                          const.SOCKS_PORT)
+        cls.shim_ports = (const.SHIM_PORT, const.SOCKS_PORT)
         cls.shim = True if args.shim else False
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
@@ -273,13 +278,6 @@ class WFPadTransport(BaseTransport):
                         self.downstreamSocket = socket.fromfd(pconn.fd, pconn.family, pconn.type)
                         break
 
-        if self.weAreClient:
-            # To be implemented in the method that overrides `circuitConnected`
-            # in the child class of the final countermeasure. We can use
-            # primitives in this transport to initialize the probability
-            # distributions to be used at the server.
-            pass
-
     @test_ut.instrument_rcv_upstream
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream.
@@ -302,7 +300,7 @@ class WFPadTransport(BaseTransport):
                       len(self._buffer))
 
     def whenReceivedUpstream(self):
-        """Template pattern for child WF defense transport."""
+        """Template method for child WF defense transport."""
         pass
 
     @test_ut.instrument_class_method
@@ -311,14 +309,11 @@ class WFPadTransport(BaseTransport):
         d = data.read()
         if self._state >= const.ST_CONNECTED:
             self.whenReceivedDownstream()
-            if self._deferBurst['rcv'] and not self._deferBurst['rcv'].called:
-                self._deferBurst['rcv'].cancel()
-            if self._deferGap['rcv'] and not self._deferGap['rcv'].called:
-                self._deferGap['rcv'].cancel()
+            self.cancelDeferrers('rcv')
             return self.processMessages(d)
 
     def whenReceivedDownstream(self):
-        """Template pattern for child WF defense transport."""
+        """Template method for child WF defense transport."""
         pass
 
     def sendDownstream(self, data):
@@ -388,15 +383,7 @@ class WFPadTransport(BaseTransport):
 
         # Cancel existing deferred calls to padding methods to prevent
         # callbacks that remove tokens from histograms
-        deferBurstCancelled = deferGapCancelled = False
-        if self._deferBurst['snd'] and not self._deferBurst['snd'].called:
-            self._deferBurst['snd'].cancel()
-            deferBurstCancelled = True
-            log.debug("[wfpad] - Burst deferrer was cancelled.")
-        if self._deferGap['snd'] and not self._deferGap['snd'].called:
-            self._deferGap['snd'].cancel()
-            deferGapCancelled = True
-            log.debug("[wfpad] - Gap deferrer was cancelled.")
+        deferBurstCancelled, deferGapCancelled = self.cancelDeferrers('snd')
 
         # Draw delay for data message
         delay = self._delayDataProbdist.randomSample()
@@ -478,11 +465,11 @@ class WFPadTransport(BaseTransport):
         if len(self._buffer) > 0:
             dataDelay = self._delayDataProbdist.randomSample()
             self._deferData = deferLater(dataDelay, self.flushBuffer)
-            log.debug("[wfpad]  data waiting in buffer, flushing again "
-                      "after delay %s." % dataDelay)
+            log.debug("[wfpad] data waiting in buffer, flushing again "
+                      "after delay of %s ms." % dataDelay)
         else:
             self.deferBurstPadding('snd')
-            log.debug("[wfpad] buffer is empty, pad `snd` gap.")
+            log.debug("[wfpad] buffer is empty, pad `snd` burst.")
 
     def processMessages(self, data):
         """Extract WFPad protocol messages.
@@ -504,6 +491,7 @@ class WFPadTransport(BaseTransport):
             log.exception("[wfpad] Exception extracting "
                           "messages from stream: %s" % str(e))
 
+        self._lastRcvDownstreamTs = reactor.seconds()
         for msg in msgs:
             msg.rcvTime = time()
             if msg.flags & const.FLAG_CONTROL:
@@ -520,6 +508,7 @@ class WFPadTransport(BaseTransport):
                     log.debug("[wfad] Data flag detected, relaying upstream")
                     self._dataBytes['rcv'] += len(msg.payload)
                     self.circuit.upstream.write(msg.payload)
+                    self._lastRcvDataDownstreamTs = reactor.seconds()
 
                 # Filter padding messages out.
                 elif msg.flags & const.FLAG_PADDING:
@@ -537,11 +526,18 @@ class WFPadTransport(BaseTransport):
         `timeout` to send ignore packets and sample next delay.
         """
         burstDelay = self._burstHistoProbdist[when].randomSample()
+        log.debug("[wfpad] - Delay %sms sampled from burst distribution." % burstDelay)
         if burstDelay is not const.INF_LABEL:
             self._deferBurst[when] = deferLater(burstDelay,
                                                 self.timeout,
                                                 when=when,
                                                 cbk=self._deferBurstCallback[when])
+
+    def is_channel_idle(self):
+        """Return boolean on whether there has passed too much time without communication."""
+        is_idle_up = reactor.seconds() - self._lastSndDataDownstreamTs > const.MAX_LAST_DATA_TIME
+        is_idle_down = reactor.seconds() - self._lastSndDataDownstreamTs > const.MAX_LAST_DATA_TIME
+        return is_idle_up and is_idle_down
 
     def timeout(self, when):
         """Send ignore in response to up/downstream traffic and wait for data.
@@ -550,8 +546,12 @@ class WFPadTransport(BaseTransport):
         We call this method again in case we don't receive data after the
         delay.
         """
-        if reactor.seconds() - self._lastSndDataDownstreamTs > const.MAX_LAST_DATA_TIME:
-            self.endSession(const.DEFAULT_SESSION)
+        if self.weAreClient:
+            if self.is_channel_idle():
+                log.info("[wfpad] - Channel has been idle more than %s ms,"
+                         "flag end of session" % const.MAX_LAST_DATA_TIME)
+                self.endSession(const.DEFAULT_SESSION)
+                return
         if self.stopCondition(self):
             log.debug("[wfpad] -  Padding was stopped!!")
             return
@@ -594,6 +594,25 @@ class WFPadTransport(BaseTransport):
             self._sessId = sessId
         log.info("[wfpad] - Session has started!(sessid = %s)" % sessId)
 
+    def cancelDeferrer(self, d):
+        """Cancel padding deferrer."""
+        if d and not d.called:
+            log.debug("[wfpad] - Attempting to cancel a deferrer.")
+            d.cancel()
+            return True
+        return False
+
+    def cancelBurst(self, when):
+        log.debug("[wfpad] - Burst (%s) deferrer was cancelled." % when)
+        return self.cancelDeferrer(self._deferBurst[when])
+
+    def cancelGap(self, when):
+        log.debug("[wfpad] - Gap (%s) deferrer was cancelled." % when)
+        return self.cancelDeferrer(self._deferGap[when])
+
+    def cancelDeferrers(self, when):
+        return self.cancelBurst(when), self.cancelGap(when)
+
     def onSessionEnds(self, sessId):
         """Send hint for session end.
 
@@ -604,6 +623,18 @@ class WFPadTransport(BaseTransport):
         self._dataBytes = {'rcv': 0, 'snd': 0}
         self._totalBytes = {'rcv': 0, 'snd': 0}
         self._numMessages = {'rcv': 0, 'snd': 0}
+
+        self._lastSndDownstreamTs = 0
+        self._lastSndDataDownstreamTs = 0
+        self._lastRcvDownstreamTs = 0
+        self._lastRcvDataDownstreamTs = 0
+        self._lastRcvUpstreamTs = 0
+        self._consecPaddingMsgs = 0
+        self._sentDataBytes = 0
+
+        # Cancel deferers
+        self.cancelDeferrers('snd')
+        self.cancelDeferrers('rcv')
 
         if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT,
