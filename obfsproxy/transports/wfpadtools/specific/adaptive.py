@@ -2,8 +2,6 @@
 This module implements the Adaptive Padding countermeasure proposed
 by Shmatikov and Wang.
 """
-import json
-
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 
