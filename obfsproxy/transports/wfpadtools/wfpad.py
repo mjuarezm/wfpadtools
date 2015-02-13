@@ -1,8 +1,8 @@
 """The wfpad module implements the WFPadTools Tor pluggable transport.
 
 This module implements WFPadTools, a framework to develop link-padding-based
-website fingerprinting countermeasures in Tor. It implements a framing layer for
-the Tor protocol that allows to add cover traffic and provides a set of
+website fingerprinting countermeasures in Tor. It implements a framing layer
+for the Tor protocol that allows to add cover traffic and provides a set of
 primitives that can be used to implement more specific anti-website
 fingerprinting strategies.
 
@@ -83,16 +83,16 @@ from twisted.internet import reactor, task
 from twisted.internet.defer import CancelledError
 
 import obfsproxy.common.log as logging
-from obfsproxy.transports.base import BaseTransport, PluggableTransportError
+import obfsproxy.transports.wfpadtools.const as const
+import obfsproxy.transports.wfpadtools.histo as hist
+import obfsproxy.transports.wfpadtools.test_util as test_ut
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message as mes
 from obfsproxy.transports.wfpadtools import message, socks_shim
 from obfsproxy.transports.wfpadtools import wfpad_shim
-import obfsproxy.transports.wfpadtools.const as const
-import obfsproxy.transports.wfpadtools.histo as hist
 from obfsproxy.transports.wfpadtools.kist import estimate_write_capacity
-import obfsproxy.transports.wfpadtools.test_util as test_ut
+from obfsproxy.transports.base import BaseTransport, PluggableTransportError
 
 
 log = logging.get_obfslogger()

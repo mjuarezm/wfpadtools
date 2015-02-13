@@ -64,7 +64,7 @@ class CSBuFLOTransport(WFPadTransport):
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables."""
         # Defaults for BuFLO specifications.
-        cls._period = 10
+        cls._period = 1
         cls._length = const.MPU
         cls._padding_mode = const.TOTAL_PADDING
 
@@ -81,12 +81,12 @@ class CSBuFLOTransport(WFPadTransport):
         # Initialize rho stats
         WFPadTransport.onSessionStarts(self, sessId)
         self.constantRatePaddingDistrib(self._period)
-        if self._padding_mode is const.TOTAL_PADDING:
+        if self._padding_mode == const.TOTAL_PADDING:
             self.relayTotalPad(sessId, self._period, False)
-        elif self._padding_mode is const.PAYLOAD_PADDING:
+        elif self._padding_mode == const.PAYLOAD_PADDING:
             self.relayPayloadPad(sessId, self._period, False)
         else:
-            raise RuntimeError("Value passed for padding mode is not valid")
+            raise RuntimeError("Value passed for padding mode is not valid: %s" % self._padding_mode)
 
     def onSessionEnds(self, sessId):
         super(CSBuFLOTransport, self).onSessionEnds(sessId)
