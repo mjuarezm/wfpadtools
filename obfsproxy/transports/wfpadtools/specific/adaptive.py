@@ -4,10 +4,9 @@ by Shmatikov and Wang.
 """
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
-
-import obfsproxy.common.log as logging
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools.util import load_json
+import obfsproxy.common.log as logging
 
 
 log = logging.get_obfslogger()
