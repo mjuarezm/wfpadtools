@@ -288,7 +288,7 @@ class WFPadTransport(BaseTransport):
         d = data.read()
         self._lastRcvUpstreamTs = reactor.seconds()
         # Start session when getting data and not previously started
-        if self.weAreClient and not self._visiting:
+        if self.weAreClient and not self.isVisiting():
             self.startSession(const.DEFAULT_SESSION)
 
         if self._state >= const.ST_CONNECTED:
