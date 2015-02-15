@@ -1,3 +1,7 @@
+"""
+WARNING: THIS MODULE NEEDS A LOT OF LOVE...
+"""
+
 import json
 from os.path import join, exists
 from time import sleep
@@ -27,7 +31,7 @@ if DEBUG:
 DUMPS = {"client": join(const.TEST_DUMP_DIR, "client.dump"),
          "server": join(const.TEST_DUMP_DIR, "server.dump")}
 
-TEST_MSG = "foobar"
+TEST_MSG = "thisisatestmsg"
 
 
 class TestSetUp(tester.TransportsSetUp):
@@ -157,6 +161,9 @@ class SendPaddingTest(ControlMessageCommunicationTest, tu.STTest):
         paddingMsgs = [msg for msg in msgs if msg.flags == const.FLAG_PADDING]
         expNumPaddingMsgs = self.N
         numPaddingMsgs = len(paddingMsgs)
+        log.debug("TEST: Observed number of padding msgs (%s)"
+                  " expected num of padding msgs: %s"
+                  % (numPaddingMsgs, expNumPaddingMsgs))
         self.assertEquals(numPaddingMsgs, expNumPaddingMsgs,
                           "Observed number of padding msgs (%s)"
                           " does not match the expected one: %s"
@@ -167,6 +174,9 @@ class SendPaddingTest(ControlMessageCommunicationTest, tu.STTest):
         expectedDelay = self.t / const.SCALE
         for msg0, msg1 in zip(msgs[:-1], msgs[1:]):
             obsPeriod = msg1.rcvTime - msg0.rcvTime
+            log.debug("TEST: Observed delay %s should approx"
+                      " match the expected delay: %s"
+                      % (obsPeriod, expectedDelay))
             self.assertAlmostEqual(obsPeriod, expectedDelay,
                                    msg="The observed delay %s does not"
                                    " match with the expected delay: %s"
@@ -200,6 +210,9 @@ class AppHintTest(ControlMessageCommunicationTest, tu.STTest):
 
     def spectest_sessid(self):
         firstServerState = self.states(self.serverDumps)[0]
+        log.debug("TEST: The server's session Id (%s) should match "
+                  "the session Id indicated in the hint (%s)."
+                  % (firstServerState['_sessId'], self.sessId))
         self.assertEquals(firstServerState['_sessId'], self.sessId,
                           "The server's session Id (%s) does not match "
                           "the session Id indicated in the hint (%s)."
@@ -207,6 +220,9 @@ class AppHintTest(ControlMessageCommunicationTest, tu.STTest):
 
     def spectest_state(self):
         firstServerState = self.states(self.serverDumps)[0]
+        log.debug("TEST: The server's state (%s) should match "
+                  "the status indicated in the hint (%s)."
+                  % (firstServerState['_visiting'], self.status))
         self.assertEquals(firstServerState['_visiting'], self.status,
                           "The server's state (%s) does not match "
                           "the status indicated in the hint (%s)."
@@ -237,6 +253,8 @@ class TotalPadTest(PostPrimitiveTest, tu.STTest):
         clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)
                              if msg.flags & const.FLAG_PADDING]
         obsNumMessages = len(clientPaddingMsgs)
+        log.debug("TEST: The observed number of padding messages (%s) "
+                  "should be a power of 2." % obsNumMessages)
         self.assertTrue((obsNumMessages & (obsNumMessages - 1)) == 0,
                         "The observed number of padding messages (%s) "
                         "is not a power of 2." % obsNumMessages)
@@ -247,6 +265,9 @@ class TotalPadTest(PostPrimitiveTest, tu.STTest):
         for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
             observedPeriod = msg2.rcvTime - msg1.rcvTime
             expectedPeriod = self.delay
+            log.debug("TEST: The observed period %s should"
+                      " match with the expected period: %s"
+                      % (observedPeriod, expectedPeriod))
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
                                    msg="The observed period %s does not"
                                    " match with the expected period: %s"
@@ -254,39 +275,39 @@ class TotalPadTest(PostPrimitiveTest, tu.STTest):
                                    delta=0.05)
 
 
-class PayloadPadBytesTest(PostPrimitiveTest, tu.STTest):
-    # Config endpoints
-    transport = "buflo"
-    server_args = ("buflo", "server",
-                   "127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
-                   "--test=%s" % DUMPS["server"])
-    client_args = ("buflo", "client",
-                   "127.0.0.1:%d" % tester.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
-                   "--test=%s" % DUMPS["client"])
-
-    # Arguments
-    opcode = const.OP_PAYLOAD_PAD
-    sessId, delay, msg_level = "id123", 1, False
-    args = [sessId, delay, msg_level]
-
-    def do_instructions(self):
-        self.send_to_transport(TEST_MSG)
-
-    def posttest_num_data_bytes_correctly_padded(self):
-        lastState = self.states(self.postServerDumps)[-1]
-        dataSentBytes = lastState['_dataBytes']['rcv']
-        totalSentBytes = lastState['_totalBytes']['rcv']
-        expectedNumBytes = wfpad.bytes_after_payload_padding(dataSentBytes,
-                                                             totalSentBytes)
-        self.assertEqual(expectedNumBytes, dataSentBytes,
-                         "The observed number of bytes (%s) "
-                         "does not match the expected (%s)."
-                         % (dataSentBytes, expectedNumBytes))
-
-    def posttest_period(self):
-        pass
+# class PayloadPadBytesTest(PostPrimitiveTest, tu.STTest):
+#     # Config endpoints
+#     transport = "buflo"
+#     server_args = ("buflo", "server",
+#                    "127.0.0.1:%d" % tester.SERVER_PORT,
+#                    "--dest=127.0.0.1:%d" % tester.EXIT_PORT,
+#                    "--test=%s" % DUMPS["server"])
+#     client_args = ("buflo", "client",
+#                    "127.0.0.1:%d" % tester.ENTRY_PORT,
+#                    "--dest=127.0.0.1:%d" % tester.SERVER_PORT,
+#                    "--test=%s" % DUMPS["client"])
+# 
+#     # Arguments
+#     opcode = const.OP_PAYLOAD_PAD
+#     sessId, delay, msg_level = "id123", 1, False
+#     args = [sessId, delay, msg_level]
+# 
+#     def do_instructions(self):
+#         self.send_to_transport(TEST_MSG)
+# 
+#     def posttest_num_data_bytes_correctly_padded(self):
+#         lastState = self.states(self.postServerDumps)[-1]
+#         dataSentBytes = lastState['_dataBytes']['rcv']
+#         totalSentBytes = lastState['_totalBytes']['rcv']
+#         expectedNumBytes = wfpad.bytes_after_payload_padding(dataSentBytes,
+#                                                              totalSentBytes)
+#         self.assertEqual(expectedNumBytes, dataSentBytes,
+#                          "The observed number of bytes (%s) "
+#                          "does not match the expected (%s)."
+#                          % (dataSentBytes, expectedNumBytes))
+# 
+#     def posttest_period(self):
+#         pass
 
 
 class BatchPadTest(PostPrimitiveTest, tu.STTest):
@@ -307,13 +328,15 @@ class BatchPadTest(PostPrimitiveTest, tu.STTest):
     args = [sessId, L, delay]
 
     def do_instructions(self):
-        #self.send_to_transport(tester.TEST_FILE)
-        pass
+        self.send_to_transport(tester.TEST_FILE)
 
     def posttest_num_messages_is_multiple_of_L(self):
         clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)
                              if msg.flags & const.FLAG_PADDING]
         obsNumMessages = len(clientPaddingMsgs)
+        log.debug("TEST: The observed number of padding messages (%s) "
+                  "should be a multiple of %s."
+                  % (obsNumMessages, self.L))
         self.assertTrue(obsNumMessages % self.L == 0,
                         "The observed number of padding messages (%s) "
                         "is not a multiple of %s."
@@ -325,6 +348,9 @@ class BatchPadTest(PostPrimitiveTest, tu.STTest):
         for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
             observedPeriod = msg2.rcvTime - msg1.rcvTime
             expectedPeriod = self.delay
+            self.debug("The observed period %s should"
+                       " match with the expected period: %s"
+                       % (observedPeriod, expectedPeriod))
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
                                    msg="The observed period %s does not"
                                    " match with the expected period: %s"
@@ -373,6 +399,9 @@ class ConstantRateRcvHistoTests(PostPrimitiveTest, tu.STTest):
         for msg1, msg2 in zip(clientPaddingMsgs[:-1], clientPaddingMsgs[1:]):
             observedPeriod = msg2.rcvTime - msg1.rcvTime
             expectedPeriod = self.delay / const.SCALE
+            log.debug("TEST: The observed period %s does not"
+                      " match with the expected period: %s"
+                      % (observedPeriod, expectedPeriod))
             self.assertAlmostEqual(observedPeriod, expectedPeriod,
                                    msg="The observed period %s does not"
                                    " match with the expected period: %s"

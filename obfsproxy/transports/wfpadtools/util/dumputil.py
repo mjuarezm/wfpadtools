@@ -1,7 +1,7 @@
 import inspect
 import json
 import cPickle as pick
-from os.path import join, isfile, basename, dirname
+from os.path import join, isfile, basename, dirname, exists
 
 # WFPadTools imports
 from obfsproxy.transports.wfpadtools import const
