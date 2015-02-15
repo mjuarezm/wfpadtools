@@ -23,6 +23,7 @@ import time
 import unittest
 
 import obfsproxy.common.log as logging
+from time import sleep
 
 
 log = logging.get_obfslogger()
@@ -210,6 +211,7 @@ class DirectTest(TransportsSetUp):
     def setUp(self):
         self.output_reader = ReadWorker(("127.0.0.1", EXIT_PORT))
         super(DirectTest, self).setUp()
+        sleep(1.0)
         self.input_chan = connect_with_retry(("127.0.0.1", ENTRY_PORT))
         self.input_chan.settimeout(SOCKET_TIMEOUT)
 

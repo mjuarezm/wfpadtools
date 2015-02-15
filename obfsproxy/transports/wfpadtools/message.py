@@ -9,11 +9,12 @@ our protocol specification.
 """
 import json
 import math
-from obfsproxy.transports.wfpadtools import const
 
+# WFPadTools imports
 import obfsproxy.common.log as logging
-import obfsproxy.common.serialize as pack
 import obfsproxy.transports.base as base
+import obfsproxy.common.serialize as pack
+from obfsproxy.transports.wfpadtools import const
 
 
 log = logging.get_obfslogger()

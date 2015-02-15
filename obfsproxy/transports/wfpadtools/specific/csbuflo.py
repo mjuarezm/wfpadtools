@@ -10,8 +10,7 @@ import obfsproxy.common.log as logging
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
-from obfsproxy.transports.wfpadtools.util import apply_consecutive_elements,\
-    flatten_list
+from obfsproxy.transports.wfpadtools.util import genutil as gu
 
 
 # Logging
@@ -127,9 +126,8 @@ class CSBuFLOTransport(WFPadTransport):
 
     def estimate_rho(self, rho_star):
         """Estimate new value of rho based on past network performance."""
-        time_intervals = flatten_list([apply_consecutive_elements(burst_list,
-                                                                  lambda x, y: y - x)
-                                       for burst_list in self._rho_stats])
+        time_intervals = gu.flatten_list([gu.apply_consecutive_elements(burst_list, lambda x, y: y - x)
+                                          for burst_list in self._rho_stats])
         if len(time_intervals) == 0:
             return rho_star
         else:

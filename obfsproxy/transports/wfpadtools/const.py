@@ -1,5 +1,5 @@
-from os.path import join, abspath, dirname, pardir
 import tempfile
+from os.path import join, abspath, dirname, pardir
 
 # Shortcuts
 jn = join

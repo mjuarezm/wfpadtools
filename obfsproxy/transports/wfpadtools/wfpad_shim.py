@@ -1,7 +1,7 @@
 from sets import Set
 
 import obfsproxy.common.log as logging
-from obfsproxy.transports.wfpadtools import util as ut
+from obfsproxy.transports.wfpadtools.util import genutil as gu
 
 
 log = logging.get_obfslogger()
@@ -69,4 +69,4 @@ class WFPadShimObserver(object):
         In the final countermeasure we can hash the URL to set particular
         padding strategies for individual pages.
         """
-        return ut.hash_text(str(self._sessId) + str(ut.timestamp()))
+        return gu.hash_text(str(self._sessId) + str(gu.timestamp()))

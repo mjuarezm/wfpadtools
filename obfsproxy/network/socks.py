@@ -155,9 +155,7 @@ class OBFSSOCKSv5Protocol(socks5.SOCKSv5Protocol, network.GenericProtocol):
             instance = OBFSSOCKSv5OutgoingFactory(self)
             return network.create_proxy_client(addr, port, self.pt_config.proxy, instance)
         else:
-            clientCreator = protocol.ClientCreator(reactor, OBFSSOCKSv5Outgoing, self)
-            self.circuit.transport.client = clientCreator.connector
-            return clientCreator.connectTCP(addr, port)
+            return protocol.ClientCreator(reactor, OBFSSOCKSv5Outgoing, self).connectTCP(addr, port)
 
     def set_up_circuit(self, otherConn):
         self.circuit.setDownstreamConnection(otherConn)
@@ -168,9 +166,8 @@ class OBFSSOCKSv5Factory(protocol.Factory):
     A SOCKSv5 factory.
     """
 
-    def __init__(self, transport_class, pt_config, transport=None):
+    def __init__(self, transport_class, pt_config):
         # XXX self.logging = log
-        self.transport = transport if transport else None
         self.transport_class = transport_class
         self.pt_config = pt_config
 
@@ -181,7 +178,7 @@ class OBFSSOCKSv5Factory(protocol.Factory):
 
     def buildProtocol(self, addr):
         log.debug("%s: New connection." % self.name)
-        transport = self.transport if self.transport else self.transport_class()
-        circuit = network.Circuit(transport)
+
+        circuit = network.Circuit(self.transport_class())
 
         return OBFSSOCKSv5Protocol(circuit, self.pt_config)

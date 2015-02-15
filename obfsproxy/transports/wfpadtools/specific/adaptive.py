@@ -5,7 +5,7 @@ by Shmatikov and Wang.
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 from obfsproxy.transports.scramblesuit import probdist
-from obfsproxy.transports.wfpadtools.util import load_json
+from obfsproxy.transports.wfpadtools.util import dumputil as du
 import obfsproxy.common.log as logging
 
 
@@ -87,7 +87,7 @@ class AdaptiveTransport(WFPadTransport):
         if args.psize:
             cls._length = args.psize
         if args.histo_file:
-            cls._histograms = load_json(args.histo_file)
+            cls._histograms = du.load_json(args.histo_file)
 
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)

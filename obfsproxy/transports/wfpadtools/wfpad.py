@@ -82,13 +82,15 @@ from time import time
 from twisted.internet import reactor, task
 from twisted.internet.defer import CancelledError
 
+# Scramblesuit imports
+from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.scramblesuit.fifobuf import Buffer
+
 # WFPadTools imports
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
 import obfsproxy.transports.wfpadtools.histo as hist
 import obfsproxy.transports.wfpadtools.util.testutil as test_ut
-from obfsproxy.transports.scramblesuit import probdist
-from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message as mes
 from obfsproxy.transports.wfpadtools import message, socks_shim
 from obfsproxy.transports.wfpadtools import wfpad_shim

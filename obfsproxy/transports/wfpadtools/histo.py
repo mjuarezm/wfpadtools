@@ -3,12 +3,13 @@ The class Histo provides an interface to generate and sample probability
 distributions represented as histograms.
 """
 
-from random import randint
 import random
+import bisect
+from random import randint
 
+# WFPadTools imports
 from obfsproxy.transports.wfpadtools import const
 import obfsproxy.common.log as logging
-import bisect
 
 
 log = logging.get_obfslogger()
@@ -58,7 +59,6 @@ class Histo:
     def refillHisto(self):
         self.histo = list(self.templateHisto)
         log.debug("[histo] Refilled histo: %s" % (self.histo))
-
 
     def removeToken(self, label):
         if self.removeToks:

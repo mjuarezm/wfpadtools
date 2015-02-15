@@ -13,6 +13,7 @@ import socket
 import struct
 import termios  # @UnresolvedImport
 
+# WFPadTools imports
 import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools import const
 

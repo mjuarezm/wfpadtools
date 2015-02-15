@@ -1,15 +1,15 @@
 import logging
-from os.path import join
 
-import common as cm
+# WFPadTools imports
+from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.util.fileutil import touch
 
 
 # set up logging to file - see previous section for more details
-logging.basicConfig(level=logging.DEBUG if cm.LOG_LEVEL == cm.LOG_DEBUG else logging.INFO,
+logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%m-%d %H:%M',
-                    filename=join(cm.RESULTS_DIR, "last_run_setup.log"),
+                    filename=const.DEFAULT_LOG,
                     filemode='w')
 
 # define a Handler which writes INFO messages or higher to the sys.stderr
