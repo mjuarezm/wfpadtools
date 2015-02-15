@@ -12,7 +12,6 @@ import Queue
 import difflib
 import errno
 import multiprocessing
-from os.path import join
 import re
 import shutil
 import signal
@@ -53,22 +52,19 @@ class Obfsproxy(subprocess.Popen):
     """
     def __init__(self, *args, **kwargs):
         """Spawns obfsproxy with 'args'"""
-        argv = ["/bin/obfsproxy"]
-        print args
+#         logfile = join("/tmp", "obfsproxy_tester_{}.log".format(args[0][1]))
+        argv = ["/bin/obfsproxy", "--log-min-severity", "error"]
         if len(args) == 1 and (isinstance(args[0], list) or
                                isinstance(args[0], tuple)):
             argv.extend(args[0])
         else:
             argv.extend(args)
         log.debug("COMMAND: %s" % " ".join(argv))
-        try:
-            subprocess.Popen.__init__(self, argv,
+        subprocess.Popen.__init__(self, argv,
                                   stdin=open("/dev/null", "r"),
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE,
                                   **kwargs)
-        except Exception as e:
-            log.error("Exception on running process: %s" % e)
 
     severe_error_re = re.compile(r"\[(?:warn|err(?:or)?)\]")
 
@@ -181,9 +177,6 @@ class ReadWorker(object):
 # (except that I have fleshed out the SOCKS test a bit).
 # It will be made more general and parametric Real Soon.
 
-TESTSHIM_PORT   = -1
-SHIM_PORT       = 4997
-SOCKS_PORT      = 4998
 ENTRY_PORT      = 4999
 SERVER_PORT     = 5000
 EXIT_PORT       = 5001
@@ -241,18 +234,6 @@ class DirectTest(TransportsSetUp):
         if report != "":
             self.fail("\n" + report)
 
-class DirectShimTest(DirectTest):
-
-        def setUp(self):
-            super(DirectShimTest, self).setUp()
-            self.shim_chan = connect_with_retry(("127.0.0.1", SHIM_PORT))
-            self.shim_chan.settimeout(SOCKET_TIMEOUT)
-
-        def tearDown(self):
-            self.shim_chan.close()
-            super(DirectShimTest, self).tearDown()
-
-#
 # Concrete test classes specialize the above base classes for each protocol.
 #
 class DirectDummy(DirectTest, unittest.TestCase):
@@ -335,103 +316,6 @@ class DirectScrambleSuit(DirectTest, unittest.TestCase):
         # Now, we can clean up after ourselves.
         shutil.rmtree(self.tmpdir_srv)
         shutil.rmtree(self.tmpdir_cli)
-
-class DirectWFPad(DirectShimTest, unittest.TestCase):
-    transport = "wfpad"
-    server_args = ("wfpad", "server",
-           "127.0.0.1:%d" % SERVER_PORT,
-           "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = ("wfpad", "client",
-            "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
-            "127.0.0.1:%d" % ENTRY_PORT,
-            "--dest=127.0.0.1:%d" % SERVER_PORT)
-
-class DirectWFPadTest(DirectTest, unittest.TestCase):
-    transport = "wfpad"
-    server_args = ("wfpad", "server",
-           "127.0.0.1:%d" % SERVER_PORT,
-           "--dest=127.0.0.1:%d" % EXIT_PORT,
-           "--test=/tmp/client.dump")
-    client_args = ("wfpad", "client",
-            "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
-            "127.0.0.1:%d" % ENTRY_PORT,
-            "--dest=127.0.0.1:%d" % SERVER_PORT,
-            "--test=/tmp/client.dump")
-
-class DirectBuFLO(DirectShimTest, unittest.TestCase):
-    transport = "buflo"
-    server_args = ("buflo", "server",
-           "127.0.0.1:%d" % SERVER_PORT,
-           "--period=1",
-           "--psize=1443",
-           "--mintime=10",
-           "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = ("buflo", "client",
-           "127.0.0.1:%d" % ENTRY_PORT,
-           "--period=1",
-           "--psize=1443",
-           "--mintime=10",
-           "--dest=127.0.0.1:%d" % SERVER_PORT)
-
-class DirectShimBuFLO(DirectShimTest, unittest.TestCase):
-    transport = "buflo"
-    server_args = ("buflo", "server",
-           "127.0.0.1:%d" % SERVER_PORT,
-           "--period=1",
-           "--psize=1443",
-           "--mintime=10",
-           "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = ("buflo", "client",
-           "127.0.0.1:%d" % ENTRY_PORT,
-           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
-           "--period=1",
-           "--psize=1443",
-           "--mintime=10",
-           "--dest=127.0.0.1:%d" % SERVER_PORT)
-
-class DirectShimCSBuFLO(DirectShimTest, unittest.TestCase):
-    transport = "csbuflo"
-    server_args = ("csbuflo", "server",
-           "127.0.0.1:%d" % SERVER_PORT,
-           "--period=1",
-           "--psize=1443",
-           "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = ("buflo", "client",
-           "127.0.0.1:%d" % ENTRY_PORT,
-           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
-           "--period=1",
-           "--psize=1443",
-           "--dest=127.0.0.1:%d" % SERVER_PORT)
-
-class DirectShimTamaraw(DirectShimTest, unittest.TestCase):
-    transport = "tamaraw"
-    server_args = ("tamaraw", "server",
-           "127.0.0.1:%d" % SERVER_PORT,
-           "--period=1",
-           "--psize=1443",
-           "--batch=1000",
-           "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = ("tamaraw", "client",
-           "127.0.0.1:%d" % ENTRY_PORT,
-           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
-           "--period=1",
-           "--psize=1443",
-           "--batch=1000",
-           "--dest=127.0.0.1:%d" % SERVER_PORT)
-
-class DirectShimAdaptivePadding(DirectShimTest, unittest.TestCase):
-    transport = "adaptive"
-    server_args = ("adaptive", "server",
-           "127.0.0.1:%d" % SERVER_PORT,
-           "--period=1",
-           "--psize=1443",
-           "--dest=127.0.0.1:%d" % EXIT_PORT)
-    client_args = ("adaptive", "client",
-           "127.0.0.1:%d" % ENTRY_PORT,
-           "--socks-shim=%d,%d" % (SHIM_PORT, TESTSHIM_PORT),
-           "--period=1",
-           "--psize=1443",
-           "--dest=127.0.0.1:%d" % SERVER_PORT)
 
 TEST_FILE = """\
 THIS IS A TEST FILE. IT'S USED BY THE INTEGRATION TESTS.

@@ -21,6 +21,7 @@ from twisted.internet import reactor
 from twisted.internet.protocol import Protocol, Factory
 from twisted.internet.endpoints import TCP4ClientEndpoint, TCP4ServerEndpoint
 
+# WFPadTools imports
 from obfsproxy.network.buffer import Buffer
 import obfsproxy.common.log as logging
 

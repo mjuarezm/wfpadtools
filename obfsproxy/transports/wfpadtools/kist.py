@@ -56,8 +56,8 @@ def estimate_write_capacity(sock):
     snd_cwnd, unacked, snd_mss = tcp_info[25], tcp_info[11], tcp_info[9]
 #     print "snd_cwnd", snd_cwnd, "unacked", unacked, "snd_mss", snd_mss
 # FIXME: snd_mss returns very weird values!! So far we use the typical MSS
-#     tcp_space = (snd_cwnd - unacked) * snd_mss
-    tcp_space = (snd_cwnd - unacked) * const.MSS
+    tcp_space = (snd_cwnd - unacked) * snd_mss
+#     tcp_space = (snd_cwnd - unacked) * const.MSS
 
     # Return the minimum of the two capacities.
     if tcp_space > socket_space:

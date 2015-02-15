@@ -189,9 +189,6 @@ class WFPadTransport(BaseTransport):
                 _shim = socks_shim.get()
                 self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
                 _shim.registerObserver(self._sessionObserver)
-            else:
-                self._sessId = const.DEFAULT_SESSION
-                self._visiting = False
         else:
             self._sessId = const.DEFAULT_SESSION
             self._visiting = False
@@ -292,9 +289,6 @@ class WFPadTransport(BaseTransport):
         """
         d = data.read()
         self._lastRcvUpstreamTs = reactor.seconds()
-        # Start session when getting data and not previously started
-        if self.weAreClient and not self.isVisiting():
-            self.startSession(const.DEFAULT_SESSION)
 
         if self._state >= const.ST_CONNECTED:
             self.pushData(d)
@@ -660,19 +654,6 @@ class WFPadTransport(BaseTransport):
             return self._visiting
         if self._sessionObserver:
             return self._sessionObserver._visiting
-        return self._visiting
-
-    def startSession(self, sessId):
-        """Set visiting flag to `True` and sends AppHint to server."""
-        if self.weAreClient and not self._sessionObserver:
-            self._visiting = True
-            self.onSessionStarts(sessId)
-
-    def endSession(self, sessId):
-        """Set visiting flag to `True` and sends AppHint to server."""
-        if self.weAreClient and not self._sessionObserver:
-            self._visiting = False
-            self.onSessionEnds(sessId)
 
     # ==========================================================================
     # Deal with control messages
