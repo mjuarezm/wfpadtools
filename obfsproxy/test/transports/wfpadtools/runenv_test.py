@@ -2,7 +2,8 @@ import os
 from os.path import join, exists
 import unittest
 
-from obfsproxy.test.transports.wfpadtools.sttest import STTest
+# WFPadTools imports
+from obfsproxy.transports.wfpadtools.util.testutil import STTest
 from obfsproxy.transports.wfpadtools import const
 
 

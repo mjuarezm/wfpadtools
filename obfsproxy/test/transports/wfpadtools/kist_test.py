@@ -2,12 +2,13 @@
 Tests for the kist.py module that implements the KIST algorithm.
 '''
 import socket
-from time import sleep
 import unittest
+from time import sleep
 
+# WFPadTools imports
 from obfsproxy.transports.wfpadtools import const
+from obfsproxy.transports.wfpadtools.util import testutil
 from obfsproxy.transports.wfpadtools.kist import estimate_write_capacity
-from obfsproxy.transports.wfpadtools import test_util
 
 
 HOST = "127.0.0.1"
@@ -20,7 +21,7 @@ class KistTest(unittest.TestCase):
         pass
 
     def test_estimate_write_capacity_client(self):
-        test_util.DummyReadWorker((HOST, PORT))
+        testutil.DummyReadWorker((HOST, PORT))
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sleep(1)
         client_socket.connect((HOST, PORT))
@@ -31,11 +32,11 @@ class KistTest(unittest.TestCase):
             buf_capacity = estimate_write_capacity(client_socket)
             print i, buf_capacity
             i += 1
-        self.assertTrue(buf_capacity > const.MTU)
+        self.assertTrue(buf_capacity <= const.MTU)
         client_socket.close()
 
     def test_estimate_write_capacity_server(self):
-        test_util.DummyWriteWorker((HOST, PORT))
+        testutil.DummyWriteWorker((HOST, PORT))
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind((HOST, PORT))

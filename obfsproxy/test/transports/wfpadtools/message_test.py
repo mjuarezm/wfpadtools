@@ -1,9 +1,10 @@
+import json
 import unittest
 
+# WFPadTools imports
 import obfsproxy.transports.wfpadtools.message as msg
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.scramblesuit import probdist
-import json
 
 
 class WFPadMessageFactoryTest(unittest.TestCase):

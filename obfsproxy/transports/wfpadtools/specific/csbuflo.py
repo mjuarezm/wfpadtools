@@ -1,17 +1,20 @@
 """
 This module implements the CS-CSBuFLO countermeasure proposed by Cai et al.
 """
+import math
+import numpy
+from random import uniform
+
+# WFPadTools imports
 import obfsproxy.common.log as logging
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 from obfsproxy.transports.wfpadtools.util import apply_consecutive_elements,\
     flatten_list
-import math
-import numpy
-from random import uniform
 
 
+# Logging
 log = logging.get_obfslogger()
 
 

@@ -82,10 +82,11 @@ from time import time
 from twisted.internet import reactor, task
 from twisted.internet.defer import CancelledError
 
+# WFPadTools imports
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
 import obfsproxy.transports.wfpadtools.histo as hist
-import obfsproxy.transports.wfpadtools.test_util as test_ut
+import obfsproxy.transports.wfpadtools.util.testutil as test_ut
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import message as mes
@@ -93,6 +94,8 @@ from obfsproxy.transports.wfpadtools import message, socks_shim
 from obfsproxy.transports.wfpadtools import wfpad_shim
 from obfsproxy.transports.wfpadtools.kist import estimate_write_capacity
 from obfsproxy.transports.base import BaseTransport, PluggableTransportError
+from obfsproxy.transports.wfpadtools.util.mathutil import closest_power_of_two,\
+    closest_multiple
 
 
 log = logging.get_obfslogger()
@@ -941,6 +944,19 @@ def deferLater(*args, **kargs):
             raise f.raiseException()
     d.addErrback(errbackCancel)
     return d
+
+
+def bytes_after_total_padding(total_bytes, psize=1):
+    """Return the total bytes transmitted after 'total' padding."""
+    n2 = closest_power_of_two(total_bytes)
+    return closest_multiple(n2, psize, ceil=False)
+
+
+def bytes_after_payload_padding(data_bytes, total_bytes, psize=1):
+    """Return the total bytes transmitted after 'payload' padding."""
+    n2 = closest_power_of_two(data_bytes)
+    m = closest_multiple(total_bytes, n2)
+    return closest_multiple(m, psize, ceil=False)
 
 
 class WFPadClient(WFPadTransport):

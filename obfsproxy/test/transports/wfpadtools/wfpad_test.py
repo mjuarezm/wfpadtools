@@ -1,20 +1,17 @@
 import json
 from os.path import join, exists
-from sets import Set
 from time import sleep
 import time
 import unittest
 
-from obfsproxy.common import transport_config
+# WFPadTools imports
 import obfsproxy.common.log as logging
 from obfsproxy.test import tester
 from obfsproxy.test.tester import TransportsSetUp, TEST_FILE
-from obfsproxy.test.transports.wfpadtools.sttest import STTest
-from obfsproxy.transports.wfpadtools import const
-from obfsproxy.transports.wfpadtools import util as ut
-from obfsproxy.transports.wfpadtools import test_util as tu
-from obfsproxy.transports.wfpadtools import wfpad
-from obfsproxy.transports.wfpadtools import wfpad_shim
+from obfsproxy.transports.wfpadtools import const, wfpad
+from obfsproxy.transports.wfpadtools.util import testutil as tu
+from obfsproxy.transports.wfpadtools.util import fileutil as fu
+from obfsproxy.transports.wfpadtools.util import dumputil as du
 from obfsproxy.transports.wfpadtools.message import getOpcodeNames
 
 
@@ -38,8 +35,8 @@ class TestSetUp(TransportsSetUp):
 
     def setUp(self):
         if exists(const.TEST_SERVER_DIR):
-            ut.removedir(const.TEST_SERVER_DIR)
-        ut.createdir(const.TEST_SERVER_DIR)
+            fu.removedir(const.TEST_SERVER_DIR)
+        fu.createdir(const.TEST_SERVER_DIR)
         super(TestSetUp, self).setUp()
         self.output_reader = tu.DummyReadWorker(("127.0.0.1",
                                                  tester.EXIT_PORT))
@@ -51,7 +48,7 @@ class TestSetUp(TransportsSetUp):
         self.output_reader.stop()
         self.input_chan.close()
         super(TestSetUp, self).tearDown()
-        ut.removedir(const.TEST_SERVER_DIR)
+        fu.removedir(const.TEST_SERVER_DIR)
         if DEBUG:
             self.print_output()
 
@@ -116,7 +113,7 @@ class ControlMessageCommunicationTest(TestSetUp):
 
     def load_wrapper(self, end):
         try:
-            return ut.pick_load(DUMPS[end])
+            return du.pick_load(DUMPS[end])
         except:
             # TODO: find the right exception
             return {}
@@ -138,7 +135,7 @@ class PostPrimitiveTest(ControlMessageCommunicationTest):
             getattr(self, specTest)()
 
 
-class SendPaddingTest(ControlMessageCommunicationTest, STTest):
+class SendPaddingTest(ControlMessageCommunicationTest, tu.STTest):
     # Config endpoints
     transport = "wfpad"
     server_args = ("wfpad", "server",
@@ -177,7 +174,7 @@ class SendPaddingTest(ControlMessageCommunicationTest, STTest):
                                    delta=0.005)
 
 
-class AppHintTest(ControlMessageCommunicationTest, STTest):
+class AppHintTest(ControlMessageCommunicationTest, tu.STTest):
     """Test server sends a hint to client."""
     # Config endpoints
     transport = "wfpad"
@@ -216,7 +213,7 @@ class AppHintTest(ControlMessageCommunicationTest, STTest):
                           % (firstServerState['_visiting'], self.status))
 
 
-class TotalPadTest(PostPrimitiveTest, STTest):
+class TotalPadTest(PostPrimitiveTest, tu.STTest):
     # Config endpoints
     transport = "buflo"
     server_args = ("buflo", "server",
@@ -257,7 +254,7 @@ class TotalPadTest(PostPrimitiveTest, STTest):
                                    delta=0.05)
 
 
-class PayloadPadBytesTest(PostPrimitiveTest, STTest):
+class PayloadPadBytesTest(PostPrimitiveTest, tu.STTest):
     # Config endpoints
     transport = "buflo"
     server_args = ("buflo", "server",
@@ -281,8 +278,8 @@ class PayloadPadBytesTest(PostPrimitiveTest, STTest):
         lastState = self.states(self.postServerDumps)[-1]
         dataSentBytes = lastState['_dataBytes']['rcv']
         totalSentBytes = lastState['_totalBytes']['rcv']
-        expectedNumBytes = ut.bytes_after_payload_padding(dataSentBytes,
-                                                          totalSentBytes)
+        expectedNumBytes = wfpad.bytes_after_payload_padding(dataSentBytes,
+                                                             totalSentBytes)
         self.assertEqual(expectedNumBytes, dataSentBytes,
                          "The observed number of bytes (%s) "
                          "does not match the expected (%s)."
@@ -292,7 +289,7 @@ class PayloadPadBytesTest(PostPrimitiveTest, STTest):
         pass
 
 
-class BatchPadTest(PostPrimitiveTest, STTest):
+class BatchPadTest(PostPrimitiveTest, tu.STTest):
     # Config endpoints
     transport = "buflo"
     server_args = ("buflo", "server",
@@ -334,7 +331,7 @@ class BatchPadTest(PostPrimitiveTest, STTest):
                                    delta=0.05)
 
 
-class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
+class ConstantRateRcvHistoTests(PostPrimitiveTest, tu.STTest):
     # Config endpoints
     transport = "wfpad"
     server_args = ("wfpad", "server",
@@ -380,113 +377,6 @@ class ConstantRateRcvHistoTests(PostPrimitiveTest, STTest):
                                    " match with the expected period: %s"
                                    % (observedPeriod, expectedPeriod),
                                    delta=0.005)
-
-
-class WFPadShimObserver(STTest):
-
-    def setUp(self):
-        # Initialize transport object
-        pt_config = transport_config.TransportConfig()
-        pt_config.setListenerMode("server")
-        pt_config.setObfsproxyMode("external")
-        wfpad.WFPadClient.setup(pt_config)
-        wfpadClient = wfpad.WFPadClient()
-
-        # Create an instace of the shim
-        self.shimObs = wfpad_shim.WFPadShimObserver(wfpadClient)
-
-        # Open a few connections
-        self.shimObs.onConnect(1)
-        self.shimObs.onConnect(2)
-        self.shimObs.onConnect(3)
-
-    def test_opening_connections(self):
-        """Test opening new connections.
-
-        If the observer is notified of a new open connection,
-        test that the connection is added to the data structure
-        and make sure session has started.
-        Also test adding the same connection twice.
-        """
-        self.shimObs.onConnect(1)
-
-        obsSessions = self.shimObs._sessions
-        expSessions = {1: Set([1, 2, 3])}
-
-        self.assertDictEqual(obsSessions, expSessions,
-                             "Observed sessions %s do not match"
-                             " with expected sessions %s."
-                             % (obsSessions, expSessions))
-
-        self.assertTrue(self.shimObs._visiting,
-                        "The session has not started."
-                        "The wfpad's `_visiting` flag is `False`.")
-
-    def test_closing_connections(self):
-        """Test closing connections.
-
-        If the observer is notified of a connection being closed,
-        test that connections are removed from data structure correctly.
-        Also test removing the same connection twice.
-        """
-        self.shimObs.onDisconnect(1)
-        self.shimObs.onDisconnect(1)
-
-        obsSessions = self.shimObs._sessions
-        expSessions = {1: Set([2, 3])}
-
-        self.assertDictEqual(obsSessions, expSessions,
-                             "Observed sessions %s do not match"
-                             " with expected sessions %s."
-                             % (obsSessions, expSessions))
-
-    def test_edge_cases(self):
-        """Test the data structure is working properly in the edge cases.
-
-        When the last connection is removed from data structure, make sure
-        the session ends. Also, test removing a connection that is not in
-        the data structure.
-        """
-        self.shimObs.onDisconnect(1)
-        self.shimObs.onDisconnect(2)
-        self.shimObs.onDisconnect(14)
-        self.shimObs.onDisconnect(3)
-
-        obsSessions = self.shimObs._sessions
-        expSessions = {}
-
-        self.assertDictEqual(obsSessions, expSessions,
-                             "Observed sessions %s do not match"
-                             " with expected sessions %s."
-                             % (obsSessions, expSessions))
-
-        self.assertFalse(self.shimObs._visiting,
-                         "The session has not ended."
-                         "The wfpad's `_visiting` flag is `True`.")
-
-    def test_after_removing_all_sessions(self):
-        """Test session counter for new sessions.
-
-        After removing all connections, when a new connection is started,
-        the session id must be incremented. Also, test removing connection
-        when data structure is empty.
-        """
-        self.shimObs.onDisconnect(1)
-        self.shimObs.onDisconnect(2)
-        self.shimObs.onDisconnect(3)
-        self.shimObs.onConnect(1)
-
-        obsSessions = self.shimObs._sessions
-        expSessions = {2: Set([1])}
-
-        self.assertDictEqual(obsSessions, expSessions,
-                             "Observed sessions %s do not match"
-                             " with expected sessions %s."
-                             % (obsSessions, expSessions))
-
-        self.assertTrue(self.shimObs._visiting,
-                        "The session has not started."
-                        "The wfpad's `_visiting` flag is `False`.")
 
 
 if __name__ == "__main__":

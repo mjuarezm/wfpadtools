@@ -1,14 +1,18 @@
-from obfsproxy.test import tester
-from os.path import join, basename, exists
-from subprocess import Popen
-from time import sleep
 import psutil
 import unittest
+from time import sleep
+from subprocess import Popen
+from os.path import join, basename, exists
 
+
+# WFPadTools imports
+from obfsproxy.test import tester
 import obfsproxy.common.log as logging
-import obfsproxy.transports.wfpadtools.util as ut
 from obfsproxy.transports.wfpadtools import const
-from obfsproxy.test.transports.wfpadtools.sttest import STTest
+from obfsproxy.transports.wfpadtools.util import genutil as gu
+from obfsproxy.transports.wfpadtools.util import fileutil as fu
+from obfsproxy.transports.wfpadtools.util import netutil as nu
+from obfsproxy.transports.wfpadtools.util.testutil import STTest
 
 
 # TEST CONFIGURATION
@@ -87,19 +91,19 @@ class UnmanagedTorTest(tester.TransportsSetUp):
             for datadir in DATA_DIRS.itervalues():
                 pidfile = join(datadir, "pid")
                 if exists(pidfile):
-                    pid = int(ut.read_file(pidfile))
-                    ut.terminate_process(pid)
+                    pid = int(fu.read_file(pidfile))
+                    fu.terminate_process(pid)
                     log.debug("TEST: killed Tor {}.".format(basename(datadir)))
-                    ut.removedir(datadir)
+                    fu.removedir(datadir)
         except Exception as exc:
             log.exception("Exception raised tearing down class {}: {}"
                           .format(cls.__name__, exc))
 
     def tor_log_watchdog(self, logfile, line=BOOTSRAP_LOGLINE):
-        ut.log_watchdog(line, logfile, WATCHDOG_TIMEOUT, delay=3)
+        gu.log_watchdog(line, logfile, WATCHDOG_TIMEOUT, delay=3)
 
     def terminate_process_and_log(self, pid, msg=None):
-        ut.terminate_process(pid)
+        fu.terminate_process(pid)
         if msg:
             log.debug(msg)
 
@@ -107,13 +111,13 @@ class UnmanagedTorTest(tester.TransportsSetUp):
                   quiet=DEFAULT_TOR_LOG_QUIET):
         tor_proc_name = basename(datadir)
         pid_file = join(datadir, "pid")
-        pid = ut.read_file(pid_file)
-        if ut.is_pid_running(pid):
+        pid = fu.read_file(pid_file)
+        if fu.is_pid_running(pid):
             log.debug("TEST: {} process is already running."
                       .format(tor_proc_name))
             return int(pid)
         logfile = join(datadir, DEBUG_FNAME)
-        ut.removedir(datadir)
+        fu.removedir(datadir)
         log.debug("TEST: Starting Tor {}". format(tor_proc_name))
         log_args = ["--DataDirectory", datadir,
                     "--Log", "debug file {}".format(logfile),
@@ -125,11 +129,11 @@ class UnmanagedTorTest(tester.TransportsSetUp):
         process = Popen(cmd)
         try:
             self.tor_log_watchdog(logfile)
-        except ut.TimeExceededError:
+        except gu.TimeExceededError:
             log.error("Attempt to run tor process has timedout!")
             self.tearDown()
             return
-        ut.write_to_file(join(datadir, "pid"), str(process.pid))
+        fu.write_to_file(join(datadir, "pid"), str(process.pid))
         log.debug("TEST: Finished loading {}".format(tor_proc_name))
         return process.pid
 
@@ -152,7 +156,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
              "--SOCKSPort", socksport])
 
     def get_page(self, url, port=tester.SHIM_PORT):
-        return ut.get_page(url, port=port, timeout=GET_PAGE_TIMEOUT)
+        return nu.get_page(url, port=port, timeout=GET_PAGE_TIMEOUT)
 
     def test_tor(self):
         sleep(5)
@@ -204,12 +208,12 @@ def clean_test_setting():
             log.info(proc.name() + " killed!")
     for dirpath in DATA_DIRS.itervalues():
         log.debug("Will remove old log directory: " + dirpath)
-        ut.removedir(dirpath)
+        fu.removedir(dirpath)
     obfs_log_prefix = "obfsproxy_tester_"
     for end in ["client", "server"]:
         dirpath = join(const.TEMP_DIR, obfs_log_prefix + end + ".log")
         log.debug("Will remove old obfsproxy log file: " + dirpath)
-        ut.removefile(dirpath)
+        fu.removefile(dirpath)
 
 clean_test_setting()
 

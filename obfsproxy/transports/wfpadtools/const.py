@@ -1,17 +1,21 @@
 from os.path import join, abspath, dirname, pardir
 import tempfile
 
+# Shortcuts
+jn = join
+dn = dirname
 
 # The protocol name which is used in log messages
 TRANSPORT_NAME          = "wfpad"
 
 # Paths
 TEMP_DIR                = tempfile.gettempdir()
-TEST_SERVER_DIR         = join(TEMP_DIR, "test_server")
+TEST_SERVER_DIR         = jn(TEMP_DIR, "test_server")
 
-BASE_DIR                = abspath(join(dirname(__file__), pardir, pardir, pardir))
-OBFSPROXY_DIR           = join(BASE_DIR, "obfsproxy") 
-PYOBFSPROXY_PATH        = join(OBFSPROXY_DIR, "pyobfsproxy.py")
+BASE_DIR                = abspath(jn(dirname(__file__), pardir, pardir, pardir))
+OBFSPROXY_DIR           = jn(BASE_DIR, "obfsproxy") 
+PYOBFSPROXY_PATH        = jn(OBFSPROXY_DIR, "pyobfsproxy.py")
+DEFAULT_LOG             = jn(TEMP_DIR, "wfpad.log")
 
 INF_LABEL               = -1
 
@@ -84,3 +88,10 @@ SOCKS_PORT              = 4998
 
 DEFAULT_SESSION         = 0
 MAX_LAST_DATA_TIME      = 5
+
+# Direction
+OUT                     = 1
+IN                      = -1
+
+# IPs
+LOCALHOST               = "127.0.0.1"
