@@ -209,7 +209,8 @@ class DirectTest(TransportsSetUp):
         self.input_chan.settimeout(SOCKET_TIMEOUT)
 
     def tearDown(self):
-        super(DirectTest, self).tearDown()
+        self.obfs_client.stop()
+        self.obfs_server.stop()
         self.output_reader.stop()
         self.input_chan.close()
 

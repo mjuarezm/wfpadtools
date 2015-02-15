@@ -1,6 +1,6 @@
 import inspect
 import json
-import pickle as pick
+import cPickle as pick
 from os.path import join, isfile, basename, dirname
 
 # WFPadTools imports
@@ -38,8 +38,8 @@ def update_dump(obj, fstate):
     pick_dump(dump_dict, fstate)
 
 
-def check_picleable(obj):
-    """Checks if object is can be cpickled."""
+def check_pickable(obj):
+    """Checks if object can be (c)pickled."""
     # TODO: write a test
     temp_file = join(const.TEMP_DIR, str(timestamp()) + "tmp")
     try:
@@ -55,7 +55,7 @@ def only_pickleable(C):
     # TODO: refactor
     attributes = inspect.getmembers(C, lambda c: not(inspect.isroutine(c)))
     return {k: v for k, v in attributes if not k.startswith("__")
-            and check_picleable(v)}
+            and check_pickable(v)}
 
 
 def load_json(exp_spec_file):

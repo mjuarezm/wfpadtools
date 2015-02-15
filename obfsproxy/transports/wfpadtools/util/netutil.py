@@ -3,7 +3,7 @@ import sys
 import Queue
 import socket
 import struct
-import requests
+import requesocks
 import threading
 from time import sleep
 from random import randint
@@ -318,7 +318,7 @@ def get_url(url):
 
 
 def get_page(url, port, timeout):
-    session = requests.session()
+    session = requesocks.session(config={'max_retries': 10})
     session.proxies = {'http': 'socks5://127.0.0.1:{}'.format(port),
                        'https': 'socks5://127.0.0.1:{}'.format(port)}
     return session.get(url, timeout=timeout)

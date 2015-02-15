@@ -7,7 +7,6 @@ import unittest
 # WFPadTools imports
 import obfsproxy.common.log as logging
 from obfsproxy.test import tester
-from obfsproxy.test.tester import TransportsSetUp, TEST_FILE
 from obfsproxy.transports.wfpadtools import const, wfpad
 from obfsproxy.transports.wfpadtools.util import testutil as tu
 from obfsproxy.transports.wfpadtools.util import fileutil as fu
@@ -25,30 +24,31 @@ log.set_log_severity('error')
 if DEBUG:
     log.set_log_severity('debug')
 
-DUMPS = {"client": join(const.TEST_SERVER_DIR, "client.dump"),
-         "server": join(const.TEST_SERVER_DIR, "server.dump")}
+DUMPS = {"client": join(const.TEST_DUMP_DIR, "client.dump"),
+         "server": join(const.TEST_DUMP_DIR, "server.dump")}
 
 TEST_MSG = "foobar"
 
 
-class TestSetUp(TransportsSetUp):
+class TestSetUp(tester.TransportsSetUp):
 
     def setUp(self):
-        if exists(const.TEST_SERVER_DIR):
-            fu.removedir(const.TEST_SERVER_DIR)
-        fu.createdir(const.TEST_SERVER_DIR)
+        if exists(const.TEST_DUMP_DIR):
+            fu.removedir(const.TEST_DUMP_DIR)
+        fu.createdir(const.TEST_DUMP_DIR)
         super(TestSetUp, self).setUp()
         self.output_reader = tu.DummyReadWorker(("127.0.0.1",
                                                  tester.EXIT_PORT))
+        sleep(1.0)
         self.input_chan = tester.connect_with_retry(("127.0.0.1",
                                                      tester.ENTRY_PORT))
         self.input_chan.settimeout(tester.SOCKET_TIMEOUT)
 
     def tearDown(self):
+        super(TestSetUp, self).tearDown()
         self.output_reader.stop()
         self.input_chan.close()
-        super(TestSetUp, self).tearDown()
-        fu.removedir(const.TEST_SERVER_DIR)
+        fu.removedir(const.TEST_DUMP_DIR)
         if DEBUG:
             self.print_output()
 
@@ -231,7 +231,7 @@ class TotalPadTest(PostPrimitiveTest, tu.STTest):
     args = [sessId, delay]
 
     def do_instructions(self):
-        self.send_to_transport(TEST_FILE)
+        self.send_to_transport(tester.TEST_FILE)
 
     def posttest_num_messages_is_power_of_2(self):
         clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)
@@ -307,7 +307,8 @@ class BatchPadTest(PostPrimitiveTest, tu.STTest):
     args = [sessId, L, delay]
 
     def do_instructions(self):
-        self.send_to_transport(TEST_FILE)
+        #self.send_to_transport(tester.TEST_FILE)
+        pass
 
     def posttest_num_messages_is_multiple_of_L(self):
         clientPaddingMsgs = [msg for msg in self.messages(self.postClientDumps)

@@ -10,7 +10,7 @@ TRANSPORT_NAME          = "wfpad"
 
 # Paths
 TEMP_DIR                = tempfile.gettempdir()
-TEST_SERVER_DIR         = jn(TEMP_DIR, "test_server")
+TEST_DUMP_DIR         = jn(TEMP_DIR, "test_dumps")
 
 BASE_DIR                = abspath(jn(dirname(__file__), pardir, pardir, pardir))
 OBFSPROXY_DIR           = jn(BASE_DIR, "obfsproxy") 
