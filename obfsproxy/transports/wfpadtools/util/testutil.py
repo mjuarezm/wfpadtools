@@ -117,7 +117,7 @@ class DummyReadWorker(object):
             self.worker.terminate()
 
 
-def instrument_class_method(func):
+def instrument_dump(func):
     """Decorator to instrument method and dump temporary states.
 
     The decorator should be applied on a class method, as it accesses

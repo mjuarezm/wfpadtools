@@ -6,14 +6,14 @@ from os.path import join, basename, exists
 
 
 # WFPadTools imports
+from obfsproxy.test import tester
 import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.util import genutil as gu
 from obfsproxy.transports.wfpadtools.util import fileutil as fu
 from obfsproxy.transports.wfpadtools.util import netutil as nu
 from obfsproxy.transports.wfpadtools.util.testutil import STTest
-from obfsproxy.test import tester
-import obfsproxy.test.transports.wfpadtools.integration.wfpad_spec_tester as wf_tester
+import obfsproxy.test.transports.wfpadtools.wfpad_tester as wft
 
 
 # TEST CONFIGURATION
@@ -27,8 +27,8 @@ BOOTSRAP_LOGLINE = "Bootstrapped 100%: Done"
 WATCHDOG_TIMEOUT = 180
 GET_PAGE_TIMEOUT = 30
 
+# Severity
 DEBUG = True
-# DEBUG = False
 
 # Switch to leave Tor running and speed-up tests
 LEAVE_TOR_RUNNING = False
@@ -61,7 +61,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
                                                 DATA_DIRS["router"])
             # Run Onion proxy
             self.tor_endpoints["proxy"] = self.start_tor_proxy(
-                                                    str(wf_tester.SOCKS_PORT),
+                                                    str(wft.SOCKS_PORT),
                                                     str(tester.ENTRY_PORT),
                                                     str(tester.SERVER_PORT),
                                                     DATA_DIRS["proxy"])
@@ -156,7 +156,7 @@ class UnmanagedTorTest(tester.TransportsSetUp):
                     .format(self.transport, client_port),
              "--SOCKSPort", socksport])
 
-    def get_page(self, url, port=wf_tester.SHIM_PORT):
+    def get_page(self, url, port=wft.SHIM_PORT):
         return nu.get_page(url, port=port, timeout=GET_PAGE_TIMEOUT)
 
     def test_tor(self):
@@ -181,22 +181,14 @@ class WFPadToolsTransportTests():
         pass
 
 
-class WFPadTorTest(UnmanagedTorTest, WFPadToolsTransportTests, STTest):
-    transport = wf_tester.DirectShimWFPad.transport
-    client_args = list(wf_tester.DirectShimWFPad.client_args)
-    client_args[1] = "socks"
-    client_args = tuple(client_args)
-    server_args = wf_tester.DirectShimWFPad.server_args
-    entry_port = wf_tester.SHIM_PORT
+class TestWFPadTor(wft.WFPadShimSocksConfig, UnmanagedTorTest,
+                   WFPadToolsTransportTests, STTest):
+    pass
 
 
-class BuFLOTorTest(UnmanagedTorTest, WFPadToolsTransportTests, STTest):
-    transport = wf_tester.DirectShimBuFLO.transport
-    client_args = list(wf_tester.DirectShimBuFLO.client_args)
-    client_args[1] = "socks"
-    client_args = tuple(client_args)
-    server_args = wf_tester.DirectShimBuFLO.server_args
-    entry_port = wf_tester.SHIM_PORT
+class TesBuFLOTor(wft.BuFLOShimSocksConfig, UnmanagedTorTest,
+                  WFPadToolsTransportTests, STTest):
+    pass
 
 
 def clean_test_setting():

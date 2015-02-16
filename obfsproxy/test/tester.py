@@ -23,6 +23,7 @@ import unittest
 
 import obfsproxy.common.log as logging
 from time import sleep
+from os.path import join
 
 
 log = logging.get_obfslogger()
@@ -53,13 +54,13 @@ class Obfsproxy(subprocess.Popen):
     def __init__(self, *args, **kwargs):
         """Spawns obfsproxy with 'args'"""
 #         logfile = join("/tmp", "obfsproxy_tester_{}.log".format(args[0][1]))
+#         argv = ["/bin/obfsproxy", "--log-file", logfile, "--log-min-severity", "debug"]
         argv = ["/bin/obfsproxy", "--log-min-severity", "error"]
         if len(args) == 1 and (isinstance(args[0], list) or
                                isinstance(args[0], tuple)):
             argv.extend(args[0])
         else:
             argv.extend(args)
-        log.debug("COMMAND: %s" % " ".join(argv))
         subprocess.Popen.__init__(self, argv,
                                   stdin=open("/dev/null", "r"),
                                   stdout=subprocess.PIPE,

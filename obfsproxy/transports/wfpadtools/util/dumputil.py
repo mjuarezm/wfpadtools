@@ -40,14 +40,18 @@ def update_dump(obj, fstate):
 
 def check_pickable(obj):
     """Checks if object can be (c)pickled."""
-    # TODO: write a test
+    # TESTME!
     temp_file = join(const.TEMP_DIR, str(timestamp()) + "tmp")
     try:
         pick_dump(obj, temp_file)
     except:
         return False
     finally:
-        removefile(temp_file)
+        try:
+            removefile(temp_file)
+        except Exception as e:
+            log.error("The file %s could not be removed: %s",
+                      temp_file, e)
     return True
 
 

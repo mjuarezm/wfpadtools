@@ -61,6 +61,12 @@ def createdir(dirpath):
     return dirpath
 
 
+def resetdir(dirpath):
+    """Removes and creates a new dir."""
+    removedir(dirpath)
+    createdir(dirpath)
+
+
 def remove_symlink(linkpath):
     if lexists(linkpath):
         unlink(linkpath)

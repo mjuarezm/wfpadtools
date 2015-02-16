@@ -9,7 +9,7 @@ from obfsproxy.transports.wfpadtools.util import testutil as test_ut
 class TestUtilTest(test_ut.STTest):
     """Test the wfpad.test_util module."""
 
-    def test_instrument_class_method(self):
+    def test_instrument_dump(self):
         enable_test_value = False
         dump_path_value = "/tmp/test.dump"
         return_value = [1, 2, 3]
@@ -21,7 +21,7 @@ class TestUtilTest(test_ut.STTest):
             def __init__(self):
                 self.state = 1
 
-            @test_ut.instrument_class_method
+            @test_ut.instrument_dump
             def meth_test(self):
                 return return_value
 

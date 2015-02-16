@@ -78,7 +78,7 @@ import math
 import os
 import psutil
 import socket
-from time import time
+import time
 from twisted.internet import reactor, task
 from twisted.internet.defer import CancelledError
 
@@ -302,7 +302,6 @@ class WFPadTransport(BaseTransport):
         """Template method for child WF defense transport."""
         pass
 
-    @test_ut.instrument_class_method
     def receivedDownstream(self, data):
         """Got data from downstream; relay them upstream."""
         d = data.read()
@@ -320,11 +319,12 @@ class WFPadTransport(BaseTransport):
         if isinstance(data, str):
             self.circuit.downstream.write(data)
         elif isinstance(data, mes.WFPadMessage):
-            data.sndTime = time()
+            data.sndTime = time.clock()
             self.circuit.downstream.write(str(data))
-            self._numMessages['snd'] += 1
-            self._dataBytes['snd'] += len(data.payload)
-            self._totalBytes['snd'] += data.totalLen
+            if not data.flags & const.FLAG_CONTROL:
+                self._numMessages['snd'] += 1
+                self._dataBytes['snd'] += len(data.payload)
+                self._totalBytes['snd'] += data.totalLen
             return [data]
         elif isinstance(data, list):
             listMsgs = []
@@ -470,13 +470,14 @@ class WFPadTransport(BaseTransport):
             self.deferBurstPadding('snd')
             log.debug("[wfpad] buffer is empty, pad `snd` burst.")
 
+    @test_ut.instrument_dump
     def processMessages(self, data):
         """Extract WFPad protocol messages.
 
         Data is written to the local application and padding messages are
         filtered out.
         """
-        log.debug("[wfad] Parse protocol messages from data.")
+        log.debug("[wfad] Parse protocol messages from stream.")
 
         # Make sure there actually is data to be parsed
         if (data is None) or (len(data) == 0):
@@ -492,7 +493,7 @@ class WFPadTransport(BaseTransport):
 
         self._lastRcvDownstreamTs = reactor.seconds()
         for msg in msgs:
-            msg.rcvTime = time()
+            msg.rcvTime = time.clock()
             if msg.flags & const.FLAG_CONTROL:
                 # Process control messages
                 self.circuit.upstream.write(msg.payload)
@@ -502,16 +503,16 @@ class WFPadTransport(BaseTransport):
                 self._numMessages['rcv'] += 1
                 self._totalBytes['rcv'] += msg.totalLen
 
+                # Filter padding messages out.
+                if msg.flags & const.FLAG_PADDING:
+                    log.debug("[wfad] Padding message ignored.")
+
                 # Forward data to the application.
-                if not msg.flags & const.FLAG_PADDING:
+                elif not msg.flags & const.FLAG_DATA:
                     log.debug("[wfad] Data flag detected, relaying upstream")
                     self._dataBytes['rcv'] += len(msg.payload)
                     self.circuit.upstream.write(msg.payload)
                     self._lastRcvDataDownstreamTs = reactor.seconds()
-
-                # Filter padding messages out.
-                elif msg.flags & const.FLAG_PADDING:
-                    log.debug("[wfad] Padding message ignored.")
 
                 # Otherwise, flag not recognized
                 else:
@@ -549,7 +550,8 @@ class WFPadTransport(BaseTransport):
             if self.is_channel_idle():
                 log.info("[wfpad] - Channel has been idle more than %s ms,"
                          "flag end of session" % const.MAX_LAST_DATA_TIME)
-                self.endSession(const.DEFAULT_SESSION)
+                self.sendControlMessage(const.OP_APP_HINT,
+                                        [self.getSessId(), False])
                 return
         if self.stopCondition(self):
             log.debug("[wfpad] -  Padding was stopped!!")
@@ -580,19 +582,6 @@ class WFPadTransport(BaseTransport):
         self._gapHistoProbdist = {'rcv': probdist.uniform(const.INF_LABEL),
                                   'snd': probdist.uniform(const.INF_LABEL)}
 
-    def onSessionStarts(self, sessId):
-        """Sens hint for session start.
-
-        To be extended at child classes that implement
-        final website fingerprinting countermeasures.
-        """
-        if self.weAreClient:
-            self.sendControlMessage(const.OP_APP_HINT,
-                                    [self.getSessId(), True])
-        else:
-            self._sessId = sessId
-        log.info("[wfpad] - Session has started!(sessid = %s)" % sessId)
-
     def cancelDeferrer(self, d):
         """Cancel padding deferrer."""
         if d and not d.called:
@@ -612,17 +601,39 @@ class WFPadTransport(BaseTransport):
     def cancelDeferrers(self, when):
         return self.cancelBurst(when), self.cancelGap(when)
 
+    def onSessionStarts(self, sessId):
+        """Sens hint for session start.
+
+        To be extended at child classes that implement
+        final website fingerprinting countermeasures.
+        """
+        if self.weAreClient:
+            self.sendControlMessage(const.OP_APP_HINT,
+                                    [self.getSessId(), True])
+        else:
+            self._sessId = sessId
+            self._visiting = True
+        log.info("[wfpad] - Session has started!(sessid = %s)" % sessId)
+
     def onSessionEnds(self, sessId):
         """Send hint for session end.
 
         Interface to be extended at child classes that implement
         final website fingerprinting countermeasures.
         """
+        if self.weAreClient:
+            self.sendControlMessage(const.OP_APP_HINT,
+                                    [self.getSessId(), False])
+        else:
+            self._visiting = False
+        log.info("[wfpad] - Session has ended! (sessid = %s)" % sessId)
+
+    def onEndPadding(self):
         # Restart statistics
         self._dataBytes = {'rcv': 0, 'snd': 0}
         self._totalBytes = {'rcv': 0, 'snd': 0}
         self._numMessages = {'rcv': 0, 'snd': 0}
-
+ 
         self._lastSndDownstreamTs = 0
         self._lastSndDataDownstreamTs = 0
         self._lastRcvDownstreamTs = 0
@@ -635,10 +646,6 @@ class WFPadTransport(BaseTransport):
         self.cancelDeferrers('snd')
         self.cancelDeferrers('rcv')
 
-        if self.weAreClient:
-            self.sendControlMessage(const.OP_APP_HINT,
-                                    [self.getSessId(), False])
-        log.info("[wfpad] - Session has ended! (sessid = %s)" % sessId)
 
     def getSessId(self):
         """Return current session Id."""
@@ -650,10 +657,10 @@ class WFPadTransport(BaseTransport):
 
     def isVisiting(self):
         """Return a bool indicating if we're in the middle of a session."""
-        if self.weAreServer:
-            return self._visiting
-        if self._sessionObserver:
+        if self.weAreClient:
             return self._sessionObserver._visiting
+        elif self.weAreServer:
+            return self._visiting
 
     # ==========================================================================
     # Deal with control messages
@@ -819,17 +826,17 @@ class WFPadTransport(BaseTransport):
         """
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
-        to_pad = self._numMessages['snd'] \
-            if msg_level else self._totalBytes['snd']
 
         def stopConditionTotalPad(s):
-            if self.isVisiting():
+            if s.isVisiting():
                 log.debug("[wfpad] - False stop condition, still visiting...")
                 return False
+            to_pad = s._numMessages['snd'] \
+                if msg_level else s._totalBytes['snd']
             stopCond = to_pad > 0 and (to_pad & (to_pad - 1)) == 0
             log.debug("[wfpad] - Total pad stop condition is %s."
                       "\n Visiting: %s, Num snd msgs: %s"
-                      % (stopCond, self.isVisiting(), self._numMessages))
+                      % (stopCond, s.isVisiting(), s._numMessages))
             return stopCond
         self.stopCondition = stopConditionTotalPad
 
@@ -852,18 +859,18 @@ class WFPadTransport(BaseTransport):
         """
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
-        to_pad = self._numMessages['snd'] \
-            if msg_level else self._totalBytes['snd']
 
         def stopConditionBatchPad(s):
-            if self.isVisiting():
+            if s.isVisiting():
                 log.debug("[wfpad] - False stop condition, still visiting...")
                 return False
-            L = math.pow(2, math.ceil(math.log(self._dataBytes['snd'], 2)))
+            L = math.pow(2, math.ceil(math.log(s._dataBytes['snd'], 2)))
+            to_pad = s._numMessages['snd'] \
+                if msg_level else s._totalBytes['snd']
             stopCond = to_pad > 0 and to_pad % L == 0
             log.debug("[wfpad] - Payload pad stop condition is %s."
-                      "\n Visiting: %s, Num snd msgs: %s, L: %s"
-                      % (stopCond, self.isVisiting(), self._numMessages, L))
+                      "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, L: %s"
+                      % (stopCond, s.isVisiting(), s._numMessages, s._totalBytes, L))
             return stopCond
         self.stopCondition = stopConditionBatchPad
 
@@ -888,17 +895,16 @@ class WFPadTransport(BaseTransport):
         """
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
-        to_pad = self._numMessages['snd'] \
-            if msg_level else self._totalBytes['snd']
 
         def stopConditionBatchPad(s):
             if self.isVisiting():
                 log.debug("[wfpad] - False stop condition, still visiting...")
                 return False
+            to_pad = s._numMessages['snd'] if msg_level else s._totalBytes['snd']
             stopCond = to_pad > 0 and to_pad % L == 0
             log.debug("[wfpad] - Batch pad stop condition is %s."
-                      "\n Visiting: %s, Num snd msgs: %s, L: %s"
-                      % (stopCond, self.isVisiting(), self._numMessages, L))
+                      "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, L: %s"
+                      % (stopCond, s.isVisiting(), s._numMessages, s._totalBytes, L))
             return stopCond
         self.stopCondition = stopConditionBatchPad
 

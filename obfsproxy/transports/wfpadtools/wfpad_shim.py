@@ -53,7 +53,6 @@ class WFPadShimObserver(object):
         """Sets wfpad's `_visiting` flag to `True`."""
         log.debug("[wfpad - shim obs] Session %s begins." % self._sessId)
         self._visiting = True
-        self._wfpad._numMessages = {'rcv': 0, 'snd': 0}
         self._wfpad.onSessionStarts(self._sessId)
 
     def onSessionEnds(self, sessId):

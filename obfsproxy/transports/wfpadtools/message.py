@@ -448,6 +448,7 @@ class WFPadMessageExtractor(object):
 
                 # Create WFPadMessage
                 msgs.append(WFPadMessage(payload=extracted,
+                                         paddingLen=self.totalLen - self.payloadLen,
                                          flags=self.flags,
                                          opcode=self.opcode,
                                          args=args))

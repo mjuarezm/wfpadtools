@@ -1,7 +1,7 @@
 import unittest
 
 
-class CSBuFLOTest(unittest.TestCase):
+class AdaptiveTest(unittest.TestCase):
 
     def setUp(self):
         pass

@@ -1,5 +1,6 @@
 """Provides general network-related utility methods."""
 import sys
+import json
 import Queue
 import socket
 import struct
@@ -17,40 +18,80 @@ from obfsproxy.transports.wfpadtools.util import logutil
 log = logutil.get_logger("netutil")
 
 
-class BiTransportSetup(TransportsSetUp):
-    """Set bidirectional transport communication."""
+class CommInterfaceAbstract(TransportsSetUp):
+    """Implement methods for a class with a CommunicationInterface instance.
 
-    def __init__(self):
-        """Set dummy client/server as endpoints."""
+    The instance must be named `commInterf`.
+    """
+    ENTRY_PORT = None
+    EXIT_PORT = None
+    SHIM_PORTS = None
+
+    def setup(self):
+        """Sets dummy and obfsproxy endpoints for bidirectional comm."""
         self.shim_commInterf = CommunicationInterface()
         self.commInterf = CommunicationInterface()
+        self.shim_commInterf = CommunicationInterface()
         self.commInterf.listen((const.LOCALHOST, self.EXIT_PORT))
         sleep(0.3)
-        self.setUp()
+        TransportsSetUp.setUp(self)
         sleep(4)
         self.commInterf.connect((const.LOCALHOST, self.ENTRY_PORT))
 
-    def send(self, msg, direction=const.OUT):
+    def send(self, msg, direction=const.OUT, op=False):
+        """Send msg to obfsproxy client or server.
+
+        The `op` option is used to indicate that we're passing
+        a test instruction to the client. See the testutil module.
+        """
         if direction is const.OUT:
-            self.commInterf.send('client', msg)
+            self.commInterf.send('client', msg, op)
         elif direction is const.IN:
             self.commInterf.send('server', msg)
         else:
             raise ValueError("Invalid direction!")
 
+    def send_instruction(self, opcode, args=None):
+        """Send instruction to client."""
+        instrMsg = "TEST:{};".format(str(opcode))
+        if args:
+            instrMsg += json.dumps(args)
+        self.send_to_client(instrMsg, op=True)
+
+    def send_to_client(self, msg, op=False):
+        """Shortcut method for sending to the client."""
+        self.send(msg, const.OUT, op)
+
+    def send_to_server(self, msg):
+        """Shortcut method for sending to the server."""
+        self.send(msg, const.IN)
+
     def start_session(self):
         """Make TCP connection to shim to flag start of session to PT."""
         self.shim_commInterf.listen((const.LOCALHOST, self.SHIM_PORTS[1]))
         sleep(0.2)
-        self.shim_commInterf.connect((self.LOCALHOST, self.SHIM_PORTS[0]))
+        self.shim_commInterf.connect((const.LOCALHOST, self.SHIM_PORTS[0]))
 
     def end_session(self):
         """Destroy TCP connection to shim to flag end of session to PT."""
         self.shim_commInterf.close()
 
     def close(self):
-        self.tearDown()
+        """Close the communication interface."""
+        TransportsSetUp.tearDown(self)
         self.commInterf.close()
+        self.commInterf.terminate()
+
+
+class BiTransportSetup(CommInterfaceAbstract):
+    """Implement the setup of the interface in the init.
+
+    This class allows instantiating the setup as a regular class,
+    not as a test case class.
+    """
+    def __init__(self):
+        """Run the parent class setup method."""
+        self.setup()
 
 
 class Command(object):
@@ -98,10 +139,12 @@ class CommunicationInterface(object):
         for endpoint in self.endpoints.itervalues():
             endpoint.start()
 
-    def send(self, sndr, data):
+    def send(self, sndr, data, op=False):
         rcvr = 'server' if sndr is 'client' else 'client'
         log.debug("%s sending %sbytes of data to %s", sndr, len(data), rcvr)
         self.endpoints[sndr].cmd_q.put(Command(Command.SEND, data))
+        if op:
+            return self.wait_reply(sndr)
         self.endpoints[rcvr].cmd_q.put(Command(Command.RECEIVE, len(data)))
         return self.wait_replies(sndr, rcvr)
 
@@ -317,8 +360,13 @@ def get_url(url):
     return html
 
 
-def get_page(url, port, timeout):
-    session = requesocks.session(config={'max_retries': 10})
+def get_page(url, port, timeout, max_retries=1):
+    if max_retries == 1:
+        session = requesocks.session()
+    elif max_retries > 1:
+        session = requesocks.session(config={'max_retries': 10})
+    else:
+        raise
     session.proxies = {'http': 'socks5://127.0.0.1:{}'.format(port),
                        'https': 'socks5://127.0.0.1:{}'.format(port)}
     return session.get(url, timeout=timeout)
