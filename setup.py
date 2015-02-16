@@ -35,6 +35,7 @@ setup(
         'argparse',
         'pyptlib >= 0.0.6',
         'pyyaml',
+        'psutil',
         'requesocks'
         ],
 
