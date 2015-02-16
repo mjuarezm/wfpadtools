@@ -55,7 +55,7 @@ class Obfsproxy(subprocess.Popen):
         """Spawns obfsproxy with 'args'"""
 #         logfile = join("/tmp", "obfsproxy_tester_{}.log".format(args[0][1]))
 #         argv = ["/bin/obfsproxy", "--log-file", logfile, "--log-min-severity", "debug"]
-        argv = ["/bin/obfsproxy", "--log-min-severity", "error"]
+        argv = ["bin/obfsproxy", "--log-min-severity", "error"]
         if len(args) == 1 and (isinstance(args[0], list) or
                                isinstance(args[0], tuple)):
             argv.extend(args[0])
