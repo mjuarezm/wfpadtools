@@ -39,7 +39,6 @@ setup(
 
     extras_require = {
         'SOCKS': ["txsocksx"],
-        'wfpadtools': ['psutil', 'requesocks',
-                       ]  # 'numpy'] FIXME: https://github.com/numpy/numpy/issues/2434
+        'wfpadtools': ['psutil', 'requesocks']  # 'numpy'] FIXME: https://github.com/numpy/numpy/issues/2434
         }
 )
