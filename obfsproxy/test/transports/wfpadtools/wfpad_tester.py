@@ -1,4 +1,5 @@
 """Provide methods and classes to be used in tests for wfpad transports."""
+import os
 import unittest
 from time import sleep
 
@@ -13,7 +14,7 @@ from obfsproxy.transports.wfpadtools.util import dumputil as du
 from obfsproxy.transports.wfpadtools.message import getOpcodeNames
 
 
-DEBUG = True
+DEBUG = os.environ["WFPAD_DEBUG"] if "WFPAD_DEBUG" in os.environ else True
 # DEBUG = False
 
 # Logging settings:
