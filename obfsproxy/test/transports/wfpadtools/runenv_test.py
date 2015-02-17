@@ -21,9 +21,6 @@ class RunEnvTest(STTest):
                         "~/.bashrc && source ~/.bashrc;"
                         .format(const.BASE_DIR))
 
-    def test_numpy(self):
-        self.assert_package_is_installed('numpy')
-
     def test_tor(self):
         self.assert_is_installed('tor')
 

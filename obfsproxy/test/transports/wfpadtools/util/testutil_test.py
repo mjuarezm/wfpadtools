@@ -34,9 +34,8 @@ class TestUtilTest(test_ut.STTest):
         A.enable_test = True
         a.meth_test()
         dump = du.pick_load(dump_path_value)
-        values = [v for v in dump.itervalues()]
 
-        obs_value = values[0][1]
+        obs_value = dump[0][1]
         exp_return = return_value
         self.assertEqual(obs_value, exp_return,
                          "Return values do not match: %s != %s"
