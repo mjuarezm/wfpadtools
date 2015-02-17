@@ -57,11 +57,41 @@ class TestSendPadding(wt.WFPadShimConfig, wt.TestSendControlMessage,
 ######################
 
 class TestBurstHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
-    pass
+    sessId = "id123"
+    opcode = const.OP_BURST_HISTO
+    delay = 1
+    tokens = 100000
+    histo = [tokens, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    labels_ms = [0, delay, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+                 2048, 4096, 8192, 16384, 32768, 65536, -1]
+    removeTokens = True
+    interpolate = False
+    when = "rcv"
+    args = [histo, labels_ms, removeTokens, interpolate, when]
+
+    def test_burst_is_padded(self):
+        """Reproduce a burst and test that is paded according to histo."""
+        # TODO
+        pass
 
 
 class TestGapHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
-    pass
+    sessId = "id123"
+    opcode = const.OP_BURST_HISTO
+    delay = 1
+    tokens = 100000
+    histo = [tokens, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    labels_ms = [0, delay, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+                 2048, 4096, 8192, 16384, 32768, 65536, -1]
+    removeTokens = True
+    interpolate = False
+    when = "rcv"
+    args = [histo, labels_ms, removeTokens, interpolate, when]
+
+    def test_gap_is_padded(self):
+        """Reproduce a gap and test is padded according to histo."""
+        # TODO
+        pass
 
 
 # CS-BuFLO PRIMITIVES
