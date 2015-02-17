@@ -256,20 +256,26 @@ class PrimitiveTest(TestSetUp):
         """Parse test dumps."""
         # Load dumps
         sleep(1)
-        serverDumps = self.__load_wrapper("server")
-        log.debug("Server Dumps: %s", serverDumps)
-        clientDumps = self.__load_wrapper("client")
-        log.debug("Client Dumps: %s", clientDumps)
+        self.serverDumps = self.__load_wrapper("server")
+        log.debug("Server Dumps: %s", self.serverDumps)
+        self.clientDumps = self.__load_wrapper("client")
+        log.debug("Client Dumps: %s", self.clientDumps)
 
         # Parse messages
-        self.clientMsgs = self.__messages(clientDumps)
-        self.serverMsgs = self.__messages(serverDumps)
+        self.clientMsgs = self.__messages(self.clientDumps)
+        self.serverMsgs = self.__messages(self.serverDumps)
 
         # States
-        self.clientStates = self.__states(clientDumps)
-        self.serverStates = self.__states(serverDumps)
-        self.clientState = self.__last_state(clientDumps)
-        self.serverState = self.__last_state(serverDumps)
+        self.clientStates = self.__states(self.clientDumps)
+        self.serverStates = self.__states(self.serverDumps)
+        self.clientState = self.__last_state(self.clientDumps)
+        self.serverState = self.__last_state(self.serverDumps)
+
+    def get_state(self, message, dump):
+        for state, messages in dump:
+            if message in messages:
+                return state
+        return None
 
     @staticmethod
     def control_msgs(msgs):

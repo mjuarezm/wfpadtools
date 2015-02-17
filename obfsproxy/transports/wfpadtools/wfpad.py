@@ -148,6 +148,10 @@ class WFPadTransport(BaseTransport):
         self._numMessages = {'rcv': 0, 'snd': 0}
         self._dataMessages = {'rcv': 0, 'snd': 0}
 
+        # Padding after end of session
+        self.totalPadding = 0
+        self.calculateTotalPadding = lambda Self: None
+
         # Initialize length distribution
         self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
 
@@ -636,6 +640,7 @@ class WFPadTransport(BaseTransport):
                                     [self.getSessId(), False])
         else:
             self._visiting = False
+        self.totalPadding = self.calculateTotalPadding(self)
         log.info("[wfpad] - Session has ended! (sessid = %s)" % sessId)
 
     def onEndPadding(self):
@@ -655,7 +660,6 @@ class WFPadTransport(BaseTransport):
         # Cancel deferers
         self.cancelDeferrers('snd')
         self.cancelDeferrers('rcv')
-
 
     def getSessId(self):
         """Return current session Id."""
@@ -837,20 +841,28 @@ class WFPadTransport(BaseTransport):
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
 
+        def stopConditionTotalPadding(self):
+            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
+            total_padding = closest_power_of_two(to_pad)
+            log.debug("[wfpad] - Computed total padding: %s (to_pad is %s)"
+                      % (total_padding, to_pad))
+            return total_padding
+
         def stopConditionTotalPad(s):
             if s.isVisiting():
                 log.debug("[wfpad] - False stop condition, still visiting...")
                 return False
             to_pad = s._numMessages['snd'] \
                 if msg_level else s._totalBytes['snd']
-            stopCond = to_pad > 0 and (to_pad & (to_pad - 1)) == 0
+            stopCond = to_pad > 0 and to_pad >= self.totalPadding
             log.debug("[wfpad] - Total pad stop condition is %s."
-                      "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, "
+                      "\n Visiting: %s, Total padding: %s, Num msgs: %s, Total Bytes: %s, "
                       "Num data msgs: %s, Data Bytes: %s, to_pad: %s"
-                      % (stopCond, self.isVisiting(), self._numMessages,
+                      % (stopCond, self.isVisiting(), self.totalPadding, self._numMessages,
                          self._totalBytes, self._dataMessages, self._dataBytes, to_pad))
             return stopCond
         self.stopCondition = stopConditionTotalPad
+        self.calculateTotalPadding = stopConditionTotalPadding
 
     def relayPayloadPad(self, sessId, t, msg_level=True):
         """Pad until the total sent data is multiple of 2^int(log(TOTAL_PAYLOAD))
@@ -873,21 +885,27 @@ class WFPadTransport(BaseTransport):
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
 
+        def stopConditionPayloadPadding(self):
+            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
+            divisor = self._dataMessages['snd'] if msg_level else self._dataBytes['snd']
+            k = closest_power_of_two(divisor)
+            total_padding = closest_multiple(to_pad, k)
+            log.debug("[wfpad] - Computed payload padding: %s (to_pad is %s and divisor is %s)"
+                      % (total_padding, to_pad, divisor))
+            return total_padding
+
         def stopConditionPayloadPad(self):
             if self.isVisiting():
                 log.debug("[wfpad] - False stop condition, still visiting...")
                 return False
             to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
-            divisor = self._dataMessages['snd'] if msg_level else self._dataBytes['snd']
-            L = closest_power_of_two(divisor)
-            stopCond = to_pad > 0 and to_pad % L == 0
+            stopCond = to_pad > 0 and to_pad >= self.totalPadding
             log.debug("[wfpad] - Payload pad stop condition is %s."
-                      "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, "
-                      "Num data msgs: %s, Data Bytes: %s, L: %s"
-                      % (stopCond, self.isVisiting(), self._numMessages, self._totalBytes,
-                         self._dataMessages, self._dataBytes, L))
+                      "\n Visiting: %s, Total padding: %s, Num msgs: %s, Total Bytes: %s"
+                      % (stopCond, self.isVisiting(), self.totalPadding, self._numMessages, self._totalBytes))
             return stopCond
         self.stopCondition = stopConditionPayloadPad
+        self.calculateTotalPadding = stopConditionPayloadPadding
 
     def relayBatchPad(self, sessId, L, t, msg_level=True):
         """Pad all batches of cells to the nearest multiple of `L` cells/bytes total.
@@ -911,17 +929,25 @@ class WFPadTransport(BaseTransport):
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
 
+        def stopConditionBatchPadding(self):
+            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
+            total_padding = closest_multiple(to_pad, L)
+            log.debug("[wfpad] - Computed batch padding: %s (to_pad is %s)"
+                      % (total_padding, to_pad))
+            return total_padding
+
         def stopConditionBatchPad(self):
             if self.isVisiting():
                 log.debug("[wfpad] - False stop condition, still visiting...")
                 return False
             to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
-            stopCond = to_pad > 0 and to_pad % L == 0
+            stopCond = to_pad > 0 and to_pad >= self.totalPadding
             log.debug("[wfpad] - Batch pad stop condition is %s."
-                      "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, L: %s"
-                      % (stopCond, self.isVisiting(), self._numMessages, self._totalBytes, L))
+                      "\n Visiting: %s, Total padding: %s, Num msgs: %s, Total Bytes: %s, L: %s"
+                      % (stopCond, self.isVisiting(), self.totalPadding, self._numMessages, self._totalBytes, L))
             return stopCond
         self.stopCondition = stopConditionBatchPad
+        self.calculateTotalPadding = stopConditionBatchPadding
 
 
 def deferLater(*args, **kargs):
