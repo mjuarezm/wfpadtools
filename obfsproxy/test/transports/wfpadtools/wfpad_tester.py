@@ -350,7 +350,7 @@ class TestSendDataServer(TestSendControlMessage):
         self.send_to_server(TEST_MSG)
 
 
-class TestControlMessages(TestSendControlMessage):
+class TestControlMessages(WFPadShimConfig, TestSendControlMessage):
 
     def test_control_is_received_successfully(self):
         # Test opcode of the sent message is received at the server.

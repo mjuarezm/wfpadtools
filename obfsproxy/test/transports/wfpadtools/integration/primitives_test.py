@@ -115,6 +115,7 @@ class TestPayloadPadBytes(wt.BuFLOShimConfig, wt.TestSendDataServer,
                         "The observed number of sent bytes (%s) is not a"
                         " multiple of %s." % (obs_num_cl_bytes, L))
 
+
 class TestTotalPadMsgs(wt.BuFLOShimConfig, wt.TestSendDataServer, tu.STTest):
     # Primitive args
     opcode = const.OP_TOTAL_PAD
