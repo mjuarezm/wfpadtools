@@ -20,11 +20,10 @@ import subprocess
 import tempfile
 import time
 import unittest
-
-import obfsproxy.common.log as logging
 from time import sleep
 from os.path import join
 
+import obfsproxy.common.log as logging
 
 log = logging.get_obfslogger()
 
@@ -178,9 +177,33 @@ class ReadWorker(object):
 # (except that I have fleshed out the SOCKS test a bit).
 # It will be made more general and parametric Real Soon.
 
-ENTRY_PORT      = 4999
-SERVER_PORT     = 5000
-EXIT_PORT       = 5001
+def get_free_ports(n=1):
+    """Return free socket port.
+
+    WARNING: doesn't guarantee that port will be free from
+    the end of this function, till a new socket is bind to it.
+    """
+    ports, socks = [], []
+    for _ in xrange(n):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('', 0))
+        free_port = s.getsockname()[1]
+        socks.append(s)
+        ports.append(free_port)
+    for s in socks:
+        s.close()
+    if n == 1:
+        return free_port
+    return ports
+
+ports = get_free_ports(5)
+
+ENTRY_PORT      = ports[0]
+SERVER_PORT     = ports[1]
+EXIT_PORT       = ports[2]
+
+SHIM_PORT       = ports[3]
+SOCKS_PORT      = ports[4]
 
 #
 # Test base classes.  They do _not_ inherit from unittest.TestCase

@@ -333,17 +333,24 @@ def get_local_ip():
     return local_ip
 
 
-def get_free_port():
+def get_free_ports(n=1):
     """Return free socket port.
 
     WARNING: doesn't guarantee that port will be free from
     the end of this function, till a new socket is bind to it.
     """
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('', 0))
-    free_port = s.getsockname()[1]
-    s.close()
-    return free_port
+    ports, socks = [], []
+    for _ in xrange(n):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('', 0))
+        free_port = s.getsockname()[1]
+        socks.append(s)
+        ports.append(free_port)
+    for s in socks:
+        s.close()
+    if n == 1:
+        return free_port
+    return ports
 
 
 @gu.memodict
