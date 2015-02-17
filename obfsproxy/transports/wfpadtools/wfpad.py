@@ -349,7 +349,7 @@ class WFPadTransport(BaseTransport):
         don't send the padding message.
         """
         if not paddingLength:
-            paddingLength = const.MPU
+            paddingLength = self._lengthDataProbdist.randomSample()
         cap = estimate_write_capacity(self.downstreamSocket)
         if cap < paddingLength:
             log.debug("[wfpad] We skipped sending padding because the"
@@ -497,11 +497,13 @@ class WFPadTransport(BaseTransport):
 
         self._lastRcvDownstreamTs = reactor.seconds()
         for msg in msgs:
-            log.debug("A new message has been parsed!")
+            log.debug("[wfpad] A new message has been parsed!")
             msg.rcvTime = time.clock()
             if msg.flags & const.FLAG_CONTROL:
                 # Process control messages
-                self.circuit.upstream.write(msg.payload)
+                payload = msg.payload
+                if len(payload) > 0:
+                    self.circuit.upstream.write(payload)
                 self.receiveControlMessage(msg.opcode, msg.args)
             else:
                 self.deferBurstPadding('rcv')
@@ -673,8 +675,8 @@ class WFPadTransport(BaseTransport):
     # ==========================================================================
     def receiveControlMessage(self, opcode, args=None):
         """Do operation indicated by the _opcode."""
-        log.debug("Received control message with opcode %s and args: %s"
-                  % (mes.getOpcodeNames(const.OP_SEND_PADDING), args))
+        log.debug("[wfpad] Received control message with opcode %s and args: %s"
+                  % (mes.getOpcodeNames(opcode), args))
 
         if self.weAreClient:
             raise Exception("Client cannot receive control messages.")
@@ -843,8 +845,8 @@ class WFPadTransport(BaseTransport):
             log.debug("[wfpad] - Total pad stop condition is %s."
                       "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, "
                       "Num data msgs: %s, Data Bytes: %s, to_pad: %s"
-                      % (stopCond, self.isVisiting(), self._numMessages, self._totalBytes,
-                         self._dataMessages, self._dataBytes, to_pad))
+                      % (stopCond, self.isVisiting(), self._numMessages,
+                         self._totalBytes, self._dataMessages, self._dataBytes, to_pad))
             return stopCond
         self.stopCondition = stopConditionTotalPad
 

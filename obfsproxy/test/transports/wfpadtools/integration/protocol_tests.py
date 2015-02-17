@@ -10,7 +10,7 @@ from obfsproxy.test.transports.wfpadtools import wfpad_tester as wt
 log = logging.get_obfslogger()
 
 
-class TestReceivedBytes(wt.TestSendDataServer, tu.STTest):
+class TestReceivedBytes(wt.WFPadShimConfig, wt.TestSendDataServer, tu.STTest):
     opcode = const.OP_SEND_PADDING
     N, t = 5, 1
     args = [N, t]

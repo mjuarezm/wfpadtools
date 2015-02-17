@@ -333,7 +333,7 @@ class PrimitiveTest(TestSetUp):
         pass
 
 
-class TestSendControlMessage(WFPadShimConfig, PrimitiveTest):
+class TestSendControlMessage(PrimitiveTest):
 
     def doBeforeSessionStarts(self):
         """Send control msg."""

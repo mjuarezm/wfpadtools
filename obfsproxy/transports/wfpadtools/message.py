@@ -100,6 +100,7 @@ class WFPadMessageFactory(object):
         """Return payload length sampling from probability distribution."""
         if probDist:
             payloadLen = probDist.randomSample()
+            log.debug("XXX %s", payloadLen)
             if payloadLen is not const.INF_LABEL:
                 return payloadLen
         return const.MPU_CTRL if flags & const.FLAG_CONTROL > 0 else const.MPU
@@ -145,15 +146,15 @@ class WFPadMessageFactory(object):
                 messages.append(self.newControl(opcode, strArgs[:payloadLen],
                                                 "", 0))
             else:
-                pbckLen = const.MPU_CTRL - argsLen
+                maxPiggyLen = payloadLen - const.CONTROL_LEN - const.ARGS_TOTAL_LENGTH_LEN - argsLen
                 dataLen = len(data)
-                pbckData = data[:pbckLen] if dataLen > 0 else ""
-                paddingLen = dataLen - pbckLen if pbckLen < dataLen else 0
+                piggyData = data[:maxPiggyLen] if dataLen > 0 else ""
+                paddingLen = maxPiggyLen - dataLen  if maxPiggyLen > dataLen else 0
                 flags = const.FLAG_CONTROL | const.FLAG_LAST
                 flags |= const.FLAG_DATA if dataLen > 0 else const.FLAG_PADDING
-                messages.append(self.new(pbckData, paddingLen, flags, opcode,
+                messages.append(self.new(piggyData, paddingLen, flags, opcode,
                                          strArgs[:payloadLen]))
-                data = data[pbckLen:]
+                data = data[maxPiggyLen:]
             strArgs = strArgs[payloadLen:]
 
         if len(data) > 0:
@@ -221,10 +222,12 @@ def isSane(totalLen, payloadLen, flags):
     validFlags = [
         const.FLAG_DATA,
         const.FLAG_PADDING,
-        const.FLAG_DATA | const.FLAG_CONTROL,
+        const.FLAG_CONTROL,
+        const.FLAG_CONTROL | const.FLAG_DATA,
         const.FLAG_CONTROL | const.FLAG_PADDING,
         const.FLAG_CONTROL | const.FLAG_LAST,
-        const.FLAG_CONTROL | const.FLAG_PADDING | const.FLAG_LAST
+        const.FLAG_CONTROL | const.FLAG_PADDING | const.FLAG_LAST,
+        const.FLAG_CONTROL | const.FLAG_DATA | const.FLAG_LAST
     ]
 
     return isFine(totalLen) and isFine(payloadLen) and \

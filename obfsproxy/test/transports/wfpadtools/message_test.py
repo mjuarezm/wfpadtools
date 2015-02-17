@@ -99,7 +99,7 @@ class WFPadMessageExtractorTest(unittest.TestCase):
         extractedMsgs = self.msgExtractor.extract(strMsg)
         obsArgs = extractedMsgs[0].args
         self.assertEqual(obsArgs, testArgs,
-                         "Observed args: %s does not match with"
+                         "Observed args: %s do not match with"
                          " expected args: %s." % (obsArgs, testArgs))
 
         # Test piggybacking
