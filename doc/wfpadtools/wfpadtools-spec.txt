@@ -116,13 +116,16 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 	
 	Flag name       | Bit # | Description
     ----------------+-------+--------------------------------------------------
-    FLAG_PADDING    |   1   | The payload holds padding that must be discarded.
+    FLAG_DATA       |   0   | The payload holds data (may be mixed with padding).
+    ----------------+-------+--------------------------------------------------	
+    FLAG_PADDING    |   1   | The payload only holds padding data that must be
+                    |       | discarded.
     ----------------+-------+--------------------------------------------------
     FLAG_CONTROL    |   2   | The payload holds arguments for the control
                     |       | operation.
     ----------------+-------+--------------------------------------------------
     FLAG_LAST       |   3   | Flags the control message as containing the last
-    		    |	    | piece of arguments and piggybacked data.
+                    |	    | piece of arguments and piggybacked data.
     ----------------+-------+--------------------------------------------------
     
 	There is a precedence on flags. When FLAG_PADDING is signaled, the message is 
