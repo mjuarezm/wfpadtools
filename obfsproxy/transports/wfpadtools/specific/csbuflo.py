@@ -2,7 +2,6 @@
 This module implements the CS-CSBuFLO countermeasure proposed by Cai et al.
 """
 import math
-import numpy
 from random import uniform
 
 # WFPadTools imports
@@ -11,6 +10,7 @@ from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 from obfsproxy.transports.wfpadtools.util import genutil as gu
+from obfsproxy.transports.wfpadtools.util import mathutil as mu
 
 
 # Logging
@@ -131,7 +131,7 @@ class CSBuFLOTransport(WFPadTransport):
         if len(time_intervals) == 0:
             return rho_star
         else:
-            return math.pow(2, math.floor(math.log(numpy.median(time_intervals), 2)))
+            return math.pow(2, math.floor(math.log(mu.median(time_intervals), 2)))
 
     def update_transmission_rate(self):
         self._period = uniform(0, 2 * self._rho_star)
