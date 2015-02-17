@@ -14,7 +14,7 @@ from obfsproxy.transports.wfpadtools.util import dumputil as du
 from obfsproxy.transports.wfpadtools.message import getOpcodeNames
 
 
-DEBUG = os.environ["WFPAD_DEBUG"] if "WFPAD_DEBUG" in os.environ else True
+DEBUG = os.environ["WFPAD_DEBUG"] if "WFPAD_DEBUG" in os.environ else False
 # DEBUG = False
 
 # Logging settings:
