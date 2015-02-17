@@ -212,7 +212,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 	be used in the server as depicted below:
 		
 		    Client                         Server  Legend:
-		      |  	  (Bs, Gs, Br, Gr)       |      Bs: Burst send probability distribution
+              |  	  (Bs, Gs, Br, Gr)       |      Bs: Burst send probability distribution
 		      | ---------------------------> |      Gs: Gap send probability distribution 
 		      |         SessId, start        |      Br: Burst receive probability distribution
 		      | ---------------------------> |      Gr: Burst receive probability distribution 
