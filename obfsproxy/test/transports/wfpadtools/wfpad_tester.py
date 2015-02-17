@@ -26,8 +26,8 @@ if DEBUG:
 TEST_MSG = "thisisatestmsg"
 
 # Constants
-SHIM_PORT = ts.SHIM_PORT
-SOCKS_PORT = ts.SOCKS_PORT
+SHIM_PORT = 6665
+SOCKS_PORT = 6666
 
 
 # CONFIGURATIONS
