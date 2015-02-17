@@ -9,16 +9,14 @@ dn = dirname
 TRANSPORT_NAME          = "wfpad"
 
 # Paths
-TEMP_DIR                = tempfile.gettempdir()
-TEST_DUMP_DIR           = jn(TEMP_DIR, "test_dumps")
-DUMPS                   = {"client": join(TEST_DUMP_DIR, "client.dump"),
-                           "server": join(TEST_DUMP_DIR, "server.dump")}
-
-
 BASE_DIR                = abspath(jn(dirname(__file__), pardir, pardir, pardir))
 OBFSPROXY_DIR           = jn(BASE_DIR, "obfsproxy") 
 PYOBFSPROXY_PATH        = jn(OBFSPROXY_DIR, "pyobfsproxy.py")
+TEMP_DIR                = jn(BASE_DIR, "tmp")
 DEFAULT_LOG             = jn(TEMP_DIR, "wfpad.log")
+TEST_DUMP_DIR           = jn(TEMP_DIR, "test_dumps")
+DUMPS                   = {"client": join(TEST_DUMP_DIR, "client.dump"),
+                           "server": join(TEST_DUMP_DIR, "server.dump")}
 
 INF_LABEL               = -1
 

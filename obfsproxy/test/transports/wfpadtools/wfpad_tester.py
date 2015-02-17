@@ -219,6 +219,7 @@ class TestSetUp(nu.CommInterfaceAbstract):
     SHIM_PORTS = [SHIM_PORT, SOCKS_PORT]
 
     def setUp(self):
+        fu.resetdir(const.TEMP_DIR)
         log.debug("\n\n\n\n")
         fu.resetdir(const.TEST_DUMP_DIR)
         self.setup()
