@@ -350,6 +350,8 @@ class WFPadTransport(BaseTransport):
         """
         if not paddingLength:
             paddingLength = self._lengthDataProbdist.randomSample()
+            if paddingLength == const.INF_LABEL:
+                paddingLength = const.MPU
         cap = estimate_write_capacity(self.downstreamSocket)
         if cap < paddingLength:
             log.debug("[wfpad] We skipped sending padding because the"
