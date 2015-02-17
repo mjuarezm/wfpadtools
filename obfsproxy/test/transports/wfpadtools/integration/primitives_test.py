@@ -69,10 +69,25 @@ class TestBurstHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
     when = "rcv"
     args = [histo, labels_ms, removeTokens, interpolate, when]
 
+    def test_basic_func(self):
+        pass
+
+    def test_removetokens(self):
+        pass
+
+    def test_interpolation(self):
+        pass
+
     def test_burst_is_padded(self):
-        """Reproduce a burst and test that is paded according to histo."""
+        """Reproduce a burst and test that is padded according to histo."""
         # TODO
         pass
+
+
+class TestBurstHistogramSnd(TestBurstHistogram, wt.WFPadShimConfig,
+                            wt.TestSendDataServer):
+    """Test primitive for sending histogram."""
+    when = "snd"
 
 
 class TestGapHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
@@ -93,6 +108,11 @@ class TestGapHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
         # TODO
         pass
 
+
+class TestGapHistogramSnd(TestGapHistogram, wt.WFPadShimConfig,
+                            wt.TestSendDataServer):
+    """Test primitive for sending histogram."""
+    when = "snd"
 
 # CS-BuFLO PRIMITIVES
 #####################
