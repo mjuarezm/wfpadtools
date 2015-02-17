@@ -8,11 +8,11 @@ if hasattr(sys, "frozen"):
     dir_of_executable = os.path.dirname(sys.executable)
 else:
     dir_of_executable = os.path.dirname(__file__)
-path_to_project_root = os.path.abspath(os.path.join(dir_of_executable, '..'))
+path_to_project_root = os.path.abspath(os.path.join(dir_of_executable, os.path.pardir))
 
 sys.path.insert(0, path_to_project_root)
 
 from obfsproxy.pyobfsproxy import run
-run()
 
+run()
 
