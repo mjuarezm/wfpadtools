@@ -34,12 +34,11 @@ setup(
         'Twisted',
         'argparse',
         'pyptlib >= 0.0.6',
-        'pyyaml',
-        'psutil',
-        'requesocks'
+        'pyyaml'
         ],
 
     extras_require = {
-        'SOCKS': ["txsocksx"]
+        'SOCKS': ["txsocksx"],
+        'wfpadtools': ['psutil', 'requesocks', 'numpy']
         }
 )
