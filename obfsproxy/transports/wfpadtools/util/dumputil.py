@@ -8,6 +8,7 @@ from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.util import logutil
 from obfsproxy.transports.wfpadtools.util.genutil import timestamp
 from obfsproxy.transports.wfpadtools.util.fileutil import removefile
+import time
 
 log = logutil.get_logger("dumputil")
 
@@ -31,11 +32,11 @@ def pick_load(path):
 
 def update_dump(obj, fstate):
     """Updates dump file with new data."""
-    dump_dict = {}
+    dump_list = []
     if isfile(fstate):
-        dump_dict = pick_load(fstate)
-    dump_dict[timestamp()] = obj
-    pick_dump(dump_dict, fstate)
+        dump_list = pick_load(fstate)
+    dump_list.append(obj)
+    pick_dump(dump_list, fstate)
 
 
 def check_pickable(obj):

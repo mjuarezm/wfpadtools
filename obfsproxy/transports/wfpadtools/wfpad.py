@@ -116,7 +116,7 @@ class WFPadTransport(BaseTransport):
 
     def __init__(self):
         """Initialize a WFPadTransport object."""
-        log.debug("[wfad] Initializing %s (id=%s)."
+        log.debug("[wfpad] Initializing %s (id=%s)."
                   % (const.TRANSPORT_NAME, str(id(self))))
         # TODO: Define classes for all these variables
         super(WFPadTransport, self).__init__()
@@ -146,6 +146,7 @@ class WFPadTransport(BaseTransport):
         self._dataBytes = {'rcv': 0, 'snd': 0}
         self._totalBytes = {'rcv': 0, 'snd': 0}
         self._numMessages = {'rcv': 0, 'snd': 0}
+        self._dataMessages = {'rcv': 0, 'snd': 0}
 
         # Initialize length distribution
         self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
@@ -295,7 +296,7 @@ class WFPadTransport(BaseTransport):
             self.whenReceivedUpstream()
         else:
             self._buffer.write(d)
-            log.debug("[wfad] Buffered %d bytes of outgoing data." %
+            log.debug("[wfpad] Buffered %d bytes of outgoing data." %
                       len(self._buffer))
 
     def whenReceivedUpstream(self):
@@ -321,10 +322,13 @@ class WFPadTransport(BaseTransport):
         elif isinstance(data, mes.WFPadMessage):
             data.sndTime = time.clock()
             self.circuit.downstream.write(str(data))
+            log.debug("[wfpad] A new message (flag=%s) sent!", data.flags)
             if not data.flags & const.FLAG_CONTROL:
                 self._numMessages['snd'] += 1
-                self._dataBytes['snd'] += len(data.payload)
                 self._totalBytes['snd'] += data.totalLen
+                if data.flags & const.FLAG_DATA:
+                    self._dataMessages['snd'] += 1
+                    self._dataBytes['snd'] += len(data.payload)
             return [data]
         elif isinstance(data, list):
             listMsgs = []
@@ -403,21 +407,21 @@ class WFPadTransport(BaseTransport):
 
         if delay == 0:
             # Send data message over the wire
+            log.debug("[wfpad] Sending data message without delay.")
             self.sendDownstream(self._msgFactory.encapsulate(data,
                                 lenProbdist=self._lengthDataProbdist))
-            log.debug("[wfpad] Data message has been sent without delay.")
 
         else:
             # Push data message to data buffer
             self._buffer.write(data)
-            log.debug("[wfad] Buffered %d bytes of outgoing data w/ delay %sms"
+            log.debug("[wfpad] Buffered %d bytes of outgoing data w/ delay %sms"
                       % (len(self._buffer), delay))
 
             # In case there is no scheduled flush of the buffer,
             # make a delayed call to the flushing method.
             if not self._deferData or (self._deferData and self._deferData.called):
                 self._deferData = deferLater(delay, self.flushBuffer)
-                log.debug("[wfad] Delay buffer flush %s ms delay" % delay)
+                log.debug("[wfpad] Delay buffer flush %s ms delay" % delay)
 
     def elapsedSinceLastMsg(self):
         elap = reactor.seconds() - self._lastSndDownstreamTs  # @UndefinedVariable
@@ -433,7 +437,7 @@ class WFPadTransport(BaseTransport):
         """
         dataLen = len(self._buffer)
         assert(dataLen > 0)
-        log.debug("[wfad] %s bytes of data found in buffer."
+        log.debug("[wfpad] %s bytes of data found in buffer."
                   " Flushing buffer." % dataLen)
 
         payloadLen = self._lengthDataProbdist.randomSample()
@@ -453,10 +457,10 @@ class WFPadTransport(BaseTransport):
         else:
             paddingLen = payloadLen - dataLen
             self.sendDataMessage(self._buffer.read(), paddingLen)
-            log.debug("[wfad] Padding message to %d (adding %d)."
+            log.debug("[wfpad] Padding message to %d (adding %d)."
                       % (msgTotalLen, paddingLen))
 
-        log.debug("[wfad] Sent data message of length %d." % msgTotalLen)
+        log.debug("[wfpad] Sent data message of length %d." % msgTotalLen)
 
         self._lastSndDataDownstreamTs = self._lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
 
@@ -477,7 +481,7 @@ class WFPadTransport(BaseTransport):
         Data is written to the local application and padding messages are
         filtered out.
         """
-        log.debug("[wfad] Parse protocol messages from stream.")
+        log.debug("[wfpad] Parse protocol messages from stream.")
 
         # Make sure there actually is data to be parsed
         if (data is None) or (len(data) == 0):
@@ -493,6 +497,7 @@ class WFPadTransport(BaseTransport):
 
         self._lastRcvDownstreamTs = reactor.seconds()
         for msg in msgs:
+            log.debug("A new message has been parsed!")
             msg.rcvTime = time.clock()
             if msg.flags & const.FLAG_CONTROL:
                 # Process control messages
@@ -505,12 +510,13 @@ class WFPadTransport(BaseTransport):
 
                 # Filter padding messages out.
                 if msg.flags & const.FLAG_PADDING:
-                    log.debug("[wfad] Padding message ignored.")
+                    log.debug("[wfpad] Padding message ignored.")
 
                 # Forward data to the application.
-                elif not msg.flags & const.FLAG_DATA:
-                    log.debug("[wfad] Data flag detected, relaying upstream")
+                elif msg.flags & const.FLAG_DATA:
+                    log.debug("[wfpad] Data flag detected, relaying upstream")
                     self._dataBytes['rcv'] += len(msg.payload)
+                    self._dataMessages['rcv'] += 1
                     self.circuit.upstream.write(msg.payload)
                     self._lastRcvDataDownstreamTs = reactor.seconds()
 
@@ -711,7 +717,7 @@ class WFPadTransport(BaseTransport):
         t : int
             Number of milliseconds delay before sending.
         """
-        millisec = t / const.SCALE
+        millisec = t
         for _ in xrange(N):
             deferLater(millisec, self.sendIgnore)
 
@@ -835,16 +841,19 @@ class WFPadTransport(BaseTransport):
                 if msg_level else s._totalBytes['snd']
             stopCond = to_pad > 0 and (to_pad & (to_pad - 1)) == 0
             log.debug("[wfpad] - Total pad stop condition is %s."
-                      "\n Visiting: %s, Num snd msgs: %s"
-                      % (stopCond, s.isVisiting(), s._numMessages))
+                      "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, "
+                      "Num data msgs: %s, Data Bytes: %s, to_pad: %s"
+                      % (stopCond, self.isVisiting(), self._numMessages, self._totalBytes,
+                         self._dataMessages, self._dataBytes, to_pad))
             return stopCond
         self.stopCondition = stopConditionTotalPad
 
     def relayPayloadPad(self, sessId, t, msg_level=True):
         """Pad until the total sent data is multiple of 2^int(log(TOTAL_PAYLOAD))
 
-        Set the stop condition to satisfy the number of messages (or bytes)
-        sent within the session is a multiple of the parameter `L` and that the
+        Set the stop condition to satisfy the number of TOTAL messages (or
+        bytes), both fake and real data, are a multiple of the closest power
+        of two to the amount of real units (messages or bytes), and that the
         session has finished.
 
         Parameters
@@ -860,26 +869,28 @@ class WFPadTransport(BaseTransport):
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
 
-        def stopConditionBatchPad(s):
-            if s.isVisiting():
+        def stopConditionPayloadPad(self):
+            if self.isVisiting():
                 log.debug("[wfpad] - False stop condition, still visiting...")
                 return False
-            L = math.pow(2, math.ceil(math.log(s._dataBytes['snd'], 2)))
-            to_pad = s._numMessages['snd'] \
-                if msg_level else s._totalBytes['snd']
+            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
+            divisor = self._dataMessages['snd'] if msg_level else self._dataBytes['snd']
+            L = closest_power_of_two(divisor)
             stopCond = to_pad > 0 and to_pad % L == 0
             log.debug("[wfpad] - Payload pad stop condition is %s."
-                      "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, L: %s"
-                      % (stopCond, s.isVisiting(), s._numMessages, s._totalBytes, L))
+                      "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, "
+                      "Num data msgs: %s, Data Bytes: %s, L: %s"
+                      % (stopCond, self.isVisiting(), self._numMessages, self._totalBytes,
+                         self._dataMessages, self._dataBytes, L))
             return stopCond
-        self.stopCondition = stopConditionBatchPad
+        self.stopCondition = stopConditionPayloadPad
 
     def relayBatchPad(self, sessId, L, t, msg_level=True):
         """Pad all batches of cells to the nearest multiple of `L` cells/bytes total.
 
         Set the stop condition to satisfy the number of messages (or bytes)
         sent within the session is a multiple of the parameter `L` and that the
-        session has finished.
+        session has finished. We count both padding and data messages.
 
         Parameters
         ----------
@@ -896,15 +907,15 @@ class WFPadTransport(BaseTransport):
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
 
-        def stopConditionBatchPad(s):
+        def stopConditionBatchPad(self):
             if self.isVisiting():
                 log.debug("[wfpad] - False stop condition, still visiting...")
                 return False
-            to_pad = s._numMessages['snd'] if msg_level else s._totalBytes['snd']
+            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
             stopCond = to_pad > 0 and to_pad % L == 0
             log.debug("[wfpad] - Batch pad stop condition is %s."
                       "\n Visiting: %s, Num msgs: %s, Total Bytes: %s, L: %s"
-                      % (stopCond, s.isVisiting(), s._numMessages, s._totalBytes, L))
+                      % (stopCond, self.isVisiting(), self._numMessages, self._totalBytes, L))
             return stopCond
         self.stopCondition = stopConditionBatchPad
 
@@ -914,15 +925,14 @@ def deferLater(*args, **kargs):
 
     It allows to call twisted deferLater and add callback and errback methods.
     """
-    delay, fn = args[0], args[1]
+    delayms, fn = args[0], args[1]
     callback = None
     if 'cbk' in kargs:
         callback = kargs['cbk']
         del kargs['cbk']
-    delayMiliseconds = delay / const.SCALE
-    d = task.deferLater(reactor, delayMiliseconds, fn, *args[2:], **kargs)
+    d = task.deferLater(reactor, delayms / const.SCALE, fn, *args[2:], **kargs)
     log.debug("[wfpad] - Defer call to %s after %sms delay."
-              % (fn.__name__, delayMiliseconds))
+              % (fn.__name__, delayms))
     if callback:
         d.addCallback(callback)
 

@@ -1,6 +1,5 @@
 """Provide methods and classes to be used in tests for wfpad transports."""
 import unittest
-import collections
 from time import sleep
 
 # WFPadTools imports
@@ -14,8 +13,8 @@ from obfsproxy.transports.wfpadtools.util import dumputil as du
 from obfsproxy.transports.wfpadtools.message import getOpcodeNames
 
 
-# DEBUG = True
-DEBUG = False
+DEBUG = True
+# DEBUG = False
 
 # Logging settings:
 log = logging.get_obfslogger()
@@ -255,11 +254,9 @@ class PrimitiveTest(TestSetUp):
         """Parse test dumps."""
         # Load dumps
         sleep(1)
-        serverDumps = {float(k): v for k, v in
-                       self.__load_wrapper("server").iteritems()}
+        serverDumps = self.__load_wrapper("server")
         log.debug("Server Dumps: %s", serverDumps)
-        clientDumps = {float(k): v for k, v
-                       in self.__load_wrapper("client").iteritems()}
+        clientDumps = self.__load_wrapper("client")
         log.debug("Client Dumps: %s", clientDumps)
 
         # Parse messages
@@ -272,10 +269,6 @@ class PrimitiveTest(TestSetUp):
         self.clientState = self.__last_state(clientDumps)
         self.serverState = self.__last_state(serverDumps)
 
-        # Timestamps
-        self.clientTs = self.__timestamps(clientDumps)
-        self.serverTs = self.__timestamps(serverDumps)
-
     @staticmethod
     def control_msgs(msgs):
         """Return control messages."""
@@ -287,14 +280,18 @@ class PrimitiveTest(TestSetUp):
         return [msg for msg in msgs if not msg.opcode]
 
     @staticmethod
+    def data_msgs(msgs):
+        """Return padding messages."""
+        return [msg for msg in msgs if msg.flags & const.FLAG_DATA]
+
+    @staticmethod
     def padding_msgs(msgs):
         """Return padding messages."""
         return [msg for msg in msgs if msg.flags & const.FLAG_PADDING]
 
     def __last_state(self, dump):
         """Return last state from dump."""
-        ordered = collections.OrderedDict(sorted(dump.items()))
-        states = self.__states(ordered)
+        states = self.__states(dump)
         if states:
             return states[-1]
         return None
@@ -305,15 +302,7 @@ class PrimitiveTest(TestSetUp):
         `dump` is a dictionary, and messages are always in the second
         element of the value (a tuple).
         """
-        return sum([elem[1] for elem in dump.itervalues()], [])
-
-    def __timestamps(self, dump):
-        """Return timestamps from dump.
-
-        `dump` is a dictionary and keys are timestamps of the reception
-        of the messages.
-        """
-        return [k for k in dump.iterkeys()]
+        return sum([elem[1] for elem in dump], [])
 
     def __states(self, dump):
         """Return states from dump.
@@ -322,15 +311,14 @@ class PrimitiveTest(TestSetUp):
         all the pickable attributes of the transport (either client or
         server) class.
         """
-        return [elem[0] for elem in dump.itervalues()]
+        return [elem[0] for elem in dump]
 
     def __load_wrapper(self, end):
         """Attempts to load a dump of an endpoint from a file."""
         try:
             return du.pick_load(const.DUMPS[end])
         except:
-            # TODO: find the right exception
-            return {}
+            return []
 
     def doBeforeSessionStarts(self):
         """Template method to be implemented in specific tests."""

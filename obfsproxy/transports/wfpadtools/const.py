@@ -30,10 +30,10 @@ ST_WAIT                 = 0
 ST_CONNECTED            = 1
 
 # Flags header protocol
-FLAG_DATA               = (0 << 0)
-FLAG_PADDING            = (1 << 0)
-FLAG_CONTROL            = (1 << 1)
-FLAG_LAST               = (1 << 2)
+FLAG_DATA               = (1 << 0)
+FLAG_PADDING            = (1 << 1)
+FLAG_CONTROL            = (1 << 2)
+FLAG_LAST               = (1 << 3)
 
 # CS-BuFLO padding modes
 PAYLOAD_PADDING         = 'payload'

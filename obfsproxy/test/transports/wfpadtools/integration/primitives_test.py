@@ -2,10 +2,21 @@
 import unittest
 
 # WFPadTools imports
+import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.util import testutil as tu
 from obfsproxy.test.transports.wfpadtools import wfpad_tester as wt
+from obfsproxy.transports.wfpadtools.util.mathutil import closest_power_of_two
 
+# Logging settings:
+log = logging.get_obfslogger()
+
+
+AFTER_SESSION_TIME_PRIMITIVE = 3
+
+
+# GENERAL PRIMITIVES
+#####################
 
 class TestSendPadding(wt.TestSendControlMessage, tu.STTest):
     opcode = const.OP_SEND_PADDING
@@ -40,13 +51,124 @@ class TestSendPadding(wt.TestSendControlMessage, tu.STTest):
                                   expected_delay), delta=0.05)
 
 
+# ADAPTIVE  PRIMITIVES
+######################
+
+class TestBurstHistogram(wt.TestSendDataServer):
+    pass
+
+
+class TestGapHistogram(wt.TestSendDataServer):
+    pass
+
+
+# CS-BuFLO PRIMITIVES
+#####################
+
+class TestTotalPadMsgs(wt.TestSendDataServer, tu.STTest):
+    opcode = const.OP_TOTAL_PAD
+    sessId, delay, msg_level = "id123", 1, True
+    args = [sessId, delay, msg_level]
+
+    # Give server enough time to pad the end of the session
+    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
+
+    def test_num_sent_msgs_is_closest_power_of_two(self):
+        """Test that stop condition works correctly.
+
+        TOTAL_PAD must pad end of session to closest multiple of
+        a power of two of the number of messages that have been
+        transmitted up to the moment.
+        """
+        obs_num_client_msgs = len(self.clientMsgs)
+        L = closest_power_of_two(obs_num_client_msgs)
+        self.assertTrue(obs_num_client_msgs > 0
+                        and obs_num_client_msgs % L == 0,
+                        "The observed number of sent messages (%s) "
+                        "is not a multiple of %s." % (obs_num_client_msgs, L))
+
+
+class TestTotalPadBytes(wt.TestSendDataServer, tu.STTest):
+    opcode = const.OP_TOTAL_PAD
+    sessId, delay, msg_level = "id123", 1, False
+    args = [sessId, delay, msg_level]
+
+    # Give server enough time to pad the end of the session
+    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
+
+    def test_num_sent_bytes_is_closest_power_of_two(self):
+        """Test that stop condition works correctly.
+
+        TOTAL_PAD must pad end of session to closest multiple of
+        a power of two of the number of bytes that have been
+        transmitted up to the moment.
+        """
+        obs_num_cl_bytes = len(self.clientMsgs)
+        L = closest_power_of_two(obs_num_cl_bytes)
+        self.assertTrue(obs_num_cl_bytes > 0
+                        and obs_num_cl_bytes % L == 0,
+                        "The observed number of padding messages (%s) "
+                        "is not a multiple of %s." % (obs_num_cl_bytes, L))
+
+
+class TestPayloadPadMsgs(wt.TestSendDataServer, tu.STTest):
+    opcode = const.OP_PAYLOAD_PAD
+    sessId, delay, msg_level = "id123", 1, True
+    args = [sessId, delay, msg_level]
+
+    # Give server enough time to pad the end of the session
+    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
+
+    def test_num_sent_msgs_is_multiple_of_closer_power_of_two(self):
+        """Test that stop condition works for messages.
+
+        PAYLOAD_PAD must pad end of session to closest multiple of
+        the closest power of two of the number of data units (bytes
+        or messages) that have been transmitted up to the moment.
+        """
+        obs_num_client_msgs = len(self.clientMsgs)
+        num_data_msgs = len(self.data_msgs(self.clientMsgs))
+        L = closest_power_of_two(num_data_msgs)
+        self.assertTrue(obs_num_client_msgs > 0
+                        and obs_num_client_msgs % L == 0,
+                        "The observed number of sent messages (%s) "
+                        "is not a multiple of %s." % (obs_num_client_msgs, L))
+
+
+class TestPayloadPadBytes(wt.TestSendDataServer, tu.STTest):
+    opcode = const.OP_PAYLOAD_PAD
+    sessId, delay, msg_level = "id123", 1, False
+    args = [sessId, delay, msg_level]
+
+    # Give server enough time to pad the end of the session
+    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
+
+    def test_num_sent_bytes_is_multiple_of_power_of_two(self):
+        """Test that stop condition works for bytes.
+
+        PAYLOAD_PAD must pad end of session to closest multiple of
+        the closest power of two of the number of bytes that have
+        been transmitted up to the moment.
+        """
+        obs_num_cl_bytes = len(self.clientMsgs)
+        num_data_bytes = len(self.data_msgs(self.clientMsgs))
+        L = closest_power_of_two(num_data_bytes)
+        self.assertTrue(obs_num_cl_bytes > 0
+                        and obs_num_cl_bytes % L == 0,
+                        "The observed number of sent bytes (%s) is not a"
+                        " multiple of %s." % (obs_num_cl_bytes, L))
+
+
+# TAMARAW PRIMITIVES
+#####################
+
 class TestBatchPadMsgs(wt.TestSendDataServer, tu.STTest):
     opcode = const.OP_BATCH_PAD
     sessId, L, delay, msg_level = "id123", 5, 1, True
     args = [sessId, L, delay, msg_level]
 
-    # Give server enough time to send padding
-    AFTER_SESSION_TIME = 5
+    # Give server enough time to pad the end of the session
+    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
 
     def test_num_sent_msgs_is_multiple_of_L(self):
         """Test the number of messages received by the client is multiple of `L`.
@@ -68,8 +190,8 @@ class TestBatchPadBytes(wt.TestSendDataServer, tu.STTest):
     sessId, L, delay, msg_level = "id123", 5, 1, False
     args = [sessId, L, delay, msg_level]
 
-    # Give server enough time to send padding
-    AFTER_SESSION_TIME = 5
+    # Give server enough time to pad the end of the session
+    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
 
     def test_num_sent_bytes_is_multiple_of_L(self):
         """Test the number of bytes received by the client is multiple of `L`.
@@ -81,33 +203,9 @@ class TestBatchPadBytes(wt.TestSendDataServer, tu.STTest):
         obs_total_bytes = self.clientState["_totalBytes"]['rcv']
         self.assertTrue(obs_total_bytes > 0
                         and obs_total_bytes % self.L == 0,
-                        "The observed number of bytes (%s) "
-                        "is not a multiple of %s."
-                        % (obs_total_bytes, self.L))
+                        "The observed number of bytes (%s) is not a multiple"
+                        " of %s." % (obs_total_bytes, self.L))
 
-
-class TestPayloadPad(wt.TestSendDataServer, tu.STTest):
-    opcode = const.OP_PAYLOAD_PAD
-    sessId, delay, msg_level = "id123", 1, False
-    args = [sessId, delay, msg_level]
-
-    # Give server enough time to send padding
-    AFTER_SESSION_TIME = 5
-
-    def test_num_data_bytes_correctly_padded(self):
-        pass
-
-
-class TotalPadPad(wt.TestSendDataServer, tu.STTest):
-    opcode = const.OP_TOTAL_PAD
-    sessId, delay = "id123", 1
-    args = [sessId, delay]
-
-    # Give server enough time to send padding
-    AFTER_SESSION_TIME = 5
-
-    def test_num_messages_is_power_of_2(self):
-        pass
 
 if __name__ == "__main__":
     unittest.main()
