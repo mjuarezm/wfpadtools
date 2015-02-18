@@ -19,29 +19,7 @@ class AdaptiveTransport(WFPadTransport):
     delay probabilities in response to dummy and data messages coming from
     upstream and downstream directions.
     """
-    _histograms = {"burst": {"snd": {"histo": [1],
-                                     "labels": [1],
-                                     "removeToks": False,
-                                     "interpolate": True
-                                     },
-                             "rcv": {"histo": [1],
-                                     "labels": [1],
-                                     "removeToks": False,
-                                     "interpolate": True
-                                     }
-                             },
-                   "gap": {"snd": {"histo": [1],
-                                   "labels": [1],
-                                   "removeToks": False,
-                                   "interpolate": True
-                                   },
-                           "rcv": {"histo": [1],
-                                   "labels": [1],
-                                   "removeToks": False,
-                                   "interpolate": True
-                                   }
-                           }
-                   }
+    _histograms = None
 
     def __init__(self):
         super(AdaptiveTransport, self).__init__()
@@ -91,22 +69,22 @@ class AdaptiveTransport(WFPadTransport):
 
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
-        self.constantRatePaddingDistrib(self._period)
-
+        self._delayDataProbdist = probdist.uniform(self._period)
         # i-th position in histogram is the number of tokens for the
         # probability of sampling a delay within [labels(i-1), labels(i)),
         # except:
         #     i=0 -> [0, labels(0)]
         #     i=len(histo)-1 -> delay=infinite
         #     i=len(histo)-2 -> [labels(len(histo)-2), MAX_DELAY]
-        self.relayBurstHistogram(**dict(self._histograms["burst"]["snd"],
-                                        **{"when": "snd"}))
-        self.relayBurstHistogram(**dict(self._histograms["burst"]["rcv"],
-                                        **{"when": "rcv"}))
-        self.relayGapHistogram(**dict(self._histograms["gap"]["snd"],
-                                      **{"when": "snd"}))
-        self.relayGapHistogram(**dict(self._histograms["gap"]["rcv"],
-                                      **{"when": "rcv"}))
+        if self._histograms:
+            self.relayBurstHistogram(**dict(self._histograms["burst"]["snd"],
+                                            **{"when": "snd"}))
+            self.relayBurstHistogram(**dict(self._histograms["burst"]["rcv"],
+                                            **{"when": "rcv"}))
+            self.relayGapHistogram(**dict(self._histograms["gap"]["snd"],
+                                          **{"when": "snd"}))
+            self.relayGapHistogram(**dict(self._histograms["gap"]["rcv"],
+                                          **{"when": "rcv"}))
 
 
 class AdaptiveClient(AdaptiveTransport):

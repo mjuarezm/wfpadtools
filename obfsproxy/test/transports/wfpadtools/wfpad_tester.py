@@ -92,7 +92,7 @@ class CSBuFLOShimConfig(object):
                    "--test=%s" % const.DUMPS["server"])
     client_args = ("buflo", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
-                   "--socks-shim=%d,%d" % (SHIM_PORT, SHIM_PORT),
+                   "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
                    "--period=1",
                    "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
@@ -109,7 +109,7 @@ class AdaptiveShimConfig(object):
                    "--test=%s" % const.DUMPS["server"])
     client_args = ("adaptive", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
-                   "--socks-shim=%d,%d" % (SHIM_PORT, SHIM_PORT),
+                   "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
                    "--period=0",
                    "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
@@ -127,7 +127,7 @@ class TamarawShimConfig(object):
                    "--test=%s" % const.DUMPS["server"])
     client_args = ("tamaraw", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
-                   "--socks-shim=%d,%d" % (SHIM_PORT, SHIM_PORT),
+                   "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
                    "--period=1",
                    "--psize=%s" % const.MPU,
                    "--batch=1000",
@@ -354,7 +354,7 @@ class PrimitiveTest(SetUpTest):
 
 class HistoPrimitiveTest(PrimitiveTest):
 
-    DURING_SESSION_TIME = 0
+    DURING_SESSION_TIME = 5
     BEFORE_SESSION_END_TIME = 1
 
     def doBeforeSessionStarts(self):

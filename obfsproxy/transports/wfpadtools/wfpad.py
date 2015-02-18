@@ -422,11 +422,11 @@ class WFPadTransport(BaseTransport):
             log.debug("[wfpad] Buffered %d bytes of outgoing data w/ delay %sms"
                       % (len(self._buffer), delay))
 
-            # In case there is no scheduled flush of the buffer,
-            # make a delayed call to the flushing method.
-            if not self._deferData or (self._deferData and self._deferData.called):
-                self._deferData = deferLater(delay, self.flushBuffer)
-                log.debug("[wfpad] Delay buffer flush %s ms delay" % delay)
+        # In case there is no scheduled flush of the buffer,
+        # make a delayed call to the flushing method.
+        if not self._deferData or (self._deferData and self._deferData.called):
+            self._deferData = deferLater(delay, self.flushBuffer)
+            log.debug("[wfpad] Delay buffer flush %s ms delay" % delay)
 
     def elapsedSinceLastMsg(self):
         elap = reactor.seconds() - self._lastSndDownstreamTs  # @UndefinedVariable
@@ -441,7 +441,10 @@ class WFPadTransport(BaseTransport):
         start padding.
         """
         dataLen = len(self._buffer)
-        assert(dataLen > 0)
+        if dataLen > 0:
+            self.deferBurstPadding('snd')
+            log.debug("[wfpad] buffer is empty, pad `snd` burst.")
+            return
         log.debug("[wfpad] %s bytes of data found in buffer."
                   " Flushing buffer." % dataLen)
 
