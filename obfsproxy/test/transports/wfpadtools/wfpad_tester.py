@@ -348,6 +348,9 @@ class PadPrimitiveTest(PrimitiveTest):
     DURING_SESSION_TIME = 0
     BEFORE_SESSION_END_TIME = 1
 
+    DATA_STR = "pad!"
+    LEN_DATA_STR = len(DATA_STR)
+
     def doBeforeSessionStarts(self):
         self.send_instruction(const.OP_SEND_PADDING, [self.junk_msgs, 0])
         for _ in xrange(self.real_msgs):
@@ -357,7 +360,7 @@ class PadPrimitiveTest(PrimitiveTest):
         self.send_instruction(self.opcode, self.args)
 
     def doAfterSessionEnds(self):
-        self.send_to_server("pad!")
+        self.send_to_server(self.DATA_STR)
 
     def total_pad(self):
         pass

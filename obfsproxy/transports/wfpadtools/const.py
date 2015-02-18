@@ -1,4 +1,3 @@
-import tempfile
 from os.path import join, abspath, dirname, pardir
 
 # Shortcuts
