@@ -87,7 +87,7 @@ class BuFLOTransport(WFPadTransport):
 
         If a session has not yet started, it returns time since __init__.
         """
-        return time.time() - self._startTime
+        return (time.time() - self._startTime) * const.SCALE
 
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
