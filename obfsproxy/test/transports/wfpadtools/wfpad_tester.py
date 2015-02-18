@@ -220,7 +220,6 @@ class SetUpTest(nu.CommInterfaceAbstract):
 
     def setUp(self):
         fu.resetdir(const.TEMP_DIR)
-        os.chdir(const.BASE_DIR)
         log.debug("\n\n\n\n")
         fu.resetdir(const.TEST_DUMP_DIR)
         self.setup()
@@ -302,12 +301,12 @@ class PrimitiveTest(SetUpTest):
     @staticmethod
     def data_msgs(msgs):
         """Return padding messages."""
-        return [msg for msg in msgs if msg.flags & const.FLAG_DATA]
+        return [msg for msg in msgs if msg.flags & const.FLAG_DATA and not msg.flags & const.FLAG_CONTROL]
 
     @staticmethod
     def padding_msgs(msgs):
         """Return padding messages."""
-        return [msg for msg in msgs if msg.flags & const.FLAG_PADDING]
+        return [msg for msg in msgs if msg.flags & const.FLAG_PADDING and not msg.flags & const.FLAG_CONTROL]
 
     def __last_state(self, dump):
         """Return last state from dump."""

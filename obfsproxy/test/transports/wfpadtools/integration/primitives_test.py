@@ -4,7 +4,6 @@ from time import sleep
 
 # WFPadTools imports
 import obfsproxy.common.log as logging
-from obfsproxy.test import tester as ts
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.util import testutil as tu
 from obfsproxy.test.transports.wfpadtools import wfpad_tester as wt

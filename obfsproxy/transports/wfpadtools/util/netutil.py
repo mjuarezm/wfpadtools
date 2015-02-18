@@ -1,4 +1,5 @@
 """Provides general network-related utility methods."""
+import os
 import sys
 import json
 import Queue
@@ -29,6 +30,7 @@ class CommInterfaceAbstract(TransportsSetUp):
 
     def setup(self):
         """Sets dummy and obfsproxy endpoints for bidirectional comm."""
+        os.chdir(const.BASE_DIR)
         self.shim_commInterf = CommunicationInterface()
         self.commInterf = CommunicationInterface()
         self.shim_commInterf = CommunicationInterface()

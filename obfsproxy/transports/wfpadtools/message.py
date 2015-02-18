@@ -168,9 +168,9 @@ def getFlagNames(flags):
     This function is only useful for printing easy-to-read flag names in
     debug log messages.
     """
-    if flags & const.FLAG_DATA:
+    if flags & const.FLAG_DATA and not flags & const.FLAG_CONTROL:
         return "DATA"
-    elif flags & const.FLAG_PADDING:
+    elif flags & const.FLAG_PADDING and not flags & const.FLAG_CONTROL:
         return "PADDING"
     elif flags & const.FLAG_CONTROL:
         return "CONTROL"
