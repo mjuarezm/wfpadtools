@@ -60,7 +60,6 @@ class TestBurstHistogram(wt.AdaptiveShimConfig, wt.HistoPrimitiveTest, tu.STTest
     # Give server enough time to pad the end of the session
     AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
 
-    @unittest.skip("Skip for now...")
     def test_deferrer(self):
         # Check delay histo is larger than time between ignore and data
         # the deferrer should cancel and restart.
@@ -83,7 +82,6 @@ class TestBurstHistogram(wt.AdaptiveShimConfig, wt.HistoPrimitiveTest, tu.STTest
                                delta=0.001)
 
         # Is it sampling and delaying?
-
 
         # Is it removing tokens?
 
