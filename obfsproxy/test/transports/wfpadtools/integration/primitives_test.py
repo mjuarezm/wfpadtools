@@ -54,7 +54,7 @@ class TestBurstHistogram(wt.AdaptiveShimConfig, wt.HistoPrimitiveTest,
     histo = [tokens, 0, 0, 0, 0, 0, 0]
     labels_ms = [delay, 2, 4, 8, 16, 32, -1]
     removeTokens = True
-    interpolate = True
+    interpolate = False
     when = "snd"
     args = [histo, labels_ms, removeTokens, interpolate, when]
 
@@ -65,6 +65,7 @@ class TestBurstHistogram(wt.AdaptiveShimConfig, wt.HistoPrimitiveTest,
         # Check delay histo is larger than time between ignore and data
         # the deferrer should cancel and restart.
 
+        # Is it sampling and delaying?
         # We need to find the two adjacent ignores around data in server
         #     data_snd_time - ignore1_snd.Time < histo_delay
         #     ignore2_snd.Time - data_snd_time approx = histo_delay
@@ -83,14 +84,9 @@ class TestBurstHistogram(wt.AdaptiveShimConfig, wt.HistoPrimitiveTest,
                                "histo_delay (%s)." % (t2, sec_delay),
                                delta=0.005)
 
-        # Is it sampling and delaying?
-
-
         # Is it removing tokens?
-
-
-        # Is it interpolating?
-        pass
+        histo = self.serverState["_burstHistoProbdist"]["snd"].histo
+        self.assertTrue(histo[0] < self.tokens, "No token has been removed.")
 
     @unittest.skip("Skip for now...")
     def test_burst_is_padded(self):
