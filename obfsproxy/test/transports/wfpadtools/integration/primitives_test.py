@@ -251,8 +251,8 @@ class TestTotalPadBytes(PaddingPrimitiveTestBytes, tu.STTest):
 
 class TestBatchPadMsgs(wt.WFPadShimConfig, PaddingPrimitiveTestMsgs, tu.STTest):
     opcode = const.OP_BATCH_PAD
-    sessId, delay,L,  msg_level = "id123", 1, 5, True
-    args = [sessId, delay, L, msg_level]
+    sessId, delay, L,  msg_level = "id123", 1, 5, True
+    args = [sessId, L, delay, msg_level]
 
     def get_totalpad(self, end_sess_srv_st):
         to_pad = end_sess_srv_st['_numMessages']['snd']
@@ -261,7 +261,7 @@ class TestBatchPadMsgs(wt.WFPadShimConfig, PaddingPrimitiveTestMsgs, tu.STTest):
 
 class TestBatchPadBytes(wt.WFPadShimConfig, PaddingPrimitiveTestBytes, tu.STTest):
     opcode = const.OP_BATCH_PAD
-    sessId, delay,L,  msg_level = "id123", 1, 5, True
+    sessId, L, delay, msg_level = "id123", 1, 5, True
     args = [sessId, delay, L, msg_level]
 
     def get_totalpad(self, end_sess_srv_st):
