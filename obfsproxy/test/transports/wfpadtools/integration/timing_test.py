@@ -13,7 +13,7 @@ from util.util import consec_elem
 log = logging.get_obfslogger()
 
 
-class TestrRTT(wt.WFPadShimConfig, wt.TestSendControlMessage,
+class TestrRTT(wt.WFPadShimConfig, wt.SendControlMessageTest,
                tu.STTest):
     """Estimate mean roundtrip time."""
     # repetitions of sending padding
@@ -26,7 +26,7 @@ class TestrRTT(wt.WFPadShimConfig, wt.TestSendControlMessage,
 
     def doWhileSession(self):
         for _ in xrange(self.repetitions):
-            wt.TestSendControlMessage.doWhileSession(self)
+            wt.SendControlMessageTest.doWhileSession(self)
 
     @unittest.skip("Skip for now.")
     def test_timing(self):

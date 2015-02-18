@@ -207,7 +207,7 @@ class ShimTamaraw(TamarawShimConfig, ShimTest, unittest.TestCase):
 
 # CLASSES TO TEST BIDIRECTIONAL COMMUNICATION
 #############################################
-class TestSetUp(nu.CommInterfaceAbstract):
+class SetUpTest(nu.CommInterfaceAbstract):
     """Implement the CommInterfaceAbstract as a test class.
 
     The setUp method sets the bidirectional communication (obfsproxy (with
@@ -228,14 +228,14 @@ class TestSetUp(nu.CommInterfaceAbstract):
         self.close()
 
 
-class PrimitiveTest(TestSetUp):
+class PrimitiveTest(SetUpTest):
 
     BEFORE_SESSION_TIME = 1
     DURING_SESSION_TIME = 1
     AFTER_SESSION_TIME = 1
 
     def setUp(self):
-        TestSetUp.setUp(self)
+        SetUpTest.setUp(self)
         self.doBeforeSessionStarts()
         sleep(self.BEFORE_SESSION_TIME)
 
@@ -341,7 +341,7 @@ class PrimitiveTest(TestSetUp):
         pass
 
 
-class TestSendControlMessage(PrimitiveTest):
+class SendControlMessageTest(PrimitiveTest):
 
     def doBeforeSessionStarts(self):
         """Send control msg."""
@@ -350,7 +350,7 @@ class TestSendControlMessage(PrimitiveTest):
         self.send_instruction(self.opcode, self.args)
 
 
-class TestSendDataServer(TestSendControlMessage):
+class SendDataServerTest(SendControlMessageTest):
 
     def doWhileSession(self):
         """Send file to server."""
@@ -358,7 +358,7 @@ class TestSendDataServer(TestSendControlMessage):
         self.send_to_server(TEST_MSG)
 
 
-class TestControlMessages(WFPadShimConfig, TestSendControlMessage):
+class ControlMessagesTest(WFPadShimConfig, SendControlMessageTest):
 
     def test_control_is_received_successfully(self):
         # Test opcode of the sent message is received at the server.

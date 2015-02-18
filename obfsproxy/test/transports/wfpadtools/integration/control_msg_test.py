@@ -6,19 +6,19 @@ from obfsproxy.transports.wfpadtools.util import testutil as tu
 import obfsproxy.test.transports.wfpadtools.wfpad_tester as wft
 
 
-class TestSendPaddingControl(wft.TestControlMessages, tu.STTest):
+class TestSendPaddingControl(wft.ControlMessagesTest, tu.STTest):
     opcode = const.OP_SEND_PADDING
     N, t = 5, 1
     args = [N, t]
 
 
-class TestAppHintControl(wft.TestControlMessages, tu.STTest):
+class TestAppHintControl(wft.ControlMessagesTest, tu.STTest):
     opcode = const.OP_APP_HINT
     sessId,  status = "id123", True
     args = [sessId, status]
 
 
-class TestBurstHistoControl(wft.TestControlMessages, tu.STTest):
+class TestBurstHistoControl(wft.ControlMessagesTest, tu.STTest):
     sessId = "id123"
     opcode = const.OP_BURST_HISTO
     delay = 1
@@ -32,7 +32,7 @@ class TestBurstHistoControl(wft.TestControlMessages, tu.STTest):
     args = [histo, labels_ms, removeTokens, interpolate, when]
 
 
-class TestGapHistoControl(wft.TestControlMessages, tu.STTest):
+class TestGapHistoControl(wft.ControlMessagesTest, tu.STTest):
     sessId = "id123"
     opcode = const.OP_BURST_HISTO
     delay = 1
@@ -46,19 +46,19 @@ class TestGapHistoControl(wft.TestControlMessages, tu.STTest):
     args = [histo, labels_ms, removeTokens, interpolate, when]
 
 
-class TestTotalPadControl(wft.TestControlMessages, tu.STTest):
+class TestTotalPadControl(wft.ControlMessagesTest, tu.STTest):
     opcode = const.OP_TOTAL_PAD
     sessId, delay = "id123", 1
     args = [sessId, delay]
 
 
-class TestPayloadPadControl(wft.TestControlMessages, tu.STTest):
+class TestPayloadPadControl(wft.ControlMessagesTest, tu.STTest):
     opcode = const.OP_PAYLOAD_PAD
     sessId, delay, msg_level = "id123", 1, False
     args = [sessId, delay, msg_level]
 
 
-class TestBatchPadControl(wft.TestControlMessages, tu.STTest):
+class TestBatchPadControl(wft.ControlMessagesTest, tu.STTest):
     opcode = const.OP_BATCH_PAD
     sessId, L, delay = "id123", 5, 1
     args = [sessId, L, delay]

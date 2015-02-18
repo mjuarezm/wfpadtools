@@ -20,7 +20,7 @@ AFTER_SESSION_TIME_PRIMITIVE = 5
 # GENERAL PRIMITIVES
 #####################
 
-class TestSendPadding(wt.WFPadShimConfig, wt.TestSendControlMessage,
+class TestSendPadding(wt.WFPadShimConfig, wt.SendControlMessageTest,
                       tu.STTest):
     opcode = const.OP_SEND_PADDING
     N, t = 5, 1
@@ -43,7 +43,7 @@ class TestSendPadding(wt.WFPadShimConfig, wt.TestSendControlMessage,
 # ADAPTIVE  PRIMITIVES
 ######################
 
-class TestBurstHistogram(wt.WFPadShimConfig, wt.TestSendDataServer, tu.STTest):
+class TestBurstHistogram(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
     sessId = "id123"
     opcode = const.OP_BURST_HISTO
     delay = 1
@@ -79,12 +79,12 @@ class TestBurstHistogram(wt.WFPadShimConfig, wt.TestSendDataServer, tu.STTest):
 
 
 class TestBurstHistogramSnd(TestBurstHistogram, wt.WFPadShimConfig,
-                            wt.TestSendDataServer):
+                            wt.SendDataServerTest):
     """Test primitive for sending histogram."""
     when = "snd"
 
 
-class TestGapHistogram(wt.WFPadShimConfig, wt.TestSendDataServer, tu.STTest):
+class TestGapHistogram(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
     sessId = "id123"
     opcode = const.OP_BURST_HISTO
     delay = 1
@@ -117,7 +117,7 @@ class TestGapHistogram(wt.WFPadShimConfig, wt.TestSendDataServer, tu.STTest):
 
 
 class TestGapHistogramSnd(TestGapHistogram, wt.WFPadShimConfig,
-                          wt.TestSendDataServer):
+                          wt.SendDataServerTest):
     """Test primitive for sending histogram."""
     when = "snd"
 
@@ -125,7 +125,7 @@ class TestGapHistogramSnd(TestGapHistogram, wt.WFPadShimConfig,
 # PADDING PRIMITIVES
 ####################
 
-class PaddingPrimitiveTest(wt.TestSendDataServer):
+class PaddingPrimitiveTest(wt.SendDataServerTest):
     sessId, delay, msg_level = "id123", 1, True
     args = [sessId, delay, msg_level]
 
