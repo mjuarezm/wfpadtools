@@ -43,24 +43,44 @@ class TestSendPadding(wt.WFPadShimConfig, wt.SendControlMessageTest,
 # ADAPTIVE  PRIMITIVES
 ######################
 
-class TestBurstHistogram(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
+class TestBurstHistogram(wt.AdaptiveShimConfig, wt.HistoPrimitiveTest, tu.STTest):
     sessId = "id123"
     opcode = const.OP_BURST_HISTO
-    delay = 1
+
+    delay = 100
+
     tokens = 100000
-    histo = [tokens, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    labels_ms = [0, delay, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
-                 2048, 4096, 8192, 16384, 32768, 65536, -1]
+    histo = [tokens, 0, 0, 0, 0, 0, 0]
+    labels_ms = [delay, 2, 4, 8, 16, 32, -1]
     removeTokens = True
     interpolate = True
-    when = "rcv"
+    when = "snd"
     args = [histo, labels_ms, removeTokens, interpolate, when]
 
     # Give server enough time to pad the end of the session
     AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
 
     @unittest.skip("Skip for now...")
-    def test_basic_func(self):
+    def test_deferrer(self):
+        # Check delay histo is larger than time between ignore and data
+        # the deferrer should cancel and restart.
+
+        # We need to find the two adjacent ignores around data in server
+        #   data_snd_time - ignore1_snd.Time < histo_delay
+        #   ignore2_snd.Time - data_snd_time approx = histo_delay
+        data_msg = self.data_msgs(self.clientMsgs)[1]
+        idx_data = self.get_index_msg(data_msg, self.clientMsgs)
+        ig1 = self.clientMsgs[idx_data - 1]
+        ig2 = self.clientMsgs[idx_data + 1]
+        t1 = data_msg.rcvTime - ig1.rcvTime
+        t2 = ig2.rcvTime - data_msg.rcvTime
+        self.assertTrue(t1 < self.histo_delay,
+                        "Time between ignore before data (%s) is less than"
+                        " histo_delay (%s)" & (t1, self.histo_delay))
+        self.assertAlmostEqual(t2, self.histo_delay, msg="Time between data "
+                               "and second delay (%s) is not similar to "
+                               "histo_delay (%s)." % (t2, self.histo_delay),
+                               delta=0.001)
 
         # Is it sampling and delaying?
 
@@ -87,11 +107,16 @@ class TestBurstHistogramSnd(TestBurstHistogram, wt.WFPadShimConfig,
 class TestGapHistogram(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
     sessId = "id123"
     opcode = const.OP_BURST_HISTO
+
     delay = 1
+    delay_ignore = 20
+    server_args_list = list(wt.BuFLOShimConfig.server_args)
+    server_args_list[3] = "--psize=%d" % delay_ignore  # 512 bytes!
+    server_args = tuple(server_args_list)
+
     tokens = 100000
-    histo = [tokens, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    labels_ms = [0, delay, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
-                 2048, 4096, 8192, 16384, 32768, 65536, -1]
+    histo = [tokens, 0, 0, 0, 0, 0, 0]
+    labels_ms = [delay, 2, 4, 8, 16, 32, -1]
     removeTokens = True
     interpolate = True
     when = "rcv"

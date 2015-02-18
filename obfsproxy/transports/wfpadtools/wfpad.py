@@ -74,7 +74,6 @@ following limitations:
   than Tor, for instance).
 
 """
-import math
 import os
 import psutil
 import socket
@@ -772,10 +771,10 @@ class WFPadTransport(BaseTransport):
         when : str
             If set to "rcv", this histogram governs the probability of
             sending a padding packet after some delay in response to a packet
-            originating from the client. If set to "snd", this histogram
+            originating from the other PT end. If set to "snd", this histogram
             governs padding packets that are transmitted after a packet
-            arrives from upstream (the middle node). In both cases, the
-            padding packet is sent in the direction of the client.
+            arrives from upstream. In both cases, the padding packet is
+            sent in the direction of the client.
         """
         self._burstHistoProbdist[when] = hist.new(histo, labels,
                                                   interpolate=bool(interpolate),

@@ -56,7 +56,7 @@ class AdaptiveTransport(WFPadTransport):
                                required=False,
                                type=float,
                                help="Time rate at which transport sends "
-                                    "messages (Default: 1ms).",
+                                    "messages (Default: 0ms).",
                                dest="period")
         subparser.add_argument("--psize",
                                required=False,
@@ -77,7 +77,7 @@ class AdaptiveTransport(WFPadTransport):
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables."""
         # Defaults for Adaptive Padding specifications.
-        cls._period = 1
+        cls._period = 0
         cls._length = const.MPU
 
         super(AdaptiveTransport, cls).validate_external_mode_cli(args)

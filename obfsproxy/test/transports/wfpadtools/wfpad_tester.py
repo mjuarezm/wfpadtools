@@ -103,14 +103,14 @@ class AdaptiveShimConfig(object):
     transport = "adaptive"
     server_args = ("adaptive", "server",
                    "127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--period=1",
+                   "--period=0",
                    "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.EXIT_PORT,
                    "--test=%s" % const.DUMPS["server"])
     client_args = ("adaptive", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (SHIM_PORT, SHIM_PORT),
-                   "--period=1",
+                   "--period=0",
                    "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
                    "--test=%s" % const.DUMPS["client"])
@@ -230,6 +230,9 @@ class SetUpTest(nu.CommInterfaceAbstract):
 
 class PrimitiveTest(SetUpTest):
 
+    DATA_STR = "pad!"
+    LEN_DATA_STR = len(DATA_STR)
+
     BEFORE_SESSION_TIME = 1
     DURING_SESSION_TIME = 1
     AFTER_SESSION_TIME = 1
@@ -272,6 +275,12 @@ class PrimitiveTest(SetUpTest):
         self.serverStates = self.__states(self.serverDumps)
         self.clientState = self.__last_state(self.clientDumps)
         self.serverState = self.__last_state(self.serverDumps)
+
+    def get_index_msg(self, message, msgs):
+        for i, msg in enumerate(msgs):
+            if message == msg:
+                return i
+        return None
 
     def get_state(self, message, dump):
         for state, messages in dump:
@@ -343,18 +352,29 @@ class PrimitiveTest(SetUpTest):
         pass
 
 
+class HistoPrimitiveTest(PrimitiveTest):
+
+    DURING_SESSION_TIME = 0
+    BEFORE_SESSION_END_TIME = 1
+
+    def doBeforeSessionStarts(self):
+        self.send_instruction(self.opcode, self.args)
+
+    def doWhileSession(self):
+        self.send_to_server(self.DATA_STR)
+        sleep(1)
+        self.send_to_server(self.DATA_STR)
+
+
 class PadPrimitiveTest(PrimitiveTest):
 
     DURING_SESSION_TIME = 0
     BEFORE_SESSION_END_TIME = 1
 
-    DATA_STR = "pad!"
-    LEN_DATA_STR = len(DATA_STR)
-
     def doBeforeSessionStarts(self):
         self.send_instruction(const.OP_SEND_PADDING, [self.junk_msgs, 0])
         for _ in xrange(self.real_msgs):
-            self.send_to_server("msg")
+            self.send_to_server(self.DATA_STR)
 
     def doWhileSession(self):
         self.send_instruction(self.opcode, self.args)
