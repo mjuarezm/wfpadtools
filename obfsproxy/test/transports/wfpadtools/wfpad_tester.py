@@ -50,14 +50,14 @@ class BuFLODirectConfig(object):
     server_args = ("buflo", "server",
                    "127.0.0.1:%d" % ts.SERVER_PORT,
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--mintime=10",
                    "--dest=127.0.0.1:%d" % ts.EXIT_PORT,
                    "--test=%s" % const.DUMPS["server"])
     client_args = ("buflo", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--mintime=10",
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
                    "--test=%s" % const.DUMPS["client"])
@@ -76,7 +76,7 @@ class BuFLOShimConfig(BuFLODirectConfig, object):
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--mintime=10",
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
                    "--test=%s" % const.DUMPS["client"])
@@ -87,14 +87,14 @@ class CSBuFLOShimConfig(object):
     server_args = ("csbuflo", "server",
                    "127.0.0.1:%d" % ts.SERVER_PORT,
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.EXIT_PORT,
                    "--test=%s" % const.DUMPS["server"])
     client_args = ("buflo", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (SHIM_PORT, SHIM_PORT),
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
                    "--test=%s" % const.DUMPS["client"])
 
@@ -104,14 +104,14 @@ class AdaptiveShimConfig(object):
     server_args = ("adaptive", "server",
                    "127.0.0.1:%d" % ts.SERVER_PORT,
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.EXIT_PORT,
                    "--test=%s" % const.DUMPS["server"])
     client_args = ("adaptive", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (SHIM_PORT, SHIM_PORT),
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
                    "--test=%s" % const.DUMPS["client"])
 
@@ -121,7 +121,7 @@ class TamarawShimConfig(object):
     server_args = ("tamaraw", "server",
                    "127.0.0.1:%d" % ts.SERVER_PORT,
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--batch=1000",
                    "--dest=127.0.0.1:%d" % ts.EXIT_PORT,
                    "--test=%s" % const.DUMPS["server"])
@@ -129,7 +129,7 @@ class TamarawShimConfig(object):
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (SHIM_PORT, SHIM_PORT),
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--batch=1000",
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
                    "--test=%s" % const.DUMPS["client"])
@@ -149,7 +149,7 @@ class BuFLOShimSocksConfig(BuFLOShimConfig, object):
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
                    "--period=1",
-                   "--psize=1443",
+                   "--psize=%s" % const.MPU,
                    "--mintime=10",
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT)
     entry_port = SHIM_PORT
@@ -233,6 +233,7 @@ class PrimitiveTest(SetUpTest):
     BEFORE_SESSION_TIME = 1
     DURING_SESSION_TIME = 1
     AFTER_SESSION_TIME = 1
+    BEFORE_SESSION_END_TIME = 1
 
     def setUp(self):
         SetUpTest.setUp(self)
@@ -246,6 +247,7 @@ class PrimitiveTest(SetUpTest):
 
         log.debug("Flag end of session.")
         self.end_session()
+        sleep(self.BEFORE_SESSION_END_TIME)
         self.doAfterSessionEnds()
         sleep(self.AFTER_SESSION_TIME)
 
@@ -339,6 +341,44 @@ class PrimitiveTest(SetUpTest):
     def doAfterSessionEnds(self):
         """Template method to be implemented in specific tests."""
         pass
+
+
+class PadPrimitiveTest(PrimitiveTest):
+
+    DURING_SESSION_TIME = 0
+    BEFORE_SESSION_END_TIME = 1
+
+    def doBeforeSessionStarts(self):
+        self.send_instruction(const.OP_SEND_PADDING, [self.junk_msgs, 0])
+        for _ in xrange(self.real_msgs):
+            self.send_to_server("msg")
+
+    def doWhileSession(self):
+        self.send_instruction(self.opcode, self.args)
+
+    def doAfterSessionEnds(self):
+        self.send_to_server("pad!")
+
+    def total_pad(self):
+        pass
+
+    def get_units(self, x):
+        return x * self.units
+
+    def data_msgs(self):
+        return self.real_msgs
+
+    def total_msgs(self):
+        return self.data_msgs() + self.junk_msgs
+
+    def test_padding(self):
+        total_pad = self.total_pad()
+        observed_padding = self.get_units(len(self.clientMsgs))
+        self.assertTrue(observed_padding > 0 and observed_padding >= total_pad
+                        and observed_padding - self.get_units(1) < total_pad,
+                        "The observed padding (%s) does not satisfy "
+                        "the stop condition (%s)." % (observed_padding,
+                                                      total_pad))
 
 
 class SendControlMessageTest(PrimitiveTest):

@@ -125,7 +125,6 @@ class TestGapHistogramSnd(TestGapHistogram, wt.WFPadShimConfig,
 # PADDING PRIMITIVES
 ####################
 
-
 class PaddingPrimitiveTest(wt.SendDataServerTest):
     sessId, delay, msg_level = "id123", 1, True
     args = [sessId, delay, msg_level]
@@ -250,24 +249,29 @@ class TestTotalPadBytes(PaddingPrimitiveTestBytes, tu.STTest):
 # TAMARAW PRIMITIVES
 #####################
 
-class TestBatchPadMsgs(wt.WFPadShimConfig, PaddingPrimitiveTestMsgs, tu.STTest):
+class TestBatchPad(wt.PadPrimitiveTest):
     opcode = const.OP_BATCH_PAD
+
+    real_msgs = 10
+    junk_msgs = 3
+
+    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
+
+    def total_pad(self):
+        total = self.get_units(self.total_msgs())
+        return closest_multiple(total, self.L)
+
+
+class TestBatchPadMsgs(wt.BuFLOShimConfig, TestBatchPad, tu.STTest):
     sessId, delay, L,  msg_level = "id123", 1, 5, True
     args = [sessId, L, delay, msg_level]
-
-    def get_totalpad(self, end_sess_srv_st):
-        to_pad = end_sess_srv_st['_numMessages']['snd']
-        return closest_multiple(to_pad, self.L)
+    units = 1
 
 
-class TestBatchPadBytes(wt.WFPadShimConfig, PaddingPrimitiveTestBytes, tu.STTest):
-    opcode = const.OP_BATCH_PAD
-    sessId, L, delay, msg_level = "id123", 1, 5, True
-    args = [sessId, delay, L, msg_level]
-
-    def get_totalpad(self, end_sess_srv_st):
-        to_pad = end_sess_srv_st['_numMessages']['snd']
-        return closest_multiple(to_pad, self.L)
+class TestBatchPadBytes(wt.BuFLOShimConfig, TestBatchPad, tu.STTest):
+    sessId, delay, L,  msg_level = "id123", 1, 5, False
+    args = [sessId, L, delay, msg_level]
+    units = const.MPU
 
 
 if __name__ == "__main__":

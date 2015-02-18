@@ -146,10 +146,10 @@ class WFPadMessageFactory(object):
                 messages.append(self.newControl(opcode, strArgs[:payloadLen],
                                                 "", 0))
             else:
-                maxPiggyLen = payloadLen - const.CONTROL_LEN - const.ARGS_TOTAL_LENGTH_LEN - argsLen
+                maxPiggyLen = payloadLen - argsLen
                 dataLen = len(data)
                 piggyData = data[:maxPiggyLen] if dataLen > 0 else ""
-                paddingLen = maxPiggyLen - dataLen  if maxPiggyLen > dataLen else 0
+                paddingLen = maxPiggyLen - dataLen if maxPiggyLen > dataLen else 0
                 flags = const.FLAG_CONTROL | const.FLAG_LAST
                 flags |= const.FLAG_DATA if dataLen > 0 else const.FLAG_PADDING
                 messages.append(self.new(piggyData, paddingLen, flags, opcode,
