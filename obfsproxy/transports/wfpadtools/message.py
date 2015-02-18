@@ -114,8 +114,8 @@ class WFPadMessageFactory(object):
             messages = self._encapsulateCtrl(opcode, args, data, lenProbdist)
         else:
             messages = self._encapsulateData(data, lenProbdist)
+        log.debug("[wfpad] Encapsulated in %d messages." % len(messages))
 
-        log.debug("[wfpad] Created %d protocol messages." % len(messages))
         return messages
 
     def _encapsulateData(self, data, lenProbdist=None):

@@ -410,17 +410,10 @@ class WFPadTransport(BaseTransport):
         if deferGapCancelled and hasattr(self._gapHistoProbdist['snd'], "histo"):
             self._gapHistoProbdist['snd'].removeToken(elapsed)
 
-        if delay == 0:
-            # Send data message over the wire
-            log.debug("[wfpad] Sending data message without delay.")
-            self.sendDownstream(self._msgFactory.encapsulate(data,
-                                lenProbdist=self._lengthDataProbdist))
-
-        else:
-            # Push data message to data buffer
-            self._buffer.write(data)
-            log.debug("[wfpad] Buffered %d bytes of outgoing data w/ delay %sms"
-                      % (len(self._buffer), delay))
+        # Push data message to data buffer
+        self._buffer.write(data)
+        log.debug("[wfpad] Buffered %d bytes of outgoing data w/ delay %sms"
+                  % (len(self._buffer), delay))
 
         # In case there is no scheduled flush of the buffer,
         # make a delayed call to the flushing method.
@@ -441,7 +434,7 @@ class WFPadTransport(BaseTransport):
         start padding.
         """
         dataLen = len(self._buffer)
-        if dataLen > 0:
+        if dataLen < 0:
             self.deferBurstPadding('snd')
             log.debug("[wfpad] buffer is empty, pad `snd` burst.")
             return

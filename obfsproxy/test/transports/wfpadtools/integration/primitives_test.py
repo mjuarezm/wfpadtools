@@ -43,7 +43,7 @@ class TestSendPadding(wt.WFPadShimConfig, wt.SendControlMessageTest,
 # ADAPTIVE  PRIMITIVES
 ######################
 
-class TestBurstHistogram(wt.AdaptiveShimConfig, wt.HistoPrimitiveTest,
+class TestBurstHistogram(wt.WFPadShimConfig, wt.HistoPrimitiveTest,
                          tu.STTest):
     sessId = "id123"
     opcode = const.OP_BURST_HISTO
