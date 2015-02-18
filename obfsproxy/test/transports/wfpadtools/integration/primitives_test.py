@@ -115,97 +115,98 @@ class TestGapHistogramSnd(TestGapHistogram, wt.WFPadShimConfig,
     when = "snd"
 
 
-# CS-BuFLO PRIMITIVES
-#####################
+# PADDING PRIMITIVES
+####################
 
-class TestPayloadPadMsgs(wt.BuFLOShimConfig, wt.TestSendDataServer, tu.STTest):
-    opcode = const.OP_PAYLOAD_PAD
+class TestPaddingPrimitive(wt.TestSendDataServer):
     sessId, delay, msg_level = "id123", 1, True
     args = [sessId, delay, msg_level]
 
     # Give server enough time to pad the end of the session
     AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
 
-    def test_num_sent_msgs_is_multiple_of_closer_power_of_two(self):
-        """Test that stop condition works for messages.
+    def get_topad(self, endd_sess_srv_st):
+        """Either messages or bytes."""
+        pass
 
-        PAYLOAD_PAD must pad end of session to closest multiple of
-        the closest power of two of the number of data units (bytes
-        or messages) that have been transmitted up to the moment.
+    def get_totalpad(self, endd_sess_srv_st):
+        """Total expected padding.
+
+        Depends on the particular primitive.
         """
+        pass
+
+    def get_end_session_state(self):
+        """Return end session of state."""
+        # Get last control message received by server (end of session)
         last_srv_ctrl_msg = self.control_msgs(self.serverMsgs)[-1]
+        # Get the state of the server associated to that message
         end_sess_srv_st = self.get_state(last_srv_ctrl_msg, self.serverDumps)
+        # Check state has been found successfully
         self.assertTrue(end_sess_srv_st, "Cannot find end of session message.")
-        to_pad = end_sess_srv_st['_numMessages']['snd']
-        divisor = end_sess_srv_st['_dataMessages']['snd']
-        k = closest_power_of_two(divisor)
-        total_pad = closest_multiple(to_pad, k)
-        obs_num_cl_msgs = self.clientState["_numMessages"]['rcv']
+        return end_sess_srv_st
+
+
+    def test_num_sent_msg(self):
+        """Test that stop condition works for messages."""
+        # Get end of session state
+        end_sess_srv_st = self.get_end_session_state()
+        # Get to pad units
+        pad_units = self.get_topad(endd_sess_srv_st)
+        to_pad = pad_units['snd']
+        total_pad = self.get_totalpad(endd_sess_srv_st)
+        obs_num_cl_msgs = pad_units['rcv']
         self.assertTrue(obs_num_cl_msgs > 0
                         and obs_num_cl_msgs >= total_pad,
-                        "The observed number of sent messages (%s) has not been"
-                        " padded to %s." % (obs_num_cl_msgs, total_pad))
+                        "The observed  padding (%s) does not match "
+                        " the total pad (%s)." % (obs_num_cl_msgs, total_pad))
 
 
-class TestPayloadPadBytes(wt.BuFLOShimConfig, wt.TestSendDataServer,
-                          tu.STTest):
-    opcode = const.OP_PAYLOAD_PAD
+class TestPaddingPrimitiveMsgs(TestPaddingPrimitive):
+    sessId, delay, msg_level = "id123", 1, True
+    args = [sessId, delay, msg_level]
+
+    def get_topad(self, endd_sess_srv_st):
+        return end_sess_srv_st['_numMessages']['snd']
+
+
+class TestPaddingPrimitiveBytes(TestPaddingPrimitive):
     sessId, delay, msg_level = "id123", 1, False
     args = [sessId, delay, msg_level]
 
-    # Give server enough time to pad the end of the session
-    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
+    def get_topad(self, endd_sess_srv_st):
+        return end_sess_srv_st['_totalBytes']['snd']
 
-    def test_num_sent_bytes_is_multiple_of_power_of_two(self):
-        """Test that stop condition works for bytes.
+# CS-BuFLO PRIMITIVES
+#####################
 
-        PAYLOAD_PAD must pad end of session to closest multiple of
-        the closest power of two of the number of bytes that have
-        been transmitted up to the moment.
-        """
-        last_srv_ctrl_msg = self.control_msgs(self.serverMsgs)[-1]
-        end_sess_srv_st = self.get_state(last_srv_ctrl_msg, self.serverDumps)
-        self.assertTrue(end_sess_srv_st, "Cannot find end of session message.")
-        to_pad = end_sess_srv_st['_totalBytes']['snd']
+class TestPayloadPadMsgs(wt.BuFLOShimConfig, TestPaddingPrimitiveMsgs, tu.STTest):
+    opcode = const.OP_PAYLOAD_PAD
+
+    def get_totalpad(self, end_sess_srv_st):
+        divisor = end_sess_srv_st['_dataMessages']['snd']
+        k = closest_power_of_two(divisor)
+        return closest_multiple(to_pad, k)
+
+
+class TestPayloadPadBytes(wt.BuFLOShimConfig, TestPaddingPrimitiveBytes, tu.STTest):
+    opcode = const.OP_PAYLOAD_PAD
+
+    def get_totalpad(self, end_sess_srv_st):
         divisor = end_sess_srv_st['_dataBytes']['snd']
         k = closest_power_of_two(divisor)
-        total_pad = closest_multiple(to_pad, k)
-        obs_num_cl_bytes = self.clientState["_totalBytes"]['rcv']
-        self.assertTrue(obs_num_cl_bytes > 0
-                        and obs_num_cl_bytes >= total_pad,
-                        "The observed number of sent bytes (%s) has not been"
-                        " padded to %s." % (obs_num_cl_bytes, total_pad))
+        return closest_multiple(to_pad, k)
 
 
-class TestTotalPadMsgs(wt.BuFLOShimConfig, wt.TestSendDataServer, tu.STTest):
-    # Primitive args
+class TestTotalPadMsgs(wt.BuFLOShimConfig, TestPaddingPrimitiveMsgs, tu.STTest):
     opcode = const.OP_TOTAL_PAD
-    sessId, delay, msg_level = "id123", 1, True
-    args = [sessId, delay, msg_level]
 
-    # Give server enough time to pad the end of the session
-    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
-
-    def test_num_sent_msgs_is_closest_power_of_two(self):
-        """Test that stop condition works correctly.
-
-        TOTAL_PAD must pad end of session to closest multiple of
-        a power of two of the number of messages that have been
-        transmitted up to the moment.
-        """
-        last_srv_ctrl_msg = self.control_msgs(self.serverMsgs)[-1]
-        end_sess_srv_st = self.get_state(last_srv_ctrl_msg, self.serverDumps)
-        self.assertTrue(end_sess_srv_st, "Cannot find end of session message.")
+    def get_totalpad(self, end_sess_srv_st):
         to_pad = end_sess_srv_st['_numMessages']['snd']
-        total_pad = closest_power_of_two(to_pad)
-        obs_num_cl_msgs = self.clientState["_numMessages"]['rcv']
-        self.assertTrue(obs_num_cl_msgs > 0
-                        and obs_num_cl_msgs >= total_pad,
-                        "The observed number of sent messages (%s) has not "
-                        "been padded to %s." % (obs_num_cl_msgs, total_pad))
+        return closest_power_of_two(to_pad)
 
 
-class TestTotalPadBytes(wt.TestSendDataServer, tu.STTest):
+class TestTotalPadBytes(TestPaddingPrimitiveBytes, tu.STTest):
     # Transport args
     # WARNING: Pad to bytes primitives depend a lot on the size of
     # the MTU! Protocols with fixed-length size not a power of two
@@ -231,80 +232,33 @@ class TestTotalPadBytes(wt.TestSendDataServer, tu.STTest):
 
     # Primitive args
     opcode = const.OP_TOTAL_PAD
-    sessId, delay, msg_level = "id123", 1000, False
-    args = [sessId, delay, msg_level]
 
-    # Give server enough time to pad the end of the session
-    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
-
-    def test_num_sent_bytes_is_closest_power_of_two(self):
-        """Test that stop condition works correctly.
-
-        TOTAL_PAD must pad end of session to closest multiple of
-        a power of two of the number of bytes that have been
-        transmitted up to the moment.
-        """
-        last_srv_ctrl_msg = self.control_msgs(self.serverMsgs)[-1]
-        end_sess_srv_st = self.get_state(last_srv_ctrl_msg, self.serverDumps)
-        self.assertTrue(end_sess_srv_st, "Cannot find end of session message.")
+    def get_totalpad(self, end_sess_srv_st):
         to_pad = end_sess_srv_st['_totalBytes']['snd']
-        k = closest_power_of_two(to_pad)
-        total_pad = closest_multiple(to_pad, k)
-        obs_num_cl_bytes = self.clientState["_totalBytes"]['rcv']
-        self.assertTrue(obs_num_cl_bytes > 0
-                        and obs_num_cl_bytes >= total_pad,
-                        "The observed number of sent bytes (%s) has not been"
-                        " padded to %s." % (obs_num_cl_bytes, total_pad))
+        return closest_power_of_two(to_pad)
 
 
 # TAMARAW PRIMITIVES
 #####################
 
-class TestBatchPadMsgs(wt.BuFLOShimConfig, wt.TestSendDataServer, tu.STTest):
+class TestBatchPadMsgs(wt.BuFLOShimConfig, TestPaddingPrimitiveMsgs, tu.STTest):
     opcode = const.OP_BATCH_PAD
-    sessId, L, delay, msg_level = "id123", 5, 1, True
-    args = [sessId, L, delay, msg_level]
+    sessId, delay,L,  msg_level = "id123", 1, 5, True
+    args = [sessId, delay, L, msg_level]
 
-    # Give server enough time to pad the end of the session
-    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
-
-    def test_num_sent_msgs_is_multiple_of_L(self):
-        """Test the number of messages received by the client is multiple of `L`.
-
-        BATCH_PAD primitive should pad the link to multiple of `L`. Since
-        we sent the control message to the server, we expect messages received
-        by client to satisfy this condition.
-        """
-        obs_num_client_msgs = len(self.clientMsgs)
-        closest_l_mult = closest_multiple(obs_num_client_msgs, self.L, ceil=False)
-        self.assertTrue(obs_num_client_msgs > 0
-                        and obs_num_client_msgs - 1 <= closest_l_mult,
-                        "The observed number of padding messages (%s) "
-                        "is not a multiple of %s."
-                        % (obs_num_client_msgs, self.L))
+    def get_totalpad(self, end_sess_srv_st):
+        to_pad = end_sess_srv_st['_numMessages']['snd']
+        return closest_multiple(to_pad, self.L)
 
 
-class TestBatchPadBytes(wt.BuFLOShimConfig, wt.TestSendDataServer, tu.STTest):
+class TestBatchPadBytes(wt.BuFLOShimConfig, TestPaddingPrimitiveBytes, tu.STTest):
     opcode = const.OP_BATCH_PAD
-    sessId, L, delay, msg_level = "id123", 5, 1, False
-    args = [sessId, L, delay, msg_level]
+    sessId, delay,L,  msg_level = "id123", 1, 5, True
+    args = [sessId, delay, L, msg_level]
 
-    # Give server enough time to pad the end of the session
-    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
-
-    def test_num_sent_bytes_is_larger_than_closest_multiple_of_L(self):
-        """Test the number of bytes received by the client is multiple of `L`.
-
-        BATCH_PAD primitive should pad the link to multiple of `L`. Since
-        we sent the control message to the server, we expect bytes received
-        by client to satisfy this condition.
-        """
-        obs_total_bytes = self.clientState["_totalBytes"]['rcv']
-        closest_l_mult = closest_multiple(obs_total_bytes, self.L, ceil=False)
-        self.assertTrue(obs_total_bytes > 0
-                        and obs_total_bytes - closest_l_mult <= const.MPU,
-                        "The observed number of bytes (%s) is not a multiple"
-                        " of %s." % (obs_total_bytes, self.L))
+    def get_totalpad(self, end_sess_srv_st):
+        to_pad = end_sess_srv_st['_numMessages']['snd']
+        return closest_multiple(to_pad, self.L)
 
 
 if __name__ == "__main__":
