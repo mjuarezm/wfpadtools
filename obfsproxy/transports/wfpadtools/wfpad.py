@@ -442,6 +442,7 @@ class WFPadTransport(BaseTransport):
                   " Flushing buffer." % dataLen)
 
         payloadLen = self._lengthDataProbdist.randomSample()
+        # INF_LABEL = -1 means we don't pad packets (can be done in crypto layer)
         if payloadLen is const.INF_LABEL:
             payloadLen = const.MPU if dataLen > const.MPU else dataLen
         msgTotalLen = payloadLen + const.MIN_HDR_LEN
@@ -564,6 +565,7 @@ class WFPadTransport(BaseTransport):
                 return
         if self.stopCondition(self):
             log.debug("[wfpad] -  Padding was stopped!!")
+            self.onEndPadding()
             return
         self.sendIgnore()
         if when is 'snd':
@@ -640,17 +642,17 @@ class WFPadTransport(BaseTransport):
 
     def onEndPadding(self):
         # Restart statistics
-        self._dataBytes = {'rcv': 0, 'snd': 0}
-        self._totalBytes = {'rcv': 0, 'snd': 0}
-        self._numMessages = {'rcv': 0, 'snd': 0}
- 
-        self._lastSndDownstreamTs = 0
-        self._lastSndDataDownstreamTs = 0
-        self._lastRcvDownstreamTs = 0
-        self._lastRcvDataDownstreamTs = 0
-        self._lastRcvUpstreamTs = 0
-        self._consecPaddingMsgs = 0
-        self._sentDataBytes = 0
+#         self._dataBytes = {'rcv': 0, 'snd': 0}
+#         self._totalBytes = {'rcv': 0, 'snd': 0}
+#         self._numMessages = {'rcv': 0, 'snd': 0}
+#  
+#         self._lastSndDownstreamTs = 0
+#         self._lastSndDataDownstreamTs = 0
+#         self._lastRcvDownstreamTs = 0
+#         self._lastRcvDataDownstreamTs = 0
+#         self._lastRcvUpstreamTs = 0
+#         self._consecPaddingMsgs = 0
+#         self._sentDataBytes = 0
 
         # Cancel deferers
         self.cancelDeferrers('snd')

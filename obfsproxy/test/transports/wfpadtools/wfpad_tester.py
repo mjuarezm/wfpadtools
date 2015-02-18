@@ -334,10 +334,13 @@ class PrimitiveTest(SetUpTest):
 
     def __load_wrapper(self, end):
         """Attempts to load a dump of an endpoint from a file."""
-        try:
-            return du.pick_load(const.DUMPS[end])
-        except:
-            return []
+        max_retries = 10
+        for _ in xrange(max_retries):
+            try:
+                return du.pick_load(const.DUMPS[end])
+            except:
+                continue
+        return []
 
     def doBeforeSessionStarts(self):
         """Template method to be implemented in specific tests."""
@@ -361,8 +364,6 @@ class HistoPrimitiveTest(PrimitiveTest):
         self.send_instruction(self.opcode, self.args)
 
     def doWhileSession(self):
-        self.send_to_server(self.DATA_STR)
-        sleep(1)
         self.send_to_server(self.DATA_STR)
 
 

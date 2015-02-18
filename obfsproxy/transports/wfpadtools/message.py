@@ -100,7 +100,6 @@ class WFPadMessageFactory(object):
         """Return payload length sampling from probability distribution."""
         if probDist:
             payloadLen = probDist.randomSample()
-            log.debug("XXX %s", payloadLen)
             if payloadLen is not const.INF_LABEL:
                 return payloadLen
         return const.MPU_CTRL if flags & const.FLAG_CONTROL > 0 else const.MPU
