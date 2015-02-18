@@ -220,6 +220,7 @@ class SetUpTest(nu.CommInterfaceAbstract):
 
     def setUp(self):
         fu.resetdir(const.TEMP_DIR)
+        os.chdir(const.BASE_DIR)
         log.debug("\n\n\n\n")
         fu.resetdir(const.TEST_DUMP_DIR)
         self.setup()
