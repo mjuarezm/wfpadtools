@@ -7,7 +7,7 @@ import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.test.transports.wfpadtools import wfpad_tester as wt
 from obfsproxy.transports.wfpadtools.util import testutil as tu
-from util.util import consec_elem
+from obfsproxy.transports.wfpadtools.util import genutil as gu
 
 # Logging timing stats:
 log = logging.get_obfslogger()
@@ -33,7 +33,7 @@ class TestrRTT(wt.WFPadShimConfig, wt.SendControlMessageTest,
         """Test that delay is correct."""
         ignores_rcv_times = [e.rcvTime for e in self.padding_msgs(self.clientMsgs)]
         controls_rcv_times = [e.rcvTime for e in self.control_msgs(self.serverMsgs)]
-        rtt_times = consec_elem(ignores_rcv_times)
+        rtt_times = gu.apply_consecutive_elements(ignores_rcv_times)
         # TODO
         first_ignore_rcv_client = self.padding_msgs(self.clientMsgs)[0]
         control_msg_rcv_server = self.control_msgs(self.serverMsgs)[0]

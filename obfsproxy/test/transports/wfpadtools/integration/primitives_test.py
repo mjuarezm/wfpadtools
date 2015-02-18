@@ -125,6 +125,7 @@ class TestGapHistogramSnd(TestGapHistogram, wt.WFPadShimConfig,
 # PADDING PRIMITIVES
 ####################
 
+
 class PaddingPrimitiveTest(wt.SendDataServerTest):
     sessId, delay, msg_level = "id123", 1, True
     args = [sessId, delay, msg_level]
