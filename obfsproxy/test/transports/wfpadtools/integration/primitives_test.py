@@ -43,7 +43,7 @@ class TestSendPadding(wt.WFPadShimConfig, wt.TestSendControlMessage,
 # ADAPTIVE  PRIMITIVES
 ######################
 
-class TestBurstHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
+class TestBurstHistogram(wt.WFPadShimConfig, wt.TestSendDataServer, tu.STTest):
     sessId = "id123"
     opcode = const.OP_BURST_HISTO
     delay = 1
@@ -56,6 +56,10 @@ class TestBurstHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
     when = "rcv"
     args = [histo, labels_ms, removeTokens, interpolate, when]
 
+    # Give server enough time to pad the end of the session
+    AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
+
+    @unittest.skip("Skip for now...")
     def test_basic_func(self):
 
         # Is it sampling and delaying?
@@ -67,6 +71,7 @@ class TestBurstHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
         # Is it interpolating?
         pass
 
+    @unittest.skip("Skip for now...")
     def test_burst_is_padded(self):
         """Reproduce a burst and test that is padded according to histo."""
         # TODO
@@ -79,7 +84,7 @@ class TestBurstHistogramSnd(TestBurstHistogram, wt.WFPadShimConfig,
     when = "snd"
 
 
-class TestGapHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
+class TestGapHistogram(wt.WFPadShimConfig, wt.TestSendDataServer, tu.STTest):
     sessId = "id123"
     opcode = const.OP_BURST_HISTO
     delay = 1
@@ -92,6 +97,7 @@ class TestGapHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
     when = "rcv"
     args = [histo, labels_ms, removeTokens, interpolate, when]
 
+    @unittest.skip("Skip for now...")
     def test_basic_func(self):
 
         # Is it sampling and delaying?
@@ -103,6 +109,7 @@ class TestGapHistogram(wt.WFPadShimConfig, wt.TestSendDataServer):
         # Is it interpolating?
         pass
 
+    @unittest.skip("Skip for now...")
     def test_gap_is_padded(self):
         """Reproduce a gap and test is padded according to histo."""
         # TODO
@@ -118,18 +125,18 @@ class TestGapHistogramSnd(TestGapHistogram, wt.WFPadShimConfig,
 # PADDING PRIMITIVES
 ####################
 
-class TestPaddingPrimitive(wt.TestSendDataServer):
+class PaddingPrimitiveTest(wt.TestSendDataServer):
     sessId, delay, msg_level = "id123", 1, True
     args = [sessId, delay, msg_level]
 
     # Give server enough time to pad the end of the session
     AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
 
-    def get_topad(self, endd_sess_srv_st):
+    def get_topad(self, end_sess_srv_st):
         """Either messages or bytes."""
         pass
 
-    def get_totalpad(self, endd_sess_srv_st):
+    def get_totalpad(self, end_sess_srv_st):
         """Total expected padding.
 
         Depends on the particular primitive.
@@ -152,9 +159,8 @@ class TestPaddingPrimitive(wt.TestSendDataServer):
         # Get end of session state
         end_sess_srv_st = self.get_end_session_state()
         # Get to pad units
-        pad_units = self.get_topad(endd_sess_srv_st)
-        to_pad = pad_units['snd']
-        total_pad = self.get_totalpad(endd_sess_srv_st)
+        pad_units = self.get_topad(end_sess_srv_st)
+        total_pad = self.get_totalpad(end_sess_srv_st)
         obs_num_cl_msgs = pad_units['rcv']
         self.assertTrue(obs_num_cl_msgs > 0
                         and obs_num_cl_msgs >= total_pad,
@@ -162,43 +168,45 @@ class TestPaddingPrimitive(wt.TestSendDataServer):
                         " the total pad (%s)." % (obs_num_cl_msgs, total_pad))
 
 
-class TestPaddingPrimitiveMsgs(TestPaddingPrimitive):
+class PaddingPrimitiveTestMsgs(PaddingPrimitiveTest):
     sessId, delay, msg_level = "id123", 1, True
     args = [sessId, delay, msg_level]
 
-    def get_topad(self, endd_sess_srv_st):
-        return end_sess_srv_st['_numMessages']['snd']
+    def get_topad(self, end_sess_srv_st):
+        return self.clientState['_numMessages']
 
 
-class TestPaddingPrimitiveBytes(TestPaddingPrimitive):
+class PaddingPrimitiveTestBytes(PaddingPrimitiveTest):
     sessId, delay, msg_level = "id123", 1, False
     args = [sessId, delay, msg_level]
 
-    def get_topad(self, endd_sess_srv_st):
-        return end_sess_srv_st['_totalBytes']['snd']
+    def get_topad(self, end_sess_srv_st):
+        return self.clientState['_totalBytes']
 
 # CS-BuFLO PRIMITIVES
 #####################
 
-class TestPayloadPadMsgs(wt.BuFLOShimConfig, TestPaddingPrimitiveMsgs, tu.STTest):
+class TestPayloadPadMsgs(wt.BuFLOShimConfig, PaddingPrimitiveTestMsgs, tu.STTest):
     opcode = const.OP_PAYLOAD_PAD
 
     def get_totalpad(self, end_sess_srv_st):
+        to_pad = end_sess_srv_st['_numMessages']['snd']
         divisor = end_sess_srv_st['_dataMessages']['snd']
         k = closest_power_of_two(divisor)
         return closest_multiple(to_pad, k)
 
 
-class TestPayloadPadBytes(wt.BuFLOShimConfig, TestPaddingPrimitiveBytes, tu.STTest):
+class TestPayloadPadBytes(wt.BuFLOShimConfig, PaddingPrimitiveTestBytes, tu.STTest):
     opcode = const.OP_PAYLOAD_PAD
 
     def get_totalpad(self, end_sess_srv_st):
+        to_pad = end_sess_srv_st['_totalBytes']['snd']
         divisor = end_sess_srv_st['_dataBytes']['snd']
         k = closest_power_of_two(divisor)
         return closest_multiple(to_pad, k)
 
 
-class TestTotalPadMsgs(wt.BuFLOShimConfig, TestPaddingPrimitiveMsgs, tu.STTest):
+class TestTotalPadMsgs(wt.BuFLOShimConfig, PaddingPrimitiveTestMsgs, tu.STTest):
     opcode = const.OP_TOTAL_PAD
 
     def get_totalpad(self, end_sess_srv_st):
@@ -206,7 +214,7 @@ class TestTotalPadMsgs(wt.BuFLOShimConfig, TestPaddingPrimitiveMsgs, tu.STTest):
         return closest_power_of_two(to_pad)
 
 
-class TestTotalPadBytes(TestPaddingPrimitiveBytes, tu.STTest):
+class TestTotalPadBytes(PaddingPrimitiveTestBytes, tu.STTest):
     # Transport args
     # WARNING: Pad to bytes primitives depend a lot on the size of
     # the MTU! Protocols with fixed-length size not a power of two
@@ -215,20 +223,20 @@ class TestTotalPadBytes(TestPaddingPrimitiveBytes, tu.STTest):
     psize = const.TOR_CELL_SIZE  # 512 bytes, it is a power of 2!
     transport = "buflo"
     server_args = ("buflo", "server",
-                   "127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--period=1",
-                   "--psize=%d" % psize,
-                   "--mintime=10",
-                   "--dest=127.0.0.1:%d" % ts.EXIT_PORT,
-                   "--test=%s" % const.DUMPS["server"])
+                "127.0.0.1:%d" % ts.SERVER_PORT,
+                "--period=1",
+                "--psize=%d" % psize,
+                "--mintime=10",
+                "--dest=127.0.0.1:%d" % ts.EXIT_PORT,
+                "--test=%s" % const.DUMPS["server"])
     client_args = ("buflo", "client",
-                   "127.0.0.1:%d" % ts.ENTRY_PORT,
-                   "--socks-shim=%d,%d" % (wt.SHIM_PORT, wt.SOCKS_PORT),
-                   "--period=1",
-                   "--psize=%d" % psize,
-                   "--mintime=10",
-                   "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--test=%s" % const.DUMPS["client"])
+                "127.0.0.1:%d" % ts.ENTRY_PORT,
+                "--socks-shim=%d,%d" % (wt.SHIM_PORT, wt.SOCKS_PORT),
+                "--period=1",
+                "--psize=%d" % psize,
+                "--mintime=10",
+                "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
+                "--test=%s" % const.DUMPS["client"])
 
     # Primitive args
     opcode = const.OP_TOTAL_PAD
@@ -241,7 +249,7 @@ class TestTotalPadBytes(TestPaddingPrimitiveBytes, tu.STTest):
 # TAMARAW PRIMITIVES
 #####################
 
-class TestBatchPadMsgs(wt.BuFLOShimConfig, TestPaddingPrimitiveMsgs, tu.STTest):
+class TestBatchPadMsgs(wt.WFPadShimConfig, PaddingPrimitiveTestMsgs, tu.STTest):
     opcode = const.OP_BATCH_PAD
     sessId, delay,L,  msg_level = "id123", 1, 5, True
     args = [sessId, delay, L, msg_level]
@@ -251,7 +259,7 @@ class TestBatchPadMsgs(wt.BuFLOShimConfig, TestPaddingPrimitiveMsgs, tu.STTest):
         return closest_multiple(to_pad, self.L)
 
 
-class TestBatchPadBytes(wt.BuFLOShimConfig, TestPaddingPrimitiveBytes, tu.STTest):
+class TestBatchPadBytes(wt.WFPadShimConfig, PaddingPrimitiveTestBytes, tu.STTest):
     opcode = const.OP_BATCH_PAD
     sessId, delay,L,  msg_level = "id123", 1, 5, True
     args = [sessId, delay, L, msg_level]
