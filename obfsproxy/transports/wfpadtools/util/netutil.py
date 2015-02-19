@@ -144,9 +144,9 @@ class CommunicationInterface(object):
     def send(self, sndr, data, op=False, wait=True):
         rcvr = 'server' if sndr is 'client' else 'client'
         log.debug("%s sending %sbytes of data to %s", sndr, len(data), rcvr)
+        self.endpoints[sndr].cmd_q.put(Command(Command.SEND, data))
         if not wait:  # SPEEDUP: Let's try to ignore replies
             return
-        self.endpoints[sndr].cmd_q.put(Command(Command.SEND, data))
         if op:
             return self.wait_reply(sndr)
         self.endpoints[rcvr].cmd_q.put(Command(Command.RECEIVE, len(data)))
