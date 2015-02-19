@@ -179,6 +179,8 @@ class CommunicationInterface(object):
         reply = None
         while not reply:
             reply = self.get_reply(endpoint)
+            log.debug("Got reply from endpoint %s: (%s, %s)",
+                      endpoint, reply[0], reply[1])
         return reply
 
     def get_reply(self, endpoint):
@@ -188,8 +190,6 @@ class CommunicationInterface(object):
             info_msg = '%s reply %s: %s' % (endpoint.__class__,
                                             status,
                                             reply.data)
-            log.debug("Got reply from endpoint %s: (%s, %s)",
-                      endpoint, reply[0], reply[1])
             if reply.type is Reply.ERROR:
                 raise Exception(info_msg)
             return (reply.type, reply.data)
