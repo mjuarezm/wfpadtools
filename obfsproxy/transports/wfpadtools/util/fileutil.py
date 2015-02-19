@@ -130,6 +130,12 @@ def terminate_process(pid):
         kill(pid, signal.SIGTERM)
 
 
+def kill_process(pid):
+    """Terminate process with `pid`."""
+    if is_pid_running(pid):
+        kill(pid, signal.SIGKILL)
+
+
 def get_pids_by_name(procname):
     """Return all pids associated to process name `procname`."""
     return [proc for proc in psutil.process_iter() if proc.name() == procname]
