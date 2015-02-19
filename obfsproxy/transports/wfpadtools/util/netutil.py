@@ -179,9 +179,9 @@ class CommunicationInterface(object):
         reply = None
         while not reply:
             reply = self.get_reply(endpoint)
-            if reply:
-                log.debug("Got reply from endpoint %s: (%s, %s)",
-                          endpoint, reply[0], reply[1])
+#             if reply:
+#                 log.debug("Got reply from endpoint %s: (%s, %s)",
+#                           endpoint, reply[0], reply[1])
         return reply
 
     def get_reply(self, endpoint):
