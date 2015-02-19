@@ -47,9 +47,9 @@ class CommInterfaceAbstract(TransportsSetUp):
         a test instruction to the client. See the testutil module.
         """
         if direction is const.OUT:
-            self.commInterf.send('client', msg, op, wait)
+            self.commInterf.send('client', msg, op, wait=wait)
         elif direction is const.IN:
-            self.commInterf.send('server', msg, wait)
+            self.commInterf.send('server', msg, wait=wait)
         else:
             raise ValueError("Invalid direction!")
 
@@ -144,9 +144,8 @@ class CommunicationInterface(object):
     def send(self, sndr, data, op=False, wait=True):
         rcvr = 'server' if sndr is 'client' else 'client'
         log.debug("%s sending %sbytes of data to %s", sndr, len(data), rcvr)
-        log.debug("Data sent!")
-#         if not wait:  # SPEEDUP: Let's try to ignore replies
-#             return
+        if not wait:  # SPEEDUP: Let's try to ignore replies
+            return
         self.endpoints[sndr].cmd_q.put(Command(Command.SEND, data))
         if op:
             return self.wait_reply(sndr)
@@ -179,9 +178,9 @@ class CommunicationInterface(object):
         reply = None
         while not reply:
             reply = self.get_reply(endpoint)
-#             if reply:
-#                 log.debug("Got reply from endpoint %s: (%s, %s)",
-#                           endpoint, reply[0], reply[1])
+            if reply:
+                log.debug("Got reply from endpoint %s: (%s, %s)",
+                          endpoint, reply[0], reply[1])
         return reply
 
     def get_reply(self, endpoint):
