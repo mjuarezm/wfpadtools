@@ -15,7 +15,7 @@ In addition to a protocol to insert dummy messages in a stream of Tor data, WFPa
 
 These primitives have been extracted from existing website fingerprinting designs within the research community, such as Tamaraw, CS-BuFLO and Adaptive Padding. They have been generalized in order to allow for a broader set of possible strategies.
 
-For further details on the protocol see /doc/wfpadtools/wfpadtools-spec.txt.
+For further details on the protocol see /doc/wfpadtools/wfpadtools-spec.txt
 
 Features
 --------
