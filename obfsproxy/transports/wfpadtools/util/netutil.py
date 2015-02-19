@@ -15,6 +15,7 @@ from obfsproxy.transports.wfpadtools import const
 from obfsproxy.test.tester import TransportsSetUp
 from obfsproxy.transports.wfpadtools.util import genutil as gu
 from obfsproxy.transports.wfpadtools.util import logutil
+from obfsproxy.transports.wfpadtools.util import fileutil as fu
 
 log = logutil.get_logger("netutil")
 
@@ -80,9 +81,16 @@ class CommInterfaceAbstract(TransportsSetUp):
 
     def close(self):
         """Close the communication interface."""
-        TransportsSetUp.tearDown(self)
+        self.obfs_client.stop()
+        self.obfs_server.stop()
         self.commInterf.close()
         self.commInterf.terminate()
+        self.shim_commInterf.close()
+        self.shim_commInterf.terminate()
+        if fu.is_pid_running(self.obfs_client):
+            self.obfs_client.kill()
+        if fu.is_pid_running(self.obfs_server):
+            self.obfs_server.kill()
 
 
 class BiTransportSetup(CommInterfaceAbstract):

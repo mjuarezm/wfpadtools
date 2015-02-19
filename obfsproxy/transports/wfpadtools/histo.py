@@ -71,6 +71,8 @@ class Histo:
         """Draw and return a random numTokSample from the histogram."""
         sumHisto = sum(self.histo)
         lenHisto = len(self.histo)
+        if sumHisto == 0:
+            return const.INF_LABEL
         numTokSample = randint(1, sumHisto) if sumHisto > 0 else 0
         for i in xrange(lenHisto):
             numTokSample -= self.histo[i]
