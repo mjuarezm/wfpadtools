@@ -28,9 +28,6 @@ class CommInterfaceAbstract(TransportsSetUp):
     EXIT_PORT = None
     SHIM_PORTS = None
 
-    def load_transport(self):
-        pass
-
     def setup(self):
         """Sets dummy and obfsproxy endpoints for bidirectional comm."""
         os.chdir(const.BASE_DIR)
@@ -96,7 +93,7 @@ class BiTransportSetup(CommInterfaceAbstract):
     """
     def __init__(self):
         """Run the parent class setup method."""
-        CommInterfaceAbstract.setup(self)
+        self.setup()
 
 
 class Command(object):
@@ -141,20 +138,16 @@ class CommunicationInterface(object):
 
     def _start(self):
         log.debug("Setting up dummy worker endpoints.")
-        for endname, endpoint in self.endpoints.iteritems():
-            log.debug("Starting end point %s", endname)
+        for endpoint in self.endpoints.itervalues():
             endpoint.start()
 
     def send(self, sndr, data, op=False):
         rcvr = 'server' if sndr is 'client' else 'client'
         log.debug("%s sending %sbytes of data to %s", sndr, len(data), rcvr)
         self.endpoints[sndr].cmd_q.put(Command(Command.SEND, data))
-        log.debug("Data sent!")
-        return
         if op:
             return self.wait_reply(sndr)
         self.endpoints[rcvr].cmd_q.put(Command(Command.RECEIVE, len(data)))
-        log.debug("Waiting for replies...")
         return self.wait_replies(sndr, rcvr)
 
     def listen(self, address):
@@ -183,7 +176,6 @@ class CommunicationInterface(object):
         reply = None
         while not reply:
             reply = self.get_reply(endpoint)
-        log.debug("Got reply from endpoint %s: (%s, %s)", endpoint, reply[0], reply[1])
         return reply
 
     def get_reply(self, endpoint):
