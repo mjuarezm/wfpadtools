@@ -40,16 +40,16 @@ class CommInterfaceAbstract(TransportsSetUp):
         sleep(4)
         self.commInterf.connect((const.LOCALHOST, self.ENTRY_PORT))
 
-    def send(self, msg, direction=const.OUT, op=False):
+    def send(self, msg, direction=const.OUT, op=False, wait=True):
         """Send msg to obfsproxy client or server.
 
         The `op` option is used to indicate that we're passing
         a test instruction to the client. See the testutil module.
         """
         if direction is const.OUT:
-            self.commInterf.send('client', msg, op)
+            self.commInterf.send('client', msg, op, wait)
         elif direction is const.IN:
-            self.commInterf.send('server', msg)
+            self.commInterf.send('server', msg, wait)
         else:
             raise ValueError("Invalid direction!")
 
@@ -179,8 +179,9 @@ class CommunicationInterface(object):
         reply = None
         while not reply:
             reply = self.get_reply(endpoint)
-            log.debug("Got reply from endpoint %s: (%s, %s)",
-                      endpoint, reply[0], reply[1])
+            if reply:
+                log.debug("Got reply from endpoint %s: (%s, %s)",
+                          endpoint, reply[0], reply[1])
         return reply
 
     def get_reply(self, endpoint):
