@@ -12,7 +12,7 @@ from random import randint
 
 # WFPadTools imports
 from obfsproxy.transports.wfpadtools import const
-from obfsproxy.test.tester import TransportsSetUp
+from obfsproxy.test.tester import TransportsSetUp, SOCKET_TIMEOUT
 from obfsproxy.transports.wfpadtools.util import genutil as gu
 from obfsproxy.transports.wfpadtools.util import logutil
 from obfsproxy.transports.wfpadtools.util import fileutil as fu
@@ -32,7 +32,6 @@ class CommInterfaceAbstract(TransportsSetUp):
     def setup(self):
         """Sets dummy and obfsproxy endpoints for bidirectional comm."""
         os.chdir(const.BASE_DIR)
-        self.shim_commInterf = CommunicationInterface()
         self.commInterf = CommunicationInterface()
         self.shim_commInterf = CommunicationInterface()
         self.commInterf.listen((const.LOCALHOST, self.EXIT_PORT))
@@ -101,7 +100,7 @@ class BiTransportSetup(CommInterfaceAbstract):
     """
     def __init__(self):
         """Run the parent class setup method."""
-        self.setup()
+        CommInterfaceAbstract.setup(self)
 
 
 class Command(object):
@@ -282,12 +281,17 @@ class SocketThread(threading.Thread):
         """ Convenience method for receiving exactly n bytes from
             self.socket (assuming it's open and connected).
         """
-        data = ''
-        while len(data) < n:
-            chunk = self.socket.recv(n - len(data))
-            if chunk == '':
-                break
-            data += chunk
+        data = ""
+        try:
+            while True:
+                chunk = self.socket.recv(n)
+                if chunk == "":
+                    break
+                data += chunk
+        except socket.timeout:
+            pass
+        except Exception, e:
+            data += "|RECV ERROR: " + e
         return data
 
     def _error_reply(self, errstr):
@@ -321,11 +325,13 @@ class SocketServerThread(SocketThread):
 
     def _handle_LISTEN(self, cmd):
         try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.socket.bind((cmd.data[0], cmd.data[1]))
-            self.socket.listen(1)
+            listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind((cmd.data[0], cmd.data[1]))
+            listener.listen(1)
             self.socket, self.address = self.socket.accept()
+            self.socket.settimeout(SOCKET_TIMEOUT)
+            listener.close()
             self.reply_q.put(self._success_reply())
         except IOError as e:
             self.reply_q.put(self._error_reply(str(e)))
