@@ -13,12 +13,18 @@ import obfsproxy.network.buffer as obfs_buf
 import obfsproxy.common.transport_config as transport_config
 import obfsproxy.transports.base as base
 
+import obfsproxy.transports.scramblesuit.state as state
 import obfsproxy.transports.scramblesuit.util as util
 import obfsproxy.transports.scramblesuit.const as const
 import obfsproxy.transports.scramblesuit.mycrypto as mycrypto
 import obfsproxy.transports.scramblesuit.uniformdh as uniformdh
 import obfsproxy.transports.scramblesuit.scramblesuit as scramblesuit
 import obfsproxy.transports.scramblesuit.message as message
+import obfsproxy.transports.scramblesuit.state as state
+import obfsproxy.transports.scramblesuit.ticket as ticket
+import obfsproxy.transports.scramblesuit.packetmorpher as packetmorpher
+import obfsproxy.transports.scramblesuit.probdist as probdist
+
 
 # Disable all logging as it would yield plenty of warning and error
 # messages.
@@ -165,6 +171,30 @@ class UniformDHTest( unittest.TestCase ):
 
         self.failIf(self.udh.receivePublicKey(buf, lambda x: x) == True)
 
+    def test4_extractPublicKey( self ):
+
+        # Create UniformDH authentication message.
+        sharedSecret = "A" * const.SHARED_SECRET_LENGTH
+
+        realEpoch = util.getEpoch
+
+        # Try three valid and one invalid epoch value.
+        for epoch in util.expandedEpoch() + ["000000"]:
+            udh = uniformdh.new(sharedSecret, True)
+
+            util.getEpoch = lambda: epoch
+            authMsg = udh.createHandshake()
+            util.getEpoch = realEpoch
+
+            buf = obfs_buf.Buffer()
+            buf.write(authMsg)
+
+            if epoch == "000000":
+                self.assertFalse(udh.extractPublicKey(buf))
+            else:
+                self.assertTrue(udh.extractPublicKey(buf))
+
+
 class UtilTest( unittest.TestCase ):
 
     def test1_isValidHMAC( self ):
@@ -193,30 +223,21 @@ class UtilTest( unittest.TestCase ):
     def test4_setStateLocation( self ):
         name = (const.TRANSPORT_NAME).lower()
 
-        util.setStateLocation("/tmp")
-        self.failUnless(const.STATE_LOCATION == "/tmp/%s/" % name)
-
-        # Nothing should change if we pass "None".
-        util.setStateLocation(None)
-        self.failUnless(const.STATE_LOCATION == "/tmp/%s/" % name)
-
         # Check if function creates non-existant directories.
         d = tempfile.mkdtemp()
         util.setStateLocation(d)
         self.failUnless(const.STATE_LOCATION == "%s/%s/" % (d, name))
         self.failUnless(os.path.exists("%s/%s/" % (d, name)))
+
+        # Nothing should change if we pass "None".
+        util.setStateLocation(None)
+        self.failUnless(const.STATE_LOCATION == "%s/%s/" % (d, name))
+
         shutil.rmtree(d)
 
     def test5_getEpoch( self ):
         e = util.getEpoch()
         self.failUnless(isinstance(e, basestring))
-
-    def test6_writeToFile( self ):
-        f = tempfile.mktemp()
-        content = "ThisIsATest\n"
-        util.writeToFile(content, f)
-        self.failUnless(util.readFromFile(f) == content)
-        os.unlink(f)
 
     def test7_readFromFile( self ):
 
@@ -226,6 +247,50 @@ class UtilTest( unittest.TestCase ):
         # Read file where we (hopefully) don't have permissions.
         self.failUnless(util.readFromFile("/etc/shadow") == None)
 
+class StateTest( unittest.TestCase ):
+    def setUp( self ):
+        const.STATE_LOCATION = tempfile.mkdtemp()
+        self.stateFile = os.path.join(const.STATE_LOCATION, const.SERVER_STATE_FILE)
+        self.state = state.State()
+
+    def tearDown( self ):
+        try:
+            shutil.rmtree(const.STATE_LOCATION)
+        except OSError:
+            pass
+
+    def test1_genState( self ):
+        self.state.genState()
+        self.failUnless(os.path.exists(self.stateFile))
+
+    def test2_loadState( self ):
+        # load() should create the state file if it doesn't exist yet.
+        self.failIf(os.path.exists(self.stateFile))
+        self.failUnless(isinstance(state.load(), state.State))
+        self.failUnless(os.path.exists(self.stateFile))
+
+    def test3_replay( self ):
+        key = "A" * const.HMAC_SHA256_128_LENGTH
+        self.state.genState()
+        self.state.registerKey(key)
+        self.failUnless(self.state.isReplayed(key))
+        self.failIf(self.state.isReplayed("B" * const.HMAC_SHA256_128_LENGTH))
+
+    def test4_ioerrorFail( self ):
+        def fake_open(name, mode):
+            raise IOError()
+        self.state.genState()
+
+        import __builtin__
+        real_open = __builtin__.open
+        __builtin__.open = fake_open
+
+        # Make state.load() fail
+        self.assertRaises(SystemExit, state.load)
+        # Make State.writeState() fail.
+        self.assertRaises(SystemExit, self.state.genState)
+
+        __builtin__.open = real_open
 
 class MockArgs( object ):
     uniformDHSecret = sharedSecret = ext_cookie_file = dest = None
@@ -248,6 +313,14 @@ class ScrambleSuitTransportTest( unittest.TestCase ):
         self.validSecret = base64.b32encode( 'A' * const.SHARED_SECRET_LENGTH )
         self.invalidSecret = 'a' * const.SHARED_SECRET_LENGTH
 
+        self.statefile = tempfile.mkdtemp()
+
+    def tearDown( self ):
+        try:
+            shutil.rmtree(self.statefile)
+        except OSError:
+            pass
+
     def test1_validateExternalModeCli( self ):
         """Test with valid scramblesuit args and valid obfsproxy args."""
         self.args.uniformDHSecret = self.validSecret
@@ -266,7 +339,10 @@ class ScrambleSuitTransportTest( unittest.TestCase ):
             self.suit.validate_external_mode_cli( self.args )
 
     def test3_get_public_server_options( self ):
-        scramblesuit.ScrambleSuitTransport.setup(transport_config.TransportConfig())
+        transCfg = transport_config.TransportConfig()
+        transCfg.setStateLocation(self.statefile)
+
+        scramblesuit.ScrambleSuitTransport.setup(transCfg)
         options = scramblesuit.ScrambleSuitTransport.get_public_server_options("")
         self.failUnless("password" in options)
 
@@ -312,6 +388,80 @@ class MessageTest( unittest.TestCase ):
 
         self.assertRaises(base.PluggableTransportError,
                           message.ProtocolMessage, "1", paddingLen=const.MPU)
+
+class TicketTest( unittest.TestCase ):
+    def setUp( self ):
+        const.STATE_LOCATION = tempfile.mkdtemp()
+        self.stateFile = os.path.join(const.STATE_LOCATION, const.SERVER_STATE_FILE)
+        self.state = state.State()
+        self.state.genState()
+
+    def tearDown( self ):
+        try:
+            shutil.rmtree(const.STATE_LOCATION)
+        except OSError:
+            pass
+
+    def test1_authentication( self ):
+        ss = scramblesuit.ScrambleSuitTransport()
+        ss.srvState = self.state
+
+        realEpoch = util.getEpoch
+
+        # Try three valid and one invalid epoch value.
+        for epoch in util.expandedEpoch() + ["000000"]:
+
+            util.getEpoch = lambda: epoch
+
+            # Prepare ticket message.
+            blurb = ticket.issueTicketAndKey(self.state)
+            rawTicket = blurb[const.MASTER_KEY_LENGTH:]
+            masterKey = blurb[:const.MASTER_KEY_LENGTH]
+            ss.deriveSecrets(masterKey)
+            ticketMsg = ticket.createTicketMessage(rawTicket, ss.recvHMAC)
+
+            util.getEpoch = realEpoch
+
+            buf = obfs_buf.Buffer()
+            buf.write(ticketMsg)
+
+            if epoch == "000000":
+                self.assertFalse(ss.receiveTicket(buf))
+            else:
+                self.assertTrue(ss.receiveTicket(buf))
+
+class PacketMorpher( unittest.TestCase ):
+
+    def test1_calcPadding( self ):
+
+        def checkDistribution( dist ):
+            pm = packetmorpher.new(dist)
+            for i in xrange(0, const.MTU + 2):
+                padLen = pm.calcPadding(i)
+                self.assertTrue(const.HDR_LENGTH <= \
+                                padLen < \
+                                (const.MTU + const.HDR_LENGTH))
+
+        # Test randomly generated distributions.
+        for i in xrange(0, 100):
+            checkDistribution(None)
+
+        # Test border-case distributions.
+        checkDistribution(probdist.new(lambda: 0))
+        checkDistribution(probdist.new(lambda: 1))
+        checkDistribution(probdist.new(lambda: const.MTU))
+        checkDistribution(probdist.new(lambda: const.MTU + 1))
+
+    def test2_getPadding( self ):
+        pm = packetmorpher.new()
+        sendCrypter = mycrypto.PayloadCrypter()
+        sendCrypter.setSessionKey("A" * 32,  "A" * 8)
+        sendHMAC = "A" * 32
+
+        for i in xrange(0, const.MTU + 2):
+            padLen = len(pm.getPadding(sendCrypter, sendHMAC, i))
+            self.assertTrue(const.HDR_LENGTH <= padLen < const.MTU + \
+                            const.HDR_LENGTH)
 
 
 if __name__ == '__main__':

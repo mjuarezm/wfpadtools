@@ -17,6 +17,7 @@ import const
 import replay
 import mycrypto
 import probdist
+import base64
 
 import obfsproxy.common.log as logging
 
@@ -30,7 +31,7 @@ def load( ):
     state file is found, a new one is created and returned.
     """
 
-    stateFile = const.STATE_LOCATION + const.SERVER_STATE_FILE
+    stateFile = os.path.join(const.STATE_LOCATION, const.SERVER_STATE_FILE)
 
     log.info("Attempting to load the server's state file from `%s'." %
              stateFile)
@@ -50,6 +51,31 @@ def load( ):
         sys.exit(1)
 
     return stateObject
+
+def writeServerPassword( password ):
+    """
+    Dump our ScrambleSuit server descriptor to file.
+
+    The file should make it easy for bridge operators to obtain copy &
+    pasteable server descriptors.
+    """
+
+    assert len(password) == const.SHARED_SECRET_LENGTH
+    assert const.STATE_LOCATION != ""
+
+    passwordFile = os.path.join(const.STATE_LOCATION, const.PASSWORD_FILE)
+    log.info("Writing server password to file `%s'." % passwordFile)
+
+    password_str = "# You are supposed to give this password to your clients to append it to their Bridge line"
+    password_str = "# For example: Bridge scramblesuit 192.0.2.1:5555 EXAMPLEFINGERPRINTNOTREAL password=EXAMPLEPASSWORDNOTREAL"
+    password_str = "# Here is your password:"
+    password_str = "password=%s\n" % base64.b32encode(password)
+    try:
+        with open(passwordFile, 'w') as fd:
+            fd.write(password_str)
+    except IOError as err:
+        log.error("Error writing password file to `%s': %s" %
+                  (passwordFile, err))
 
 class State( object ):
 
@@ -76,6 +102,7 @@ class State( object ):
         self.pktDist = None
         self.iatDist = None
         self.fallbackPassword = None
+        self.closingThreshold = None
 
     def genState( self ):
         """
@@ -112,6 +139,11 @@ class State( object ):
         # did not set `ServerTransportOptions'.
         self.fallbackPassword = os.urandom(const.SHARED_SECRET_LENGTH)
 
+        # Unauthenticated connections are closed after having received the
+        # following amount of bytes.
+        self.closingThreshold = prng.randint(const.MAX_HANDSHAKE_LENGTH,
+                                             const.MAX_HANDSHAKE_LENGTH * 5)
+
         self.writeState()
 
     def isReplayed( self, hmac ):
@@ -147,7 +179,7 @@ class State( object ):
         Write the state object to a file using the `cPickle' module.
         """
 
-        stateFile = const.STATE_LOCATION + const.SERVER_STATE_FILE
+        stateFile = os.path.join(const.STATE_LOCATION, const.SERVER_STATE_FILE)
 
         log.debug("Writing server's state file to `%s'." %
                   stateFile)

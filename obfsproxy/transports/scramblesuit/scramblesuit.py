@@ -14,6 +14,7 @@ import obfsproxy.common.log as logging
 import random
 import base64
 import yaml
+import argparse
 
 import probdist
 import mycrypto
@@ -28,6 +29,11 @@ import fifobuf
 
 
 log = logging.get_obfslogger()
+
+class ReadPassFile(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        with open(values) as f:
+            setattr(namespace, self.dest, f.readline().strip())
 
 
 class ScrambleSuitTransport( base.BaseTransport ):
@@ -117,9 +123,32 @@ class ScrambleSuitTransport( base.BaseTransport ):
         if cls.weAreServer and not cls.weAreExternal:
             cfg  = transportConfig.getServerTransportOptions()
             if cfg and "password" in cfg:
-                cls.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
+                try:
+                    cls.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
                         cfg["password"]))
+                except (TypeError, AttributeError) as error:
+                    raise base.TransportSetupFailed(
+                        "Password could not be base32 decoded (%s)" % error)
+
                 cls.uniformDHSecret = cls.uniformDHSecret.strip()
+
+        if cls.weAreServer:
+            if not hasattr(cls, "uniformDHSecret"):
+                log.debug("Using fallback password for descriptor file.")
+                srv = state.load()
+                cls.uniformDHSecret = srv.fallbackPassword
+
+            if len(cls.uniformDHSecret) != const.SHARED_SECRET_LENGTH:
+                raise base.TransportSetupFailed(
+                    "Wrong password length (%d instead of %d)"
+                    % len(cls.uniformDHSecret), const.SHARED_SECRET_LENGTH)
+
+            if not const.STATE_LOCATION:
+                raise base.TransportSetupFailed(
+                    "No state location set. If you are using external mode, " \
+                    "please set it using the --data-dir switch.")
+
+            state.writeServerPassword(cls.uniformDHSecret)
 
     @classmethod
     def get_public_server_options( cls, transportOptions ):
@@ -209,6 +238,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Conduct an authenticated UniformDH handshake if there's no ticket.
         else:
+            if self.uniformDHSecret is None:
+                log.warning("A UniformDH password is not set, most likely " \
+                            "a missing 'password' argument.")
+                self.circuit.close()
+                return
             log.debug("No session ticket to redeem.  Running UniformDH.")
             self.circuit.downstream.write(self.uniformdh.createHandshake())
 
@@ -226,27 +260,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Wrap the application's data in ScrambleSuit protocol messages.
         messages = message.createProtocolMessages(data, flags=flags)
-
-        # Let the packet morpher tell us how much we should pad.
-        paddingLen = self.pktMorpher.calcPadding(sum([len(msg) for
-                                                 msg in messages]))
-
-        # If padding > header length, a single message will do...
-        if paddingLen > const.HDR_LENGTH:
-            messages.append(message.new("", paddingLen=paddingLen -
-                                                       const.HDR_LENGTH))
-
-        # ...otherwise, we use two padding-only messages.
-        else:
-            messages.append(message.new("", paddingLen=const.MPU -
-                                                       const.HDR_LENGTH))
-            messages.append(message.new("", paddingLen=paddingLen))
-
         blurb = "".join([msg.encryptAndHMAC(self.sendCrypter,
                         self.sendHMAC) for msg in messages])
 
-        # Flush data chunk for chunk to obfuscate inter arrival times.
+        # Flush data chunk for chunk to obfuscate inter-arrival times.
         if const.USE_IAT_OBFUSCATION:
+
             if len(self.choppingBuf) == 0:
                 self.choppingBuf.write(blurb)
                 reactor.callLater(self.iatMorpher.randomSample(),
@@ -254,8 +273,12 @@ class ScrambleSuitTransport( base.BaseTransport ):
             else:
                 # flushPieces() is still busy processing the chopping buffer.
                 self.choppingBuf.write(blurb)
+
         else:
-            self.circuit.downstream.write(blurb)
+            padBlurb = self.pktMorpher.getPadding(self.sendCrypter,
+                                                  self.sendHMAC,
+                                                  len(blurb))
+            self.circuit.downstream.write(blurb + padBlurb)
 
     def flushPieces( self ):
         """
@@ -275,7 +298,11 @@ class ScrambleSuitTransport( base.BaseTransport ):
 
         # Drain and send whatever is left in the output buffer.
         else:
-            self.circuit.downstream.write(self.choppingBuf.read())
+            blurb = self.choppingBuf.read()
+            padBlurb = self.pktMorpher.getPadding(self.sendCrypter,
+                                                  self.sendHMAC,
+                                                  len(blurb))
+            self.circuit.downstream.write(blurb + padBlurb)
             return
 
         reactor.callLater(self.iatMorpher.randomSample(), self.flushPieces)
@@ -388,14 +415,20 @@ class ScrambleSuitTransport( base.BaseTransport ):
         existingHMAC = potentialTicket[index + const.MARK_LENGTH:
                                        index + const.MARK_LENGTH +
                                        const.HMAC_SHA256_128_LENGTH]
-        myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
-                                          potentialTicket[0:
-                                          index + const.MARK_LENGTH] +
-                                          util.getEpoch())
+        authenticated = False
+        for epoch in util.expandedEpoch():
+            myHMAC = mycrypto.HMAC_SHA256_128(self.recvHMAC,
+                                              potentialTicket[0:index + \
+                                              const.MARK_LENGTH] + epoch)
 
-        if not util.isValidHMAC(myHMAC, existingHMAC, self.recvHMAC):
-            log.warning("The HMAC is invalid: `%s' vs. `%s'." %
-                        (myHMAC.encode('hex'), existingHMAC.encode('hex')))
+            if util.isValidHMAC(myHMAC, existingHMAC, self.recvHMAC):
+                authenticated = True
+                break
+
+            log.debug("HMAC invalid.  Trying next epoch value.")
+
+        if not authenticated:
+            log.warning("Could not verify the authentication message's HMAC.")
             return False
 
         # Do nothing if the ticket is replayed.  Immediately closing the
@@ -459,7 +492,19 @@ class ScrambleSuitTransport( base.BaseTransport ):
         payload or authentication data.
         """
 
-        if self.weAreServer and (self.protoState == const.ST_WAIT_FOR_AUTH):
+        if self.weAreServer and (self.protoState == const.ST_AUTH_FAILED):
+
+            self.drainedHandshake += len(data)
+            data.drain(len(data))
+
+            if self.drainedHandshake > self.srvState.closingThreshold:
+                log.info("Terminating connection after having received >= %d"
+                         " bytes because client could not "
+                         "authenticate." % self.srvState.closingThreshold)
+                self.circuit.close()
+                return
+
+        elif self.weAreServer and (self.protoState == const.ST_WAIT_FOR_AUTH):
 
             # First, try to interpret the incoming data as session ticket.
             if self.receiveTicket(data):
@@ -471,7 +516,8 @@ class ScrambleSuitTransport( base.BaseTransport ):
             elif self.uniformdh.receivePublicKey(data, self.deriveSecrets,
                     self.srvState):
                 # Now send the server's UniformDH public key to the client.
-                handshakeMsg = self.uniformdh.createHandshake()
+                handshakeMsg = self.uniformdh.createHandshake(srvState=
+                                                              self.srvState)
 
                 log.debug("Sending %d bytes of UniformDH handshake and "
                           "session ticket." % len(handshakeMsg))
@@ -483,6 +529,15 @@ class ScrambleSuitTransport( base.BaseTransport ):
                 self.protoState = const.ST_CONNECTED
 
                 self.sendTicketAndSeed()
+
+            elif len(data) > const.MAX_HANDSHAKE_LENGTH:
+                self.protoState = const.ST_AUTH_FAILED
+                self.drainedHandshake = len(data)
+                data.drain(self.drainedHandshake)
+                log.info("No successful authentication after having " \
+                         "received >= %d bytes.  Now ignoring client." % \
+                         const.MAX_HANDSHAKE_LENGTH)
+                return
 
             else:
                 log.debug("Authentication unsuccessful so far.  "
@@ -514,10 +569,17 @@ class ScrambleSuitTransport( base.BaseTransport ):
         specify a ticket file and one to specify a UniformDH shared secret.
         """
 
-        subparser.add_argument("--password",
-                               required=True,
+        passArgs = subparser.add_mutually_exclusive_group(required=True)
+
+        passArgs.add_argument("--password",
                                type=str,
                                help="Shared secret for UniformDH",
+                               dest="uniformDHSecret")
+
+        passArgs.add_argument("--password-file",
+                               type=str,
+                               help="File containing shared secret for UniformDH",
+                               action=ReadPassFile,
                                dest="uniformDHSecret")
 
         super(ScrambleSuitTransport, cls).register_external_mode_cli(subparser)
@@ -535,9 +597,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
                                      args.uniformDHSecret))
         except (TypeError, AttributeError) as error:
             log.error(error.message)
-            raise base.PluggableTransportError(
-                "UniformDH password '%s' isn't valid base32!"
-                % args.uniformDHSecret)
+            raise base.PluggableTransportError("Given password '%s' is not " \
+                    "valid Base32!  Run 'generate_password.py' to generate " \
+                    "a good password." % args.uniformDHSecret)
 
         parentalApproval = super(
             ScrambleSuitTransport, cls).validate_external_mode_cli(args)
@@ -584,8 +646,14 @@ class ScrambleSuitTransport( base.BaseTransport ):
             log.warning("A UniformDH password was already specified over "
                         "the command line.  Using the SOCKS secret instead.")
 
-        self.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
-                                      args[0].split('=')[1].strip()))
+        try:
+            self.uniformDHSecret = base64.b32decode(util.sanitiseBase32(
+                                          args[0].split('=')[1].strip()))
+        except TypeError as error:
+            log.error(error.message)
+            raise base.PluggableTransportError("Given password '%s' is not " \
+                    "valid Base32!  Run 'generate_password.py' to generate " \
+                    "a good password." % args[0].split('=')[1].strip())
 
         rawLength = len(self.uniformDHSecret)
         if rawLength != const.SHARED_SECRET_LENGTH:

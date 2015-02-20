@@ -57,7 +57,7 @@
    And the responder generates:
 
     RESP_SEED = SR(SEED_LENGTH)
-    RESP_PAD_KEY = MAC("Responder obfuscation padding", INIT_SEED)[:KEYLEN]
+    RESP_PAD_KEY = MAC("Responder obfuscation padding", RESP_SEED)[:KEYLEN]
 
    Each then generates a random number PADLEN in range from 0 through
    MAX_PADDING (inclusive).

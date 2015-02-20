@@ -48,6 +48,8 @@ class BaseTransport(object):
         Receive Pluggable Transport Config, perform setup task
         and save state in class attributes.
         Called at obfsproxy startup.
+
+        Raise TransportSetupFailed if something goes wrong.
         """
 
     @classmethod
@@ -134,22 +136,24 @@ class BaseTransport(object):
 
         Override for your own needs.
         """
+        err = None
 
         # If we are not 'socks', we need to have a static destination
         # to send our data to.
         if (args.mode != 'socks') and (not args.dest):
-            log.error("'client' and 'server' modes need a destination address.")
-            return False
+            err = "'client' and 'server' modes need a destination address."
 
-        if (args.mode != 'ext_server') and args.ext_cookie_file:
-            log.error("No need for --ext-cookie-file if not an ext_server.")
-            return False
+        elif (args.mode != 'ext_server') and args.ext_cookie_file:
+            err = "No need for --ext-cookie-file if not an ext_server."
 
-        if (args.mode == 'ext_server') and (not args.ext_cookie_file):
-            log.error("You need to specify --ext-cookie-file as an ext_server.")
-            return False
+        elif (args.mode == 'ext_server') and (not args.ext_cookie_file):
+            err = "You need to specify --ext-cookie-file as an ext_server."
 
-        return True
+        if not err: # We didn't encounter any errors during validation
+            return True
+        else: # Ugh, something failed.
+            raise ValueError(err)
 
 class PluggableTransportError(Exception): pass
 class SOCKSArgsError(Exception): pass
+class TransportSetupFailed(Exception): pass

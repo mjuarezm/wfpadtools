@@ -79,7 +79,7 @@ def locateMark( mark, payload ):
     `mark' could not be found, `None' is returned.
     """
 
-    index = payload.find(mark)
+    index = payload.find(mark, 0, const.MAX_PADDING_LENGTH + const.MARK_LENGTH)
     if index < 0:
         log.debug("Could not find the mark just yet.")
         return None
@@ -104,6 +104,16 @@ def getEpoch( ):
     """
 
     return str(int(time.time()) / const.EPOCH_GRANULARITY)
+
+
+def expandedEpoch( ):
+    """
+    Return [epoch, epoch-1, epoch+1].
+    """
+
+    epoch = int(getEpoch())
+
+    return [str(epoch), str(epoch - 1), str(epoch + 1)]
 
 
 def writeToFile( data, fileName ):

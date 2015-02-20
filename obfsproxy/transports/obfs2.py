@@ -8,6 +8,7 @@ The obfs2 module implements the obfs2 protocol.
 import random
 import hashlib
 import argparse
+import sys
 
 import obfsproxy.common.aes as aes
 import obfsproxy.common.serialize as srlz
@@ -126,7 +127,11 @@ class Obfs2Transport(base.BaseTransport):
         if args.ss_hash_iterations:
             cls.ss_hash_iterations = args.ss_hash_iterations
 
-        super(Obfs2Transport, cls).validate_external_mode_cli(args)
+        try:
+            super(Obfs2Transport, cls).validate_external_mode_cli(args)
+        except ValueError, err:
+            log.error(err)
+            sys.exit(1)
 
     def handle_socks_args(self, args):
         log.debug("obfs2: Got '%s' as SOCKS arguments." % args)
@@ -317,5 +322,3 @@ class Obfs2Server(Obfs2Transport):
         self.recv_keytype = "Initiator obfuscated data"
 
         Obfs2Transport.__init__(self)
-
-
