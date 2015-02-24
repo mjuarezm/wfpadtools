@@ -133,9 +133,11 @@ class _ShimTestFactory(Factory):
 
 class SocksShim(object):
     _observers = None
+    _port = None
     _id = None
 
     def __init__(self, shim_port=9250, socks_port=9150):
+        self._port = shim_port
         self._observers = []
         self._id = 0
         ep = TCP4ServerEndpoint(reactor, shim_port, interface='127.0.0.1')
@@ -143,6 +145,9 @@ class SocksShim(object):
             ep.listen(_ShimTestFactory(self))
         else:
             ep.listen(_ShimServerFactory(self, socks_port))
+
+    def getPort(self):
+        return self._port
 
     def registerObserver(self, observer):
         self._observers.append(observer)
