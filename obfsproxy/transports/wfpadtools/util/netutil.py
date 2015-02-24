@@ -12,7 +12,7 @@ from random import randint
 
 # WFPadTools imports
 from obfsproxy.transports.wfpadtools import const
-from obfsproxy.test.tester import TransportsSetUp, SOCKET_TIMEOUT
+from obfsproxy.test.tester import TransportsSetUp
 from obfsproxy.transports.wfpadtools.util import genutil as gu
 from obfsproxy.transports.wfpadtools.util import logutil
 from obfsproxy.transports.wfpadtools.util import fileutil as fu
@@ -101,7 +101,7 @@ class BiTransportSetup(CommInterfaceAbstract):
     """
     def __init__(self):
         """Run the parent class setup method."""
-        CommInterfaceAbstract.setup(self)
+        self.setup()
 
 
 class Command(object):
@@ -321,13 +321,11 @@ class SocketServerThread(SocketThread):
 
     def _handle_LISTEN(self, cmd):
         try:
-            listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            listener.bind((cmd.data[0], cmd.data[1]))
-            listener.listen(1)
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.socket.bind((cmd.data[0], cmd.data[1]))
+            self.socket.listen(1)
             self.socket, self.address = self.socket.accept()
-            self.socket.settimeout(SOCKET_TIMEOUT)
-            listener.close()
             self.reply_q.put(self._success_reply())
         except IOError as e:
             self.reply_q.put(self._error_reply(str(e)))
