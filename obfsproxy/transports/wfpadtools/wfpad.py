@@ -224,6 +224,7 @@ class WFPadTransport(BaseTransport):
             raise PluggableTransportError(
                 "Pluggable Transport args invalid: %s" % args)
 
+        cls.listen_addr = args.listen_addr
         cls.dest = args.dest if args.dest else None
 
         cls.shim_ports = (const.SHIM_PORT, const.SOCKS_PORT)
@@ -270,15 +271,18 @@ class WFPadTransport(BaseTransport):
         if len(self._buffer) > 0:
             self.flushBuffer()
 
-        # Get peer address
-        self.peer_addr = self.circuit.downstream.peer_addr
-
         # Load sockets
         self.connections = self.process.get_connections()
-        for pconn in self.connections:
-            if pconn.status == 'ESTABLISHED' and pconn.raddr[1] == self.peer_addr.port:
-                self.downstreamSocket = socket.fromfd(pconn.fd, pconn.family, pconn.type)
-                break
+        if self.weAreClient:
+                for pconn in self.connections:
+                    if pconn.status == 'ESTABLISHED' and pconn.raddr[1] == self.dest[1]:
+                        self.downstreamSocket = socket.fromfd(pconn.fd, pconn.family, pconn.type)
+                        break
+        elif self.weAreServer:
+                for pconn in self.connections:
+                    if pconn.status == 'ESTABLISHED' and pconn.laddr[1] == self.listen_addr[1]:
+                        self.downstreamSocket = socket.fromfd(pconn.fd, pconn.family, pconn.type)
+                        break
 
     @test_ut.instrument_rcv_upstream
     def receivedUpstream(self, data):
@@ -641,7 +645,7 @@ class WFPadTransport(BaseTransport):
 #         self._dataBytes = {'rcv': 0, 'snd': 0}
 #         self._totalBytes = {'rcv': 0, 'snd': 0}
 #         self._numMessages = {'rcv': 0, 'snd': 0}
-#
+#  
 #         self._lastSndDownstreamTs = 0
 #         self._lastSndDataDownstreamTs = 0
 #         self._lastRcvDownstreamTs = 0
