@@ -187,12 +187,11 @@ class WFPadTransport(BaseTransport):
         # Get the global shim object
         if self.weAreClient:
             self._sessionObserver = False
-            if self.shim:
-                if not socks_shim.get():
-                    socks_shim.new(*self.shim_ports)
-                _shim = socks_shim.get()
-                self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
-                _shim.registerObserver(self._sessionObserver)
+            if not socks_shim.get():
+                socks_shim.new(*self.shim_ports)
+            _shim = socks_shim.get()
+            self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
+            _shim.registerObserver(self._sessionObserver)
         else:
             self._sessId = const.DEFAULT_SESSION
             self._visiting = False
@@ -227,7 +226,6 @@ class WFPadTransport(BaseTransport):
         cls.dest = args.dest if args.dest else None
 
         cls.shim_ports = (const.SHIM_PORT, const.SOCKS_PORT)
-        cls.shim = True if args.shim else False
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
         if args.test:
