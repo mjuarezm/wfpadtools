@@ -325,7 +325,7 @@ class SocketServerThread(SocketThread):
             listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             listener.bind((cmd.data[0], cmd.data[1]))
             listener.listen(1)
-            self.socket, self.address = self.socket.accept()
+            self.socket, self.address = listener.accept()
             self.socket.settimeout(SOCKET_TIMEOUT)
             listener.close()
             self.reply_q.put(self._success_reply())
