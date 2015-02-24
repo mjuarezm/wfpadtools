@@ -225,7 +225,8 @@ class WFPadTransport(BaseTransport):
 
         cls.dest = args.dest if args.dest else None
 
-        cls.shim_ports = (const.SHIM_PORT, const.SOCKS_PORT)
+        # By default, shim doesn't connect to socks
+        cls.shim_ports = (const.SHIM_PORT, -1)
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
         if args.test:
