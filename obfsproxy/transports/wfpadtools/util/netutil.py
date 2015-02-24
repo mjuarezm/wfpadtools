@@ -12,7 +12,7 @@ from random import randint
 
 # WFPadTools imports
 from obfsproxy.transports.wfpadtools import const
-from obfsproxy.test.tester import TransportsSetUp, SOCKET_TIMEOUT
+from obfsproxy.test.tester import TransportsSetUp
 from obfsproxy.transports.wfpadtools.util import genutil as gu
 from obfsproxy.transports.wfpadtools.util import logutil
 from obfsproxy.transports.wfpadtools.util import fileutil as fu
@@ -326,7 +326,6 @@ class SocketServerThread(SocketThread):
             listener.bind((cmd.data[0], cmd.data[1]))
             listener.listen(1)
             self.socket, self.address = listener.accept()
-            self.socket.settimeout(SOCKET_TIMEOUT)
             listener.close()
             self.reply_q.put(self._success_reply())
         except IOError as e:
