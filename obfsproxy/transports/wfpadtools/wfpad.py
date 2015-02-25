@@ -188,7 +188,12 @@ class WFPadTransport(BaseTransport):
         if self.weAreClient:
             self._sessionObserver = False
             if not socks_shim.get():
-                socks_shim.new(*self.shim_ports)
+                # set default ports (managed mode doesn't run parse args)
+                try:
+                    shim_ports = self.shim_ports
+                except:
+                    shim_ports = (const.SHIM_PORT, -1)
+                socks_shim.new(*shim_ports)
             _shim = socks_shim.get()
             self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
             _shim.registerObserver(self._sessionObserver)
@@ -226,7 +231,6 @@ class WFPadTransport(BaseTransport):
         cls.dest = args.dest if args.dest else None
 
         # By default, shim doesn't connect to socks
-        cls.shim_ports = (const.SHIM_PORT, -1)
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
         if args.test:

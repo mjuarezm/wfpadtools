@@ -368,6 +368,7 @@ class WFPadMessageExtractor(object):
 
         # Sanity check of the fields
         if not isSane(self.totalLen, self.payloadLen, self.flags):
+            log.error("TotalLen: %s, PayloadLen: %s, Flags: %s", self.totalLen, self.payloadLen, self.flags)
             raise base.PluggableTransportError("Invalid header field.")
 
     def parseControlFields(self):
