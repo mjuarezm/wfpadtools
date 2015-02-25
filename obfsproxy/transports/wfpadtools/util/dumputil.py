@@ -1,16 +1,15 @@
 import inspect
 import json
 import cPickle as pick
-from os.path import join, isfile, basename, dirname, exists
+from os.path import join, isfile, basename, dirname
 
 # WFPadTools imports
 from obfsproxy.transports.wfpadtools import const
-from obfsproxy.transports.wfpadtools.util import logutil
+import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools.util.genutil import timestamp
 from obfsproxy.transports.wfpadtools.util.fileutil import removefile
-import time
 
-log = logutil.get_logger("dumputil")
+log = logging.get_obfslogger()
 
 # Shortcuts
 jn = join

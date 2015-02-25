@@ -11,13 +11,13 @@ from time import sleep
 from random import randint
 
 # WFPadTools imports
+import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.test.tester import TransportsSetUp
 from obfsproxy.transports.wfpadtools.util import genutil as gu
-from obfsproxy.transports.wfpadtools.util import logutil
 from obfsproxy.transports.wfpadtools.util import fileutil as fu
 
-log = logutil.get_logger("netutil")
+log = logging.get_obfslogger()
 
 
 class CommInterfaceAbstract(TransportsSetUp):

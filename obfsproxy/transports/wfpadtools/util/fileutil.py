@@ -98,8 +98,8 @@ def apply_patch_to_file(file_path, patch_path):
 
     Will return '1' if file had been already patched and '0' otherwise.
     """
-    return bool(run_cmd("sudo patch -N -s {} < {} > {} 2>&1; echo $?"
-                        .format(file_path, patch_path, const.DEFAULT_LOG)))
+    return bool(run_cmd("sudo patch -N -s {} < {} > /dev/null 2>&1; echo $?"
+                        .format(file_path, patch_path)))
 
 
 def apply_patch_to_dir(dir_path, patch_path):
@@ -107,8 +107,8 @@ def apply_patch_to_dir(dir_path, patch_path):
 
     Will return '1' if file had been already patched and '0' otherwise.
     """
-    return bool(run_cmd("sudo cd {} && patch -p0 -s < {} > {} 2>&1; echo $?"
-                        .format(dir_path, patch_path, const.DEFAULT_LOG)))
+    return bool(run_cmd("sudo cd {} && patch -p0 -s < {} > /dev/null 2>&1; echo $?"
+                        .format(dir_path, patch_path)))
 
 
 def is_installed(pkg_name):
