@@ -48,65 +48,7 @@ else:
     log.disable_logs()
 
 
-class UnmanagedTorTest(tester.TransportsSetUp):
-    tor_endpoints = {}
-
-    def setUp(self):
-        # Run transport client and server
-        super(UnmanagedTorTest, self).setUp()
-        try:
-            # Run Tor bridge
-            self.tor_endpoints["router"] = self.start_tor_bridge(
-                                                str(tester.EXIT_PORT),
-                                                DATA_DIRS["router"])
-            # Run Onion proxy
-            self.tor_endpoints["proxy"] = self.start_tor_proxy(
-                                                    str(wft.SOCKS_PORT),
-                                                    str(tester.ENTRY_PORT),
-                                                    str(tester.SERVER_PORT),
-                                                    DATA_DIRS["proxy"])
-        except Exception as exc:
-            log.exception("TEST: Exception setting up the class {}: {}"
-                    .format(self.__class__.__name__, exc))
-            LEAVE_TOR_RUNNING = False
-            self.tearDown()
-
-    def tearDown(self):
-        try:
-            # Close transports ports
-            super(UnmanagedTorTest, self).tearDown()
-            if LEAVE_TOR_RUNNING:
-                return
-            for torend_name, torend in self.tor_endpoints.iteritems():
-                self.terminate_process_and_log(torend,
-                                       "TEST: killed Tor {}."
-                                            .format(torend_name))
-        except Exception as exc:
-            log.exception("TEST: Exception tearing down the class {}: {}"
-                    .format(self.__class__.__name__, exc))
-
-    @classmethod
-    def tearDownClass(cls):
-        super(UnmanagedTorTest, cls).tearDownClass()
-        try:
-            for datadir in DATA_DIRS.itervalues():
-                pidfile = join(datadir, "pid")
-                if exists(pidfile):
-                    pid = int(fu.read_file(pidfile))
-                    fu.terminate_process(pid)
-                    log.debug("TEST: killed Tor {}.".format(basename(datadir)))
-                    fu.removedir(datadir)
-        except Exception as exc:
-            log.exception("Exception raised tearing down class {}: {}"
-                          .format(cls.__name__, exc))
-
-    def tor_log_watchdog(self, logfile, line=BOOTSRAP_LOGLINE):
-        gu.log_watchdog(line, logfile, WATCHDOG_TIMEOUT, delay=3)
-
-    def terminate_process_and_log(self, pid, msg=None):
-        fu.terminate_process(pid)
-        if msg:
-            log.debug(msg)
+class TorManager(object):
 
     def start_tor(self, datadir, args, stdout_loglevel=DEFAULT_TOR_LOGLEVEL,
                   quiet=DEFAULT_TOR_LOG_QUIET):
@@ -158,6 +100,67 @@ class UnmanagedTorTest(tester.TransportsSetUp):
 
     def get_page(self, url, port=wft.SHIM_PORT):
         return nu.get_page(url, port=port, timeout=GET_PAGE_TIMEOUT)
+
+    def tor_log_watchdog(self, logfile, line=BOOTSRAP_LOGLINE):
+        gu.log_watchdog(line, logfile, WATCHDOG_TIMEOUT, delay=3)
+
+
+class UnmanagedTorTest(tester.TransportsSetUp, TorManager):
+    tor_endpoints = {}
+
+    def setUp(self):
+        # Run transport client and server
+        super(UnmanagedTorTest, self).setUp()
+        try:
+            # Run Tor bridge
+            self.tor_endpoints["router"] = self.start_tor_bridge(
+                                                str(tester.EXIT_PORT),
+                                                DATA_DIRS["router"])
+            # Run Onion proxy
+            self.tor_endpoints["proxy"] = self.start_tor_proxy(
+                                                    str(wft.SOCKS_PORT),
+                                                    str(tester.ENTRY_PORT),
+                                                    str(tester.SERVER_PORT),
+                                                    DATA_DIRS["proxy"])
+        except Exception as exc:
+            log.exception("TEST: Exception setting up the class {}: {}"
+                    .format(self.__class__.__name__, exc))
+            LEAVE_TOR_RUNNING = False
+            self.tearDown()
+
+    def tearDown(self):
+        try:
+            # Close transports ports
+            super(UnmanagedTorTest, self).tearDown()
+            if LEAVE_TOR_RUNNING:
+                return
+            for torend_name, torend in self.tor_endpoints.iteritems():
+                self.terminate_process_and_log(torend,
+                                       "TEST: killed Tor {}."
+                                            .format(torend_name))
+        except Exception as exc:
+            log.exception("TEST: Exception tearing down the class {}: {}"
+                    .format(self.__class__.__name__, exc))
+
+    @classmethod
+    def tearDownClass(cls):
+        super(UnmanagedTorTest, cls).tearDownClass()
+        try:
+            for datadir in DATA_DIRS.itervalues():
+                pidfile = join(datadir, "pid")
+                if exists(pidfile):
+                    pid = int(fu.read_file(pidfile))
+                    fu.terminate_process(pid)
+                    log.debug("TEST: killed Tor {}.".format(basename(datadir)))
+                    fu.removedir(datadir)
+        except Exception as exc:
+            log.exception("Exception raised tearing down class {}: {}"
+                          .format(cls.__name__, exc))
+
+    def terminate_process_and_log(self, pid, msg=None):
+        fu.terminate_process(pid)
+        if msg:
+            log.debug(msg)
 
     def test_tor(self):
         sleep(5)
