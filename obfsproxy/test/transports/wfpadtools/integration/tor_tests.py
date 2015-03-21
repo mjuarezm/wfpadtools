@@ -50,6 +50,10 @@ else:
 
 class TorManager(object):
 
+
+    def __init__(self):
+        self.tor_endpoints = {}
+
     def start_tor(self, datadir, args, stdout_loglevel=DEFAULT_TOR_LOGLEVEL,
                   quiet=DEFAULT_TOR_LOG_QUIET):
         tor_proc_name = basename(datadir)
@@ -79,6 +83,13 @@ class TorManager(object):
         fu.write_to_file(join(datadir, "pid"), str(process.pid))
         log.debug("TEST: Finished loading {}".format(tor_proc_name))
         return process.pid
+
+    def start_tor_server(self, listen_port):
+        self.tor_endpoints["server"] = self.start_tor_bridge(listen_port, DATA_DIRS["router"])
+
+    def start_tor_client(self, socks_port, connect_port):
+        self.tor_endpoints["client"] = self.start_tor_proxy(socks_port, str(tester.ENTRY_PORT),
+                                                           connect_port, DATA_DIRS["proxy"])
 
     def start_tor_bridge(self, orport, datadir):
         return self.start_tor(datadir,
