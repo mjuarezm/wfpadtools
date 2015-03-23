@@ -18,7 +18,8 @@ setup(
     license = "BSD",
     keywords = ['tor', 'obfuscation', 'twisted'],
 
-    version=versioneer.get_version(),
+    version="1.0",
+    #version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
 
     packages = find_packages(),
@@ -39,6 +40,6 @@ setup(
 
     extras_require = {
         'SOCKS': ["txsocksx"],
-        'wfpadtools == 1.0': ['psutil', 'requesocks']
+        'wfpadtools': ['psutil', 'requesocks']
         }
 )
