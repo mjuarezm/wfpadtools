@@ -39,6 +39,6 @@ setup(
 
     extras_require = {
         'SOCKS': ["txsocksx"],
-        'wfpadtools': ['psutil', 'requesocks']
+        'wfpadtools == 1.0': ['psutil', 'requesocks']
         }
 )
