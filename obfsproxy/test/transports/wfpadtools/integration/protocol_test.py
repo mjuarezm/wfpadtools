@@ -19,7 +19,7 @@ class TestReceivedBytes(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
 
     def test_correctnes_bytes_stats(self):
         """Test that recorded number of bytes is correct."""
-        # We sent 5 padding cells from server to client plus
+        # We sent `N` padding cells from server to client plus
         # the string `TEST_MSG`, we need to check that client
         # received the same amount of bytes as server, corresponding
         # to bytes of string and bytes of padding.
@@ -65,8 +65,8 @@ class TestReceivedBytes(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
         # Test total bytes corresponds to the amount of padding messages plus
         # the data message multiplied by the payload len (wfpad pads to MPU by
         # default).
-        totalbytes = (self.N + 1) * const.MPU
+        totalbytes = self.N * const.MPU + databytes
         log.debug("Total bytes = %s", totalbytes)
         self.assertEqual(obs_cl_rcv_total_bytes, totalbytes,
-                         "Total bytes sent by server (%s) does not total "
+                         "Total bytes sent by server (%s) does not match total"
                          " bytes (%s)." % (obs_cl_rcv_total_bytes, totalbytes))

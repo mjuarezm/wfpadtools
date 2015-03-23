@@ -85,9 +85,17 @@ class TorManager(object):
     def start_tor_server(self, listen_port, data_dir=abspath(".")):
         self.tor_endpoints["server"] = self.start_tor_bridge(listen_port, data_dir)
 
-    def start_tor_client(self, socks_port, connect_port, data_dir=abspath(".")):
+    def start_tor_client_unamanged(self, socks_port, connect_port, data_dir=abspath(".")):
         self.tor_endpoints["client"] = self.start_tor_proxy(socks_port, str(tester.ENTRY_PORT),
                                                             connect_port, data_dir)
+
+    def start_tor_client_unamanged(self, orport, datadir):
+        return self.start_tor(datadir,
+                              ["--UseBridges", "1",
+                               "--Bridge", "{} 127.0.0.1:{}".format(self.transport, server_port),
+                               "--ClientTransportPlugin", "{} socks5 localhost:{}"
+                              .format(self.transport, client_port),
+                               "--SOCKSPort", socksport])
 
     def start_tor_bridge(self, orport, datadir):
         return self.start_tor(datadir,
@@ -103,8 +111,7 @@ class TorManager(object):
         return self.start_tor(datadir,
                               ["--UseBridges", "1",
                                "--Bridge", "{} 127.0.0.1:{}".format(self.transport, server_port),
-                               "--ClientTransportPlugin", "{} socks5 localhost:{}"
-                              .format(self.transport, client_port),
+                               "--ClientTransportPlugin", "{} socks5 localhost:{}".format(self.transport, client_port),
                                "--SOCKSPort", socksport])
 
     def get_page(self, url, port=wft.SHIM_PORT):
@@ -183,7 +190,7 @@ class UnmanagedTorTest(tester.TransportsSetUp, TorManager):
                       % resp.text)
 
 
-class WFPadToolsTransportTests():
+class WFPadToolsTransportTests(object):
     """Test protection offered by transport against Website Fingerprinting."""
 
     @unittest.skip("Not implemented yet.")
@@ -193,13 +200,11 @@ class WFPadToolsTransportTests():
         pass
 
 
-class TestWFPadTor(wft.WFPadShimSocksConfig, UnmanagedTorTest,
-                   WFPadToolsTransportTests, STTest):
+class TestWFPadTor(wft.WFPadShimSocksConfig, UnmanagedTorTest, STTest):
     pass
 
 
-class TesBuFLOTor(wft.BuFLOShimSocksConfig, UnmanagedTorTest,
-                  WFPadToolsTransportTests, STTest):
+class TesBuFLOTor(wft.BuFLOShimSocksConfig, UnmanagedTorTest, STTest):
     pass
 
 
