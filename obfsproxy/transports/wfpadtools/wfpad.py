@@ -260,10 +260,8 @@ class WFPadTransport(BaseTransport):
     def circuitConnected(self):
         """Initiate handshake.
 
-        This method is only relevant for clients since servers never initiate
-        handshakes. The handshake must be extended by the final countermeasure
-        to initialize the histograms that govern the delay distributions at the
-        server side, for example.
+        The handshake must be extended by the final countermeasure to initialize the
+        histograms that govern the delay distributions at the server side, for example.
         """
         # Change state to ST_CONNECTED
         self._state = const.ST_CONNECTED
@@ -274,7 +272,7 @@ class WFPadTransport(BaseTransport):
             self.flushBuffer()
 
         # Get peer address
-        self.peer_addr = self.circuit.downstream.peer_addr
+        self.peer_addr = self.circuit.downstream.transport.getPeer()
 
         # Load sockets
         self.connections = self.process.get_connections()
