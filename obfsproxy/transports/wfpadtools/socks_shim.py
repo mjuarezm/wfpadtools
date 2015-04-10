@@ -158,8 +158,8 @@ class SocksShim(object):
         return self._port
 
     def stopListening(self):
-        if self._ep:
-            self._ep.stopListening()
+        if self.port_obj:
+            self.port_obj.stopListening()
 
     def registerObserver(self, observer):
         self._observers.append(observer)
