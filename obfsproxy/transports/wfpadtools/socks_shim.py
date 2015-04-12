@@ -140,7 +140,7 @@ class SocksShim(object):
     
     port_obj = None
 
-    def __init__(self, shim_port=0, socks_port=9150):
+    def __init__(self, shim_port=6665, socks_port=6666):
         self._port = shim_port
         self._socks_port = socks_port
         self._observers = []
@@ -193,7 +193,7 @@ class SocksShim(object):
 _instance = None
 
 
-def new(shim_port=0, socks_port=9150):
+def new(shim_port=6665, socks_port=6666):
     global _instance
     if _instance:
         raise RuntimeError('SOCKS shim already running')
