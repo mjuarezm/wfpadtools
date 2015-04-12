@@ -272,7 +272,7 @@ class WFPadTransport(BaseTransport):
             self.flushBuffer()
 
         # Get peer address
-        self.peer_addr = self.circuit.downstream.transport.peer_addr
+        self.peer_addr = self.circuit.downstream.peer_addr
 
         # Load sockets
         self.connections = self.process.get_connections()
