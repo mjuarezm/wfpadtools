@@ -184,6 +184,22 @@ class WFPadTransport(BaseTransport):
         self.connections = []
         self.downstreamSocket = None
 
+        # Get the global shim object
+        if self.weAreClient:
+            self._sessionObserver = False
+            if not socks_shim.get():
+                # set default ports (managed mode doesn't run parse args)
+                try:
+                    shim_ports = self.shim_ports
+                except:
+                    shim_ports = (const.SHIM_PORT, -1)
+                socks_shim.new(*shim_ports)
+            _shim = socks_shim.get()
+            self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
+            _shim.registerObserver(self._sessionObserver)
+        else:
+            self._sessId = const.DEFAULT_SESSION
+            self._visiting = False
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
@@ -264,23 +280,6 @@ class WFPadTransport(BaseTransport):
             if pconn.status == 'ESTABLISHED' and pconn.raddr[1] == self.peer_addr.port:
                 self.downstreamSocket = socket.fromfd(pconn.fd, pconn.family, pconn.type)
                 break
-        
-        # Get the global shim object
-        if self.weAreClient:
-            self._sessionObserver = False
-            if not socks_shim.get():
-                # set default ports (managed mode doesn't run parse args)
-                try:
-                    shim_ports = self.shim_ports
-                except:
-                    shim_ports = (const.SHIM_PORT, -1)
-                socks_shim.new(*shim_ports)
-            _shim = socks_shim.get()
-            self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
-            _shim.registerObserver(self._sessionObserver)
-        else:
-            self._sessId = const.DEFAULT_SESSION
-            self._visiting = False
 
     @test_ut.instrument_rcv_upstream
     def receivedUpstream(self, data):

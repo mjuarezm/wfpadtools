@@ -134,25 +134,33 @@ class _ShimTestFactory(Factory):
 class SocksShim(object):
     _id = None
     _port = None
+    _socks_port = None
+    
     _observers = None
     
-    d = None
     port_obj = None
 
-    def __init__(self, shim_port=9250, socks_port=9150):
+    def __init__(self, shim_port=0, socks_port=9150):
         self._port = shim_port
+        self._socks_port = socks_port
         self._observers = []
         self._id = 0
-        self._ep = TCP4ServerEndpoint(reactor, shim_port, interface='127.0.0.1')
-        self.d = None
-        if socks_port == -1:
-            self.d = self._ep.listen(_ShimTestFactory(self))
+        
+    def listen(self):
+        self._ep = TCP4ServerEndpoint(reactor, self._port, interface='127.0.0.1')
+        d = None
+        if self._socks_port == -1:
+            d = self._ep.listen(_ShimTestFactory(self))
         else:
-            self.d = self._ep.listen(_ShimServerFactory(self, socks_port))
-        self.d.addCallback(lambda d: self.setEndpoint(d))
+            d = self._ep.listen(_ShimServerFactory(self, self._socks_port))
+        d.addCallback(lambda d: self.setEndpoint(d))
+        return d
 
     def setEndpoint(self, port_obj):
         self.port_obj = port_obj
+
+    def setSocksPort(self, new_port):
+        self._socks_port = new_port
 
     def getPort(self):
         return self._port
@@ -185,7 +193,7 @@ class SocksShim(object):
 _instance = None
 
 
-def new(shim_port=9250, socks_port=9150):
+def new(shim_port=0, socks_port=9150):
     global _instance
     if _instance:
         raise RuntimeError('SOCKS shim already running')
