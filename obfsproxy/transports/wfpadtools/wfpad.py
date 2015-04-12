@@ -112,6 +112,8 @@ class WFPadTransport(BaseTransport):
 
     enable_test = False
     dump_path = "/dev/null"
+    
+    shim_ports = None
 
     def __init__(self):
         """Initialize a WFPadTransport object."""
@@ -187,23 +189,25 @@ class WFPadTransport(BaseTransport):
         # Get the global shim object
         if self.weAreClient:
             self._sessionObserver = False
+            
             if not socks_shim.get():
                 # set default ports (managed mode doesn't run parse args)
-                try:
-                    shim_ports = self.shim_ports
-                except:
-                    shim_ports = (const.SHIM_PORT, -1)
-                socks_shim.new(*shim_ports)
+                if self.shim_ports:
+                     socks_shim.new(*self.shim_ports)
+                else:
+                    socks_shim.new(const.SHIM_PORT, -1)
             _shim = socks_shim.get()
             self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
             _shim.registerObserver(self._sessionObserver)
+            if self.shim_ports:
+                _shim.listen()
         else:
             self._sessId = const.DEFAULT_SESSION
             self._visiting = False
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
-        """Register CLI arguments fort the SOCKS shim."""
+        """Register CLI arguments for the SOCKS shim."""
         subparser.add_argument('--socks-shim',
                                action='store',
                                dest='shim',

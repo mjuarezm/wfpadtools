@@ -159,6 +159,9 @@ class SocksShim(object):
     def setEndpoint(self, port_obj):
         self.port_obj = port_obj
 
+    def setShimPort(self, new_port):
+        self._port = new_port
+        
     def setSocksPort(self, new_port):
         self._socks_port = new_port
 
