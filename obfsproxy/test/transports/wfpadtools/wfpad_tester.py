@@ -4,6 +4,7 @@ import unittest
 from time import sleep
 
 # WFPadTools imports
+from os.path import join
 from obfsproxy.test import tester
 import obfsproxy.common.log as logging
 from obfsproxy.test import tester as ts
@@ -42,7 +43,8 @@ class WFPadDirectConfig(object):
     client_args = ("wfpad", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--test=%s" % const.DUMPS["client"])
+                   "--test=%s" % const.DUMPS["client"],
+                   "--session-logs=%s" % const.TEMP_DIR)
 
 
 class BuFLODirectConfig(object):
@@ -60,7 +62,8 @@ class BuFLODirectConfig(object):
                    "--psize=%s" % const.MPU,
                    "--mintime=10",
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--test=%s" % const.DUMPS["client"])
+                   "--test=%s" % const.DUMPS["client"],
+                   "--session-logs=%s" % const.TEMP_DIR)
 
 
 class WFPadShimConfig(WFPadDirectConfig):
@@ -68,7 +71,8 @@ class WFPadShimConfig(WFPadDirectConfig):
                    "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--test=%s" % const.DUMPS["client"])
+                   "--test=%s" % const.DUMPS["client"],
+                   "--session-logs=%s" % const.TEMP_DIR)
 
 
 class BuFLOShimConfig(BuFLODirectConfig, object):
@@ -79,7 +83,8 @@ class BuFLOShimConfig(BuFLODirectConfig, object):
                    "--psize=%s" % const.MPU,
                    "--mintime=10",
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--test=%s" % const.DUMPS["client"])
+                   "--test=%s" % const.DUMPS["client"],
+                   "--session-logs=%s" % const.TEMP_DIR)
 
 
 class CSBuFLOShimConfig(object):
@@ -90,13 +95,14 @@ class CSBuFLOShimConfig(object):
                    "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.EXIT_PORT,
                    "--test=%s" % const.DUMPS["server"])
-    client_args = ("buflo", "client",
+    client_args = ("csbuflo", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
                    "--period=1",
                    "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--test=%s" % const.DUMPS["client"])
+                   "--test=%s" % const.DUMPS["client"],
+                   "--session-logs=%s" % const.TEMP_DIR)
 
 
 class AdaptiveShimConfig(object):
@@ -106,14 +112,17 @@ class AdaptiveShimConfig(object):
                    "--period=0",
                    "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.EXIT_PORT,
-                   "--test=%s" % const.DUMPS["server"])
+                   "--test=%s" % const.DUMPS["server"],
+                   "--histo-file=%s" % join(const.ETC_DIR, "example.histo"))
     client_args = ("adaptive", "client",
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
                    "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
                    "--period=0",
                    "--psize=%s" % const.MPU,
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--test=%s" % const.DUMPS["client"])
+                   "--test=%s" % const.DUMPS["client"],
+                   "--session-logs=%s" % const.TEMP_DIR,
+                   "--histo-file=%s" % join(const.ETC_DIR, "example.histo"))
 
 
 class TamarawShimConfig(object):
@@ -132,7 +141,8 @@ class TamarawShimConfig(object):
                    "--psize=%s" % const.MPU,
                    "--batch=1000",
                    "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
-                   "--test=%s" % const.DUMPS["client"])
+                   "--test=%s" % const.DUMPS["client"],
+                   "--session-logs=%s" % const.TEMP_DIR)
 
 
 # CONFIGURATION WITH SOCKS
@@ -140,7 +150,8 @@ class WFPadShimSocksConfig(WFPadShimConfig):
     client_args = ("wfpad", "socks",
                    "--socks-shim=%d,%d" % (SHIM_PORT, SOCKS_PORT),
                    "127.0.0.1:%d" % ts.ENTRY_PORT,
-                   "--dest=127.0.0.1:%d" % ts.SERVER_PORT)
+                   "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
+                   "--session-logs=%s" % const.TEMP_DIR)
     entry_port = SHIM_PORT
 
 
@@ -151,7 +162,8 @@ class BuFLOShimSocksConfig(BuFLOShimConfig, object):
                    "--period=1",
                    "--psize=%s" % const.MPU,
                    "--mintime=10",
-                   "--dest=127.0.0.1:%d" % ts.SERVER_PORT)
+                   "--dest=127.0.0.1:%d" % ts.SERVER_PORT,
+                   "--session-logs=%s" % const.TEMP_DIR)
     entry_port = SHIM_PORT
 
 

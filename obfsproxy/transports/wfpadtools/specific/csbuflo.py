@@ -4,6 +4,8 @@ This module implements the CS-CSBuFLO countermeasure proposed by Cai et al.
 import math
 from random import uniform
 
+from twisted.internet import reactor
+
 # WFPadTools imports
 import obfsproxy.common.log as logging
 from obfsproxy.transports.scramblesuit import probdist
@@ -92,7 +94,6 @@ class CSBuFLOTransport(WFPadTransport):
 
     def onSessionEnds(self, sessId):
         super(CSBuFLOTransport, self).onSessionEnds(sessId)
-
         # Reset rho stats
         self._rho_stats = [[]]
         self._rho_star = const.INIT_RHO

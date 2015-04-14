@@ -48,7 +48,7 @@ def set_up_cli_parsing():
     parser.add_argument('--no-log', action='store_true', default=False,
                         help='disable logging')
     parser.add_argument('--no-safe-logging', action='store_true',
-                        default=False,
+                        default =False,
                         help='disable safe (scrubbed address) logging')
     parser.add_argument('--data-dir', help='where persistent information should be stored.',
                         default=None)

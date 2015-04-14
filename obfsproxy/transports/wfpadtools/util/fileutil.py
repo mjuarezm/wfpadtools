@@ -34,7 +34,7 @@ def append_to_file(filepath, data):
     write_to_file(filepath, data, mode='a')
 
 
-def touch(fname, times=None):
+def touch(fname, e=None):
     with open(fname, 'a'):
         utime(fname, times)
 

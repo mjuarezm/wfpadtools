@@ -75,6 +75,7 @@ following limitations:
 
 """
 import os
+from os.path import isfile, join
 import psutil
 import socket
 import time
@@ -89,6 +90,7 @@ from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
 import obfsproxy.transports.wfpadtools.histo as hist
+from obfsproxy.transports.wfpadtools.util import fileutil
 import obfsproxy.transports.wfpadtools.util.testutil as test_ut
 from obfsproxy.transports.wfpadtools import message as mes
 from obfsproxy.transports.wfpadtools import message, socks_shim
@@ -109,6 +111,8 @@ class WFPadTransport(BaseTransport):
     different existing website fingerprinting countermeasures, and
     that can also be used to generate new ones.
     """
+
+    _session_logs = None
 
     enable_test = False
     dump_path = "/dev/null"
@@ -133,6 +137,9 @@ class WFPadTransport(BaseTransport):
         self._msgExtractor = message.WFPadMessageExtractor()
 
         # Statistics to keep track of past messages
+        # Used for debugging
+        self._history = []
+
         # Used for congestion sensitivity
         self._lastSndDownstreamTs = 0
         self._lastSndDataDownstreamTs = 0
@@ -217,6 +224,11 @@ class WFPadTransport(BaseTransport):
                                type=str,
                                help="switch to enable test dumps.",
                                dest="test")
+        subparser.add_argument("--session-logs",
+                               required=False,
+                               type=str,
+                               help="switch to enable logs for session.",
+                               dest="session_logs")
         super(WFPadTransport, cls).register_external_mode_cli(subparser)
 
     @classmethod
@@ -237,9 +249,12 @@ class WFPadTransport(BaseTransport):
         # By default, shim doesn't connect to socks
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
+            log.debug("Shim ports: %s", cls.shim_ports)
         if args.test:
             cls.enable_test = True
             cls.dump_path = args.test
+        if args.session_logs:
+            cls._session_logs = args.session_logs
 
     @classmethod
     def setup(cls, transportConfig):
@@ -298,6 +313,7 @@ class WFPadTransport(BaseTransport):
         if self._state >= const.ST_CONNECTED:
             self.pushData(d)
             self.whenReceivedUpstream()
+
         else:
             self._buffer.write(d)
             log.debug("[wfpad] Buffered %d bytes of outgoing data." %
@@ -333,6 +349,8 @@ class WFPadTransport(BaseTransport):
                 if data.flags & const.FLAG_DATA:
                     self._dataMessages['snd'] += 1
                     self._dataBytes['snd'] += len(data.payload)
+            if self._session_logs:
+                self._history.append((reactor.seconds(), message.getFlagNames(data.flags), data.totalLen))
             return [data]
         elif isinstance(data, list):
             listMsgs = []
@@ -502,6 +520,8 @@ class WFPadTransport(BaseTransport):
         for msg in msgs:
             log.debug("[wfpad] A new message has been parsed!")
             msg.rcvTime = time.clock()
+            if self._session_logs:
+                self._history.append((reactor.seconds(), message.getFlagNames(msg.flags), -1 * msg.totalLen))
             if msg.flags & const.FLAG_CONTROL:
                 # Process control messages
                 payload = msg.payload
@@ -627,6 +647,16 @@ class WFPadTransport(BaseTransport):
             self._visiting = True
         log.info("[wfpad] - Session has started!(sessid = %s)" % sessId)
 
+    def dump_session_history(self, sessId):
+        # dump history
+        csv_file = join(self._session_logs, "{}.csv".format(sessId))
+        if isfile(csv_file):
+            fileutil.removefile(csv_file)
+        with open(csv_file, "w+") as f:
+            for p in self._history:
+                f.write(";".join(map(str, p)) + "\n")
+        self._history = []
+
     def onSessionEnds(self, sessId):
         """Send hint for session end.
 
@@ -636,8 +666,12 @@ class WFPadTransport(BaseTransport):
         if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT,
                                     [self.getSessId(), False])
+            if self._session_logs:
+                self.dump_session_history(sessId)
+
         else:
             self._visiting = False
+
         self.totalPadding = self.calculateTotalPadding(self)
         log.info("[wfpad] - Session has ended! (sessid = %s)" % sessId)
 

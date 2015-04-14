@@ -1,13 +1,24 @@
 import unittest
+from time import sleep
+
+# WFPadTools imports
+from obfsproxy.transports.wfpadtools.const import SCALE
+from obfsproxy.test.transports.wfpadtools import wfpad_tester as wfp
 
 
-class CSBuFLOTest(unittest.TestCase):
+class CSBuFLOTest(wfp.CSBuFLOShimConfig, wfp.PrimitiveTest,
+                  unittest.TestCase):
 
-    def setUp(self):
-        pass
+    server_args_list = list(wfp.CSBuFLOShimConfig.server_args)
+    server_args = tuple(server_args_list)
 
-    def tearDown(self):
-        pass
+    def doWhileSession(self):
+        sleep(0.1)
+
+        # Trigger padding
+        self.send_to_client(self.DATA_STR)
+        sleep(0.1)
+        self.send_to_server(self.DATA_STR)
 
     def test_payload_padding(self):
         pass
