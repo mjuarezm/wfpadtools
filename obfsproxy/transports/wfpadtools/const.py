@@ -91,7 +91,7 @@ SHIM_PORT               = 4997
 SOCKS_PORT              = 4998
 
 DEFAULT_SESSION         = 0
-MAX_LAST_DATA_TIME      = 5
+MAX_LAST_DATA_TIME      = 100
 
 # Direction
 OUT                     = 1

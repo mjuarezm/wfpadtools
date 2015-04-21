@@ -668,7 +668,7 @@ class WFPadTransport(BaseTransport):
                                     [self.getSessId(), False])
             if self._session_logs:
                 self.dump_session_history(sessId)
-
+            self._shim.notifyStartPadding()
         else:
             self._visiting = False
 
@@ -688,6 +688,10 @@ class WFPadTransport(BaseTransport):
 #         self._lastRcvUpstreamTs = 0
 #         self._consecPaddingMsgs = 0
 #         self._sentDataBytes = 0
+
+        # Notify shim observers
+        if self.weAreClient and self._shim:
+            self._shim.notifyEndPadding()
 
         # Cancel deferers
         self.cancelDeferrers('snd')
