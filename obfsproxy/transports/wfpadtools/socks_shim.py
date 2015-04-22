@@ -72,8 +72,12 @@ class _ShimServerProtocol(Protocol):
     _socks_port = None
     _buf = None
     _client = None
+    _factory = None
+
+    connector = None
 
     def __init__(self, factory, shim, socks_port):
+        self.factory = factory
         self._shim = shim
         self._socks_port = socks_port
         self._buf = Buffer()
@@ -82,7 +86,12 @@ class _ShimServerProtocol(Protocol):
         ep = TCP4ClientEndpoint(reactor, '127.0.0.1', self._socks_port)
         f = _ShimClientFactory(self._shim, self)
         d = ep.connect(f)
+        d.addCallback(self.notifyConnector)
         d.addErrback(self.onConnectFailed)
+
+    def notifyConnector(self, connector):
+        self.connector = connector
+        self._shim.setConnector(self.connector)
 
     def onConnectFailed(self, e):
         log.warning('[shim]: client connect failed: %s', e)
@@ -141,6 +150,7 @@ class SocksShim(object):
     _observers = None
     
     port_obj = None
+    connector = None
 
     def __init__(self, shim_port=6665, socks_port=6666):
         self._port = shim_port
@@ -157,6 +167,9 @@ class SocksShim(object):
             d = self._ep.listen(_ShimServerFactory(self, self._socks_port))
         d.addCallback(lambda d: self.setEndpoint(d))
         return d
+
+    def setConnector(self, connector):
+        self.connector = connector
 
     def setEndpoint(self, port_obj):
         self.port_obj = port_obj
