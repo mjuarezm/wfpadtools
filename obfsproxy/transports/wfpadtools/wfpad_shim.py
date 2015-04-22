@@ -44,6 +44,8 @@ class WFPadShimObserver(object):
         if self._sessId in self._sessions and \
                 connId in self._sessions[self._sessId]:
             self._sessions[self._sessId].remove(connId)
+            if len(self._sessions[self._sessId]) == 0:
+                self._sessions.pop(self._sessId)
         if self.getNumConnections(self._sessId) == 0:
             self.onSessionEnds(connId)
             if self._sessId in self._sessions:

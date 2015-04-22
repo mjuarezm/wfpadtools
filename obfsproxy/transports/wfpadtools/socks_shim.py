@@ -182,7 +182,7 @@ class SocksShim(object):
         self.session_observer.paddingEnded()
 
     def notifyStartPadding(self):
-        self.session_observer.startPadding()
+        self.session_observer.paddingStarted()
 
     def registerObserver(self, observer):
         self._observers.append(observer)
