@@ -148,7 +148,8 @@ class SocksShim(object):
     _socks_port = None
     
     _observers = None
-    
+    session_observer = None
+
     port_obj = None
     connector = None
 
@@ -186,6 +187,15 @@ class SocksShim(object):
     def stopListening(self):
         if self.port_obj:
             self.port_obj.stopListening()
+
+    def addSessionObserver(self, session_observer):
+        self.session_observer = session_observer
+
+    def notifyEndPadding(self):
+        self.session_observer.paddingEnded()
+
+    def notifyStartPadding(self):
+        self.session_observer.paddingStarted()
 
     def registerObserver(self, observer):
         self._observers.append(observer)
