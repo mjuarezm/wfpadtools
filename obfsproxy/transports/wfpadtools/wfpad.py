@@ -194,6 +194,7 @@ class WFPadTransport(BaseTransport):
         self.downstreamSocket = None
 
         # Get the global shim object
+        self._shim = None
         if self.weAreClient:
             self._sessionObserver = False
             
@@ -203,11 +204,11 @@ class WFPadTransport(BaseTransport):
                      socks_shim.new(*self.shim_ports)
                 else:
                     socks_shim.new(const.SHIM_PORT, -1)
-            _shim = socks_shim.get()
+            self._shim = socks_shim.get()
             self._sessionObserver = wfpad_shim.WFPadShimObserver(self)
-            _shim.registerObserver(self._sessionObserver)
+            self._shim.registerObserver(self._sessionObserver)
             if self.shim_ports:
-                _shim.listen()
+                self._shim.listen()
         else:
             self._sessId = const.DEFAULT_SESSION
             self._visiting = False
@@ -668,7 +669,8 @@ class WFPadTransport(BaseTransport):
                                     [self.getSessId(), False])
             if self._session_logs:
                 self.dump_session_history(sessId)
-            self._shim.notifyStartPadding()
+            if self._shim:
+                self._shim.notifyStartPadding()  # padding the tail of the page
         else:
             self._visiting = False
 
