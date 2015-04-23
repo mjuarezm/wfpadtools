@@ -372,10 +372,9 @@ class HistoPrimitiveTest(PrimitiveTest):
     DURING_SESSION_TIME = 5
     BEFORE_SESSION_END_TIME = 1
 
-    def doBeforeSessionStarts(self):
+    def doWhileSession(self):
         self.send_instruction(self.opcode, self.args)
 
-    def doWhileSession(self):
         self.send_to_server(self.DATA_STR)
 
 
@@ -384,12 +383,11 @@ class PadPrimitiveTest(PrimitiveTest):
     DURING_SESSION_TIME = 0
     BEFORE_SESSION_END_TIME = 1
 
-    def doBeforeSessionStarts(self):
+    def doWhileSession(self):
         self.send_instruction(const.OP_SEND_PADDING, [self.junk_msgs, 0])
         for _ in xrange(self.real_msgs):
             self.send_to_server(self.DATA_STR)
 
-    def doWhileSession(self):
         self.send_instruction(self.opcode, self.args)
 
     def doAfterSessionEnds(self):
@@ -419,7 +417,7 @@ class PadPrimitiveTest(PrimitiveTest):
 
 class SendControlMessageTest(PrimitiveTest):
 
-    def doBeforeSessionStarts(self):
+    def doWhileSession(self):
         """Send control msg."""
         log.debug("Sending to client the control instruction"
                   " for control msg: %s", getOpcodeNames(self.opcode))
@@ -430,6 +428,8 @@ class SendDataServerTest(SendControlMessageTest):
 
     def doWhileSession(self):
         """Send file to server."""
+        SendControlMessageTest.doWhileSession(self)
+
         log.debug("Sending data to server: %s", TEST_MSG)
         self.send_to_server(TEST_MSG)
 

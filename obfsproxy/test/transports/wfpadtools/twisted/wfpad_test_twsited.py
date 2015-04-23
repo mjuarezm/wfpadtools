@@ -63,6 +63,15 @@ class WFPadTransportTestCase(TransportTestCase, unittest.TestCase):
         self.pt_client =self.proto_client.circuit.transport
         self.pt_server =self.proto_server.circuit.transport
 
+    def tearDown(self):
+        self._lose_protocol_connection(self.proto_client)
+        self._lose_protocol_connection(self.proto_server)
+        return
+
+    def _lose_protocol_connection(self, protocol):
+        protocol.circuit.upstream.transport.loseConnection()
+        protocol.circuit.downstream.transport.loseConnection()
+
     def _set_protocol_transport(self, protocol):
         # set upstream transport
         upstream = proto_helpers.StringTransport()
@@ -75,21 +84,22 @@ class WFPadTransportTestCase(TransportTestCase, unittest.TestCase):
     def _test_primitive(self, primitive, args, expected):
         d = getattr(self.pt_client, primitive)(*args)
 
-        def callback(d=None):
+        def cb(d):
             msg_sent = self.proto_client.circuit.downstream.transport.value()
             self.proto_server.dataReceived(msg_sent)
+            self.assertEqual(self.pt_server.session.totalBytes['rcv'], expected)
 
-            # wait till reaction from server
-            msg_rcvd = self.proto_server.circuit.upstream.transport.value()
-            self.assertEqual(len(msg_rcvd), expected)
-        d[-1].addCallback(callback)
-        return d
+        return d[-1].addCallback(cb)
 
     def test_send_padding(self):
         delay = 0
         num_padding_messages = 5
         expected_bytes = num_padding_messages * const.MTU
+
+        # assert total bytes received by server is the number of message times MTU
         return self._test_primitive('relaySendPadding',
-                                    (num_padding_messages, delay),
-                                    expected_bytes)
+                                    (num_padding_messages, delay), expected_bytes)
+
+    def test_primitive(self):
+        pass
 

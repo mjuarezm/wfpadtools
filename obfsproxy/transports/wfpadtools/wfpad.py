@@ -516,6 +516,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 self.deferBurstPadding('rcv')
                 self.session.numMessages['rcv'] += 1
                 self.session.totalBytes['rcv'] += msg.totalLen
+                log.debug("total bytes and total len of message: %s" % msg.totalLen)
 
                 # Filter padding messages out.
                 if msg.flags & const.FLAG_PADDING:

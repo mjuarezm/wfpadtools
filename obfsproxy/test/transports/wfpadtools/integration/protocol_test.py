@@ -39,7 +39,13 @@ class TestReceivedBytes(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
                          "Total bytes sent by server (%s) does not match total"
                          " bytes received by client (%s)."
                          % (obs_sv_snd_total_bytes, obs_cl_rcv_total_bytes))
-        self.assertEqual(obs_cl_rcv_msgs, (self.N + 1) * const.MPU)
+
+        # The number of received bytes by the client is the number of padding
+        # messages times the wfpad MPU (1443), plus the bytes of the string
+        # (recall that wfpad does not pad packets per default).
+
+        databytes = len(wt.TEST_MSG)
+        self.assertEqual(obs_cl_rcv_total_bytes, self.N * const.MPU + databytes)
 
         # Test sent and received DATA bytes match
         obs_cl_rcv_data_bytes = self.clientState["session"].dataBytes['rcv']
@@ -52,16 +58,7 @@ class TestReceivedBytes(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
                          % (obs_sv_snd_data_bytes, obs_cl_rcv_data_bytes))
 
         # Test number of rcv data bytes equals bytes of string that was sent
-        databytes = len(wt.TEST_MSG)
         self.assertEqual(obs_cl_rcv_data_bytes, databytes,
-                         "Data bytes received by client (%s) does not match "
+                         "Data bytes received bywfpad client (%s) does not match "
                          " length of test string: %s."
                          % (obs_cl_rcv_data_bytes, wt.TEST_MSG))
-
-        # Test total bytes is the amount of padding messages plus 1 (data message)
-        # multiplied by the payload length plus the number of bytes of the string.
-        # (recall that wfpad pads message length to MPU by default).
-        totalbytes = (self.N + 1) * const.MPU
-        self.assertEqual(obs_cl_rcv_total_bytes, totalbytes,
-                         "Total bytes sent by server (%s) does not match total"
-                         " bytes (%s)." % (obs_cl_rcv_total_bytes, totalbytes))
