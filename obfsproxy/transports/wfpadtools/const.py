@@ -1,5 +1,4 @@
 from os.path import join, abspath, dirname, pardir, expanduser
-import os
 
 # Shortcuts
 jn = join
