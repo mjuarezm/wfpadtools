@@ -26,8 +26,10 @@ class PaddingPrimitivesInterface(object):
             Number of milliseconds delay before sending.
         """
         millisec = t
+        deferreds = []
         for _ in xrange(N):
-            deferLater(millisec, self.sendIgnore)
+            deferreds.append(deferLater(millisec, self.sendIgnore))
+        return deferreds
 
 
     def relayAppHint(self, sessId, status):

@@ -164,7 +164,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
     def _initialize_state(self):
         # Initialize session
-        self.session = None
+        self.session = Session()
 
         # Initialize length distribution
         self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
@@ -359,11 +359,12 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             paddingLength = self._lengthDataProbdist.randomSample()
             if paddingLength == const.INF_LABEL:
                 paddingLength = const.MPU
-        cap = estimate_write_capacity(self.downstreamSocket)
-        if cap < paddingLength:
-            log.debug("[wfpad - %s] We skipped sending padding because the"
-                      " link was congested. The free space is %s", self.end, cap)
-            return
+        if self.downstreamSocket:
+            cap = estimate_write_capacity(self.downstreamSocket)
+            if cap < paddingLength:
+                log.debug("[wfpad - %s] We skipped sending padding because the"
+                          " link was congested. The free space is %s", self.end, cap)
+                return
         log.debug("[wfpad - %s] Sending ignore message.", self.end)
         self.sendDownstream(self._msgFactory.newIgnore(paddingLength))
 
