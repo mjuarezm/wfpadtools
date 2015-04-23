@@ -75,16 +75,14 @@ following limitations:
 """
 import os
 from os.path import isfile, join
-import psutil
 import socket
 import time
-from twisted.internet import reactor, task
 
-# Scramblesuit imports
+import psutil
+from twisted.internet import reactor
+
 from obfsproxy.transports.scramblesuit import probdist
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
-
-# WFPadTools imports
 import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools.common import deferLater
 import obfsproxy.transports.wfpadtools.const as const
@@ -118,11 +116,15 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
     def __init__(self):
         """Initialize a WFPadTransport object."""
-
         super(WFPadTransport, self).__init__()
 
         # which end are we?
-        self.end = "%s (%s)" % ("client" if self.weAreClient else "server", id(self))
+        self.end = "client" if self.weAreClient else "server"
+        log.debug("[wfpad - %s] Initializing %s (id=%s).",
+                  self.end, const.TRANSPORT_NAME, str(id(self)))
+
+        # Initialize the protocol's state machine
+        self._state = const.ST_WAIT
 
         # Buffer used to queue pending data messages
         self._buffer = Buffer()
@@ -160,40 +162,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
 
     def _initialize_state(self):
-        # TODO: Define classes for all these variables
-        log.debug("[wfpad %s] Initializing %s (id=%s).",
-                  self.end, const.TRANSPORT_NAME, str(id(self)))
-
-
-        # Initialize the protocol's state machine
-        self._state = const.ST_WAIT
-
-        # Flag padding
-        self._is_padding = False
-
-        # Statistics to keep track of past messages
-        # Used for debugging
-        self._history = []
-
-        # Used for congestion sensitivity
-        self._lastSndDownstreamTs = 0
-        self._lastSndDataDownstreamTs = 0
-
-        self._lastRcvDownstreamTs = 0
-        self._lastRcvDataDownstreamTs = 0
-
-        self._lastRcvUpstreamTs = 0
-        self._consecPaddingMsgs = 0
-        self._sentDataBytes = 0
-
-        self._dataBytes = {'rcv': 0, 'snd': 0}
-        self._totalBytes = {'rcv': 0, 'snd': 0}
-        self._numMessages = {'rcv': 0, 'snd': 0}
-        self._dataMessages = {'rcv': 0, 'snd': 0}
-
-        # Padding after end of session
-        self.totalPadding = 0
-        self.calculateTotalPadding = lambda Self: None
 
         # Initialize length distribution
         self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
@@ -295,7 +263,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         """
         # Change state to ST_CONNECTED
         self._state = const.ST_CONNECTED
-        log.debug("[wfpad %s] Connected with the other WFPad end.", self.end)
+        log.debug("[wfpad - %s] Connected with the other WFPad end.", self.end)
 
         # Once we are connected we can flush data accumulated in the buffer.
         if len(self._buffer) > 0:
@@ -327,7 +295,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
         else:
             self._buffer.write(d)
-            log.debug("[wfpad %s] Buffered %d bytes of outgoing data.",
+            log.debug("[wfpad - %s] Buffered %d bytes of outgoing data.",
                       self.end, len(self._buffer))
 
     def whenReceivedUpstream(self):
@@ -353,7 +321,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         elif isinstance(data, mes.WFPadMessage):
             data.sndTime = time.clock()
             self.circuit.downstream.write(str(data))
-            log.debug("[wfpad %s] A new message (flag=%s) sent!", self.end, data.flags)
+            log.debug("[wfpad - %s] A new message (flag=%s) sent!", self.end, data.flags)
             if not data.flags & const.FLAG_CONTROL:
                 self._numMessages['snd'] += 1
                 self._totalBytes['snd'] += data.totalLen
@@ -387,23 +355,23 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 paddingLength = const.MPU
         cap = estimate_write_capacity(self.downstreamSocket)
         if cap < paddingLength:
-            log.debug("[wfpad %s] We skipped sending padding because the"
+            log.debug("[wfpad - %s] We skipped sending padding because the"
                       " link was congested. The free space is %s", self.end, cap)
             return
-        log.debug("[wfpad %s] Sending ignore message.", self.end)
+        log.debug("[wfpad - %s] Sending ignore message.", self.end)
         self.sendDownstream(self._msgFactory.newIgnore(paddingLength))
 
     def sendDataMessage(self, payload="", paddingLen=0):
         """Send data message."""
-        log.debug("[wfpad %s] Sending data message with %s bytes payload"
+        log.debug("[wfpad - %s] Sending data message with %s bytes payload"
                   " and %s bytes padding", self.end, len(payload), paddingLen)
         self.sendDownstream(self._msgFactory.new(payload, paddingLen))
 
     def sendControlMessage(self, opcode, args):
         """Send control message."""
         if self.weAreServer:
-            raise Exception("[wfpad %s] Server cannot send control messages.", self.end)
-        log.debug("[wfpad %s] Sending control message: opcode=%s, args=%s."
+            raise Exception("[wfpad - %s] Server cannot send control messages.", self.end)
+        log.debug("[wfpad - %s] Sending control message: opcode=%s, args=%s."
                   % (self.end, opcode, args))
         self.sendDownstream(self._msgFactory.encapsulate("", opcode, args,
                                                          lenProbdist=self._lengthDataProbdist))
@@ -417,7 +385,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         padding deferrers are active, we cancel them and update the delay
         accordingly.
         """
-        log.debug("[wfpad %s] Pushing %d bytes of outgoing data.", self.end, len(data))
+        log.debug("[wfpad - %s] Pushing %d bytes of outgoing data.", self.end, len(data))
 
         # Cancel existing deferred calls to padding methods to prevent
         # callbacks that remove tokens from histograms
@@ -433,7 +401,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             elapsed = self.elapsedSinceLastMsg()
             newDelay = delay - elapsed
             delay = 0 if newDelay < 0 else newDelay
-            log.debug("[wfpad %s] New delay is %s", self.end, delay)
+            log.debug("[wfpad - %s] New delay is %s", self.end, delay)
 
         if deferBurstCancelled and hasattr(self._burstHistoProbdist['snd'], "histo"):
             self._burstHistoProbdist['snd'].removeToken(elapsed)
@@ -442,17 +410,17 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
         # Push data message to data buffer
         self._buffer.write(data)
-        log.debug("[wfpad %s] Buffered %d bytes of outgoing data w/ delay %sms", self.end, len(self._buffer), delay)
+        log.debug("[wfpad - %s] Buffered %d bytes of outgoing data w/ delay %sms", self.end, len(self._buffer), delay)
 
         # In case there is no scheduled flush of the buffer,
         # make a delayed call to the flushing method.
         if not self._deferData or (self._deferData and self._deferData.called):
             self._deferData = deferLater(delay, self.flushBuffer)
-            log.debug("[wfpad %s] Delay buffer flush %s ms delay", self.end, delay)
+            log.debug("[wfpad - %s] Delay buffer flush %s ms delay", self.end, delay)
 
     def elapsedSinceLastMsg(self):
         elap = reactor.seconds() - self._lastSndDownstreamTs  # @UndefinedVariable
-        log.debug("[wfpad %s] Cancel padding. Elapsed = %s ms", self.end, elap)
+        log.debug("[wfpad - %s] Cancel padding. Elapsed = %s ms", self.end, elap)
         return elap
 
     def flushBuffer(self):
@@ -465,9 +433,9 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         dataLen = len(self._buffer)
         if dataLen < 0:
             self.deferBurstPadding('snd')
-            log.debug("[wfpad %s] buffer is empty, pad `snd` burst.", self.end)
+            log.debug("[wfpad - %s] buffer is empty, pad `snd` burst.", self.end)
             return
-        log.debug("[wfpad %s] %s bytes of data found in buffer."
+        log.debug("[wfpad - %s] %s bytes of data found in buffer."
                   " Flushing buffer.", self.end, dataLen)
 
         payloadLen = self._lengthDataProbdist.randomSample()
@@ -488,9 +456,9 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         else:
             paddingLen = payloadLen - dataLen
             self.sendDataMessage(self._buffer.read(), paddingLen)
-            log.debug("[wfpad %s] Padding message to %d (adding %d).", self.end, msgTotalLen, paddingLen)
+            log.debug("[wfpad - %s] Padding message to %d (adding %d).", self.end, msgTotalLen, paddingLen)
 
-        log.debug("[wfpad %s] Sent data message of length %d.", self.end, msgTotalLen)
+        log.debug("[wfpad - %s] Sent data message of length %d.", self.end, msgTotalLen)
 
         self._lastSndDataDownstreamTs = self._lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
 
@@ -498,11 +466,11 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         if len(self._buffer) > 0:
             dataDelay = self._delayDataProbdist.randomSample()
             self._deferData = deferLater(dataDelay, self.flushBuffer)
-            log.debug("[wfpad %s] data waiting in buffer, flushing again "
+            log.debug("[wfpad - %s] data waiting in buffer, flushing again "
                       "after delay of %s ms.", self.end, dataDelay)
         else:
             self.deferBurstPadding('snd')
-            log.debug("[wfpad %s] buffer is empty, pad `snd` burst.", self.end)
+            log.debug("[wfpad - %s] buffer is empty, pad `snd` burst.", self.end)
 
     @test_ut.instrument_dump
     def processMessages(self, data):
@@ -511,7 +479,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         Data is written to the local application and padding messages are
         filtered out.
         """
-        log.debug("[wfpad %s] Parse protocol messages from stream.", self.end)
+        log.debug("[wfpad - %s] Parse protocol messages from stream.", self.end)
 
         # Make sure there actually is data to be parsed
         if (data is None) or (len(data) == 0):
@@ -522,12 +490,12 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         try:
             msgs = self._msgExtractor.extract(data)
         except Exception, e:
-            log.exception("[wfpad %s] Exception extracting "
+            log.exception("[wfpad - %s] Exception extracting "
                           "messages from stream: %s", self.end, str(e))
 
         self._lastRcvDownstreamTs = reactor.seconds()
         for msg in msgs:
-            log.debug("[wfpad %s] A new message has been parsed!", self.end)
+            log.debug("[wfpad - %s] A new message has been parsed!", self.end)
             msg.rcvTime = time.clock()
             if self._session_logs:
                 self._history.append((reactor.seconds(), message.getFlagNames(msg.flags), -1 * msg.totalLen))
@@ -544,11 +512,11 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
                 # Filter padding messages out.
                 if msg.flags & const.FLAG_PADDING:
-                    log.debug("[wfpad %s] Padding message ignored.", self.end)
+                    log.debug("[wfpad - %s] Padding message ignored.", self.end)
 
                 # Forward data to the application.
                 elif msg.flags & const.FLAG_DATA:
-                    log.debug("[wfpad %s] Data flag detected, relaying upstream", self.end)
+                    log.debug("[wfpad - %s] Data flag detected, relaying upstream", self.end)
                     self._dataBytes['rcv'] += len(msg.payload)
                     self._dataMessages['rcv'] += 1
                     self.circuit.upstream.write(msg.payload)
@@ -556,7 +524,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
                 # Otherwise, flag not recognized
                 else:
-                    log.error("[wfpad %s] Invalid message flags: %d.", self.end, msg.flags)
+                    log.error("[wfpad - %s] Invalid message flags: %d.", self.end, msg.flags)
         return msgs
 
     def deferBurstPadding(self, when):
@@ -566,7 +534,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         `timeout` to send ignore packets and sample next delay.
         """
         burstDelay = self._burstHistoProbdist[when].randomSample()
-        log.debug("[wfpad %s] - Delay %sms sampled from burst distribution.", self.end, burstDelay)
+        log.debug("[wfpad - %s] - Delay %sms sampled from burst distribution.", self.end, burstDelay)
         if burstDelay is not const.INF_LABEL:
             self._deferBurst[when] = deferLater(burstDelay,
                                                 self.timeout,
@@ -588,13 +556,13 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         """
         if self.weAreClient:
             if self.is_channel_idle():
-                log.info("[wfpad %s] - Channel has been idle more than %s ms,"
+                log.info("[wfpad - %s] - Channel has been idle more than %s ms,"
                          "flag end of session", self.end, const.MAX_LAST_DATA_TIME)
                 self.sendControlMessage(const.OP_APP_HINT,
                                         [self.getSessId(), False])
                 return
         if self._is_padding and self.stopCondition(self):
-            log.debug("[wfpad %s] -  Padding was stopped!!", self.end)
+            log.debug("[wfpad - %s] -  Padding was stopped!!", self.end)
             self.onEndPadding()
             return
         self.sendIgnore()
@@ -604,7 +572,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         delay = self._gapHistoProbdist[when].randomSample()
         if delay is const.INF_LABEL:
             return
-        log.debug("[wfpad %s]  Wait for data, pad snd gap otherwise.", self.end)
+        log.debug("[wfpad - %s]  Wait for data, pad snd gap otherwise.", self.end)
         self._deferGap[when] = deferLater(delay,
                                           self.timeout,
                                           when=when,
@@ -626,17 +594,17 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
     def cancelDeferrer(self, d):
         """Cancel padding deferrer."""
         if d and not d.called:
-            log.debug("[wfpad %s] - Attempting to cancel a deferrer.", self.end)
+            log.debug("[wfpad - %s] - Attempting to cancel a deferrer.", self.end)
             d.cancel()
             return True
         return False
 
     def cancelBurst(self, when):
-        log.debug("[wfpad %s] - Burst (%s) deferrer was cancelled.", self.end, when)
+        log.debug("[wfpad - %s] - Burst (%s) deferrer was cancelled.", self.end, when)
         return self.cancelDeferrer(self._deferBurst[when])
 
     def cancelGap(self, when):
-        log.debug("[wfpad %s] - Gap (%s) deferrer was cancelled.", self.end, when)
+        log.debug("[wfpad - %s] - Gap (%s) deferrer was cancelled.", self.end, when)
         return self.cancelDeferrer(self._deferGap[when])
 
     def cancelDeferrers(self, when):
@@ -655,7 +623,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             self._sessId = sessId
             self._visiting = True
         self._is_padding = True
-        log.info("[wfpad %s] - Session has started!(sessid = %s)", self.end, sessId)
+        log.info("[wfpad - %s] - Session has started!(sessid = %s)", self.end, sessId)
 
     def dump_session_history(self, sessId):
         # dump history
@@ -684,7 +652,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             self._visiting = False
 
         self.totalPadding = self.calculateTotalPadding(self)
-        log.info("[wfpad %s] - Session has ended! (sessid = %s)", self.end, sessId)
+        log.info("[wfpad - %s] - Session has ended! (sessid = %s)", self.end, sessId)
 
     def onEndPadding(self):
         self._is_padding = False
@@ -695,7 +663,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         # self._numMessages = {'rcv': 0, 'snd': 0}
         #
         # self._lastSndDownstreamTs = 0
-        #         self._lastSndDataDownstreamTs = 0
+        # self._lastSndDataDownstreamTs = 0
         #         self._lastRcvDownstreamTs = 0
         #         self._lastRcvDataDownstreamTs = 0
         #         self._lastRcvUpstreamTs = 0
@@ -733,7 +701,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
     # ==========================================================================
     def receiveControlMessage(self, opcode, args=None):
         """Do operation indicated by the _opcode."""
-        log.debug("[wfpad %s] Received control message with opcode %s and args: %s",
+        log.debug("[wfpad - %s] Received control message with opcode %s and args: %s",
                   self.end, mes.getOpcodeNames(opcode), args)
 
         if self.weAreClient:
@@ -761,7 +729,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         elif opcode == const.OP_BATCH_PAD:
             self.relayBatchPad(*args)
         else:
-            log.error("[wfpad %s] - The received opcode is not recognized.", self.end)
+            log.error("[wfpad - %s] - The received opcode is not recognized.", self.end)
 
 
 class WFPadClient(WFPadTransport):

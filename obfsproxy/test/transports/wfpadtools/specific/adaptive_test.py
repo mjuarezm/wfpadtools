@@ -1,14 +1,11 @@
 import unittest
 from time import sleep
 
-# WFPadTools imports
-from obfsproxy.transports.wfpadtools.const import SCALE
 from obfsproxy.test.transports.wfpadtools import wfpad_tester as wfp
 
 
 class AdaptiveTest(wfp.AdaptiveShimConfig, wfp.PrimitiveTest,
                    unittest.TestCase):
-
     server_args_list = list(wfp.AdaptiveShimConfig.server_args)
     server_args = tuple(server_args_list)
 
