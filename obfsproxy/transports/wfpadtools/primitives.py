@@ -146,7 +146,7 @@ class PaddingPrimitivesInterface(object):
         self.constantRatePaddingDistrib(t)
 
         def stopConditionTotalPadding(self):
-            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
+            to_pad = self.session.numMessages['snd'] if msg_level else self.session.totalBytes['snd']
             total_padding = closest_power_of_two(to_pad)
             log.debug("[wfpad %s] - Computed total padding: %s (to_pad is %s)",
                       self.end, total_padding, to_pad)
@@ -156,14 +156,14 @@ class PaddingPrimitivesInterface(object):
             if s.isVisiting():
                 log.debug("[wfpad %s] - False stop condition, still visiting...", self.end)
                 return False
-            to_pad = s._numMessages['snd'] \
-                if msg_level else s._totalBytes['snd']
-            stopCond = to_pad > 0 and to_pad >= self.totalPadding
+            to_pad = s.session.numMessages['snd'] \
+                if msg_level else s.session.totalBytes['snd']
+            stopCond = to_pad > 0 and to_pad >= self.session.totalPadding
             log.debug("[wfpad %s] - Total pad stop condition is %s."
                       "\n Visiting: %s, Total padding: %s, Num msgs: %s, Total Bytes: %s, "
                       "Num data msgs: %s, Data Bytes: %s, to_pad: %s"
-                      % (self.end, stopCond, self.isVisiting(), self.totalPadding, self._numMessages,
-                         self._totalBytes, self._dataMessages, self._dataBytes, to_pad))
+                      % (self.end, stopCond, self.isVisiting(), self.session.totalPadding, self.session.numMessages,
+                         self.session.totalBytes, self.session.dataMessages, self.session.dataBytes, to_pad))
             return stopCond
 
         self.stopCondition = stopConditionTotalPad
@@ -192,8 +192,8 @@ class PaddingPrimitivesInterface(object):
         self.constantRatePaddingDistrib(t)
 
         def stopConditionPayloadPadding(self):
-            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
-            divisor = self._dataMessages['snd'] if msg_level else self._dataBytes['snd']
+            to_pad = self.session.numMessages['snd'] if msg_level else self.session.totalBytes['snd']
+            divisor = self.session.dataMessages['snd'] if msg_level else self.session.dataBytes['snd']
             k = closest_power_of_two(divisor)
             total_padding = closest_multiple(to_pad, k)
             log.debug("[wfpad %s] - Computed payload padding: %s (to_pad is %s and divisor is %s)"
@@ -204,11 +204,11 @@ class PaddingPrimitivesInterface(object):
             if self.isVisiting():
                 log.debug("[wfpad %s] - False stop condition, still visiting...", self.end)
                 return False
-            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
-            stopCond = to_pad > 0 and to_pad >= self.totalPadding
+            to_pad = self.session.numMessages['snd'] if msg_level else self.session.totalBytes['snd']
+            stopCond = to_pad > 0 and to_pad >= self.session.totalPadding
             log.debug("[wfpad %s] - Payload pad stop condition is %s."
                       "\n Visiting: %s, Total padding: %s, Num msgs: %s, Total Bytes: %s"
-                      % (self.end, stopCond, self.isVisiting(), self.totalPadding, self._numMessages, self._totalBytes))
+                      % (self.end, stopCond, self.isVisiting(), self.session.totalPadding, self.session.numMessages, self.session.totalBytes))
             return stopCond
 
         self.stopCondition = stopConditionPayloadPad
@@ -238,7 +238,7 @@ class PaddingPrimitivesInterface(object):
         self.constantRatePaddingDistrib(t)
 
         def stopConditionBatchPadding(self):
-            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
+            to_pad = self.session.numMessages['snd'] if msg_level else self.session.totalBytes['snd']
             total_padding = closest_multiple(to_pad, L)
             log.debug("[wfpad %s] - Computed batch padding: %s (to_pad is %s)"
                       % (self.end, total_padding, to_pad))
@@ -248,12 +248,12 @@ class PaddingPrimitivesInterface(object):
             if self.isVisiting():
                 log.debug("[wfpad %s] - False stop condition, still visiting...", self.end)
                 return False
-            to_pad = self._numMessages['snd'] if msg_level else self._totalBytes['snd']
-            stopCond = to_pad > 0 and to_pad >= self.totalPadding
+            to_pad = self.session.numMessages['snd'] if msg_level else self.session.totalBytes['snd']
+            stopCond = to_pad > 0 and to_pad >= self.session.totalPadding
             log.debug("[wfpad %s] - Batch pad stop condition is %s."
                       "\n Visiting: %s, Total padding: %s, Num msgs: %s, Total Bytes: %s, L: %s"
                       % (
-                self.end, stopCond, self.isVisiting(), self.totalPadding, self._numMessages, self._totalBytes, L))
+                self.end, stopCond, self.isVisiting(), self.session.totalPadding, self.session.numMessages, self.session.totalBytes, L))
             return stopCond
 
         self.stopCondition = stopConditionBatchPad

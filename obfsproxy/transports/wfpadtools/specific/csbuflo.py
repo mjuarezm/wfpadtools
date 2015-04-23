@@ -157,13 +157,13 @@ class CSBuFLOTransport(WFPadTransport):
         """
         self._sessId = sessId
         self.constantRatePaddingDistrib(t)
-        to_pad = self._numMessages['snd'] if msg_level else self._dataBytes['snd']
+        to_pad = self.session.numMessages['snd'] if msg_level else self.session.dataBytes['snd']
 
         def stopConditionBatchPad(self):
             stopCond = to_pad > 0 and to_pad % L == 0 and not self.isVisiting()
             log.debug("[wfpad] - Batch pad stop condition is %self."
                       "\n Visiting: %self, Num snd msgs: %self, L: %self"
-                      % (stopCond, self.isVisiting(), self._numMessages, L))
+                      % (stopCond, self.isVisiting(), self.session.numMessages, L))
             return stopCond
         self.stopCondition = stopConditionBatchPad
 

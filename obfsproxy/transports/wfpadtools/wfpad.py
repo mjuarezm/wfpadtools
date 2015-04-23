@@ -87,6 +87,7 @@ import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools.common import deferLater
 import obfsproxy.transports.wfpadtools.const as const
 from obfsproxy.transports.wfpadtools.primitives import PaddingPrimitivesInterface
+from obfsproxy.transports.wfpadtools.session import Session
 from obfsproxy.transports.wfpadtools.util import fileutil
 import obfsproxy.transports.wfpadtools.util.testutil as test_ut
 from obfsproxy.transports.wfpadtools import message as mes
@@ -162,6 +163,8 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
 
     def _initialize_state(self):
+        # Initialize session
+        self.session = None
 
         # Initialize length distribution
         self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
@@ -189,6 +192,9 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
         # This method is evaluated to decide when to stop padding
         self.stopCondition = lambda Self: False
+
+        # method to calculate total padding
+        self.calculateTotalPadding = lambda Self: None
 
 
     @classmethod
@@ -287,7 +293,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         connected, or buffer it meanwhile otherwise.
         """
         d = data.read()
-        self._lastRcvUpstreamTs = reactor.seconds()
+        self.session.lastRcvUpstreamTs = reactor.seconds()
 
         if self._state >= const.ST_CONNECTED:
             self.pushData(d)
@@ -323,13 +329,13 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             self.circuit.downstream.write(str(data))
             log.debug("[wfpad - %s] A new message (flag=%s) sent!", self.end, data.flags)
             if not data.flags & const.FLAG_CONTROL:
-                self._numMessages['snd'] += 1
-                self._totalBytes['snd'] += data.totalLen
+                self.session.numMessages['snd'] += 1
+                self.session.totalBytes['snd'] += data.totalLen
                 if data.flags & const.FLAG_DATA:
-                    self._dataMessages['snd'] += 1
-                    self._dataBytes['snd'] += len(data.payload)
+                    self.session.dataMessages['snd'] += 1
+                    self.session.dataBytes['snd'] += len(data.payload)
             if self._session_logs:
-                self._history.append((reactor.seconds(), message.getFlagNames(data.flags), data.totalLen))
+                self.session.history.append((reactor.seconds(), message.getFlagNames(data.flags), data.totalLen))
             return [data]
         elif isinstance(data, list):
             listMsgs = []
@@ -419,7 +425,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             log.debug("[wfpad - %s] Delay buffer flush %s ms delay", self.end, delay)
 
     def elapsedSinceLastMsg(self):
-        elap = reactor.seconds() - self._lastSndDownstreamTs  # @UndefinedVariable
+        elap = reactor.seconds() - self.session.lastSndDownstreamTs  # @UndefinedVariable
         log.debug("[wfpad - %s] Cancel padding. Elapsed = %s ms", self.end, elap)
         return elap
 
@@ -444,7 +450,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             payloadLen = const.MPU if dataLen > const.MPU else dataLen
         msgTotalLen = payloadLen + const.MIN_HDR_LEN
 
-        self._consecPaddingMsgs = 0
+        self.session.consecPaddingMsgs = 0
 
         # If data in buffer fills the specified length, we just
         # encapsulate and send the message.
@@ -460,7 +466,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
         log.debug("[wfpad - %s] Sent data message of length %d.", self.end, msgTotalLen)
 
-        self._lastSndDataDownstreamTs = self._lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
+        self.session.lastSndDataDownstreamTs = self.session.lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
 
         # If buffer is empty, generate padding messages.
         if len(self._buffer) > 0:
@@ -493,12 +499,12 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             log.exception("[wfpad - %s] Exception extracting "
                           "messages from stream: %s", self.end, str(e))
 
-        self._lastRcvDownstreamTs = reactor.seconds()
+        self.session.lastRcvDownstreamTs = reactor.seconds()
         for msg in msgs:
             log.debug("[wfpad - %s] A new message has been parsed!", self.end)
             msg.rcvTime = time.clock()
             if self._session_logs:
-                self._history.append((reactor.seconds(), message.getFlagNames(msg.flags), -1 * msg.totalLen))
+                self.session.history.append((reactor.seconds(), message.getFlagNames(msg.flags), -1 * msg.totalLen))
             if msg.flags & const.FLAG_CONTROL:
                 # Process control messages
                 payload = msg.payload
@@ -507,8 +513,8 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 self.receiveControlMessage(msg.opcode, msg.args)
             else:
                 self.deferBurstPadding('rcv')
-                self._numMessages['rcv'] += 1
-                self._totalBytes['rcv'] += msg.totalLen
+                self.session.numMessages['rcv'] += 1
+                self.session.totalBytes['rcv'] += msg.totalLen
 
                 # Filter padding messages out.
                 if msg.flags & const.FLAG_PADDING:
@@ -517,10 +523,10 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 # Forward data to the application.
                 elif msg.flags & const.FLAG_DATA:
                     log.debug("[wfpad - %s] Data flag detected, relaying upstream", self.end)
-                    self._dataBytes['rcv'] += len(msg.payload)
-                    self._dataMessages['rcv'] += 1
+                    self.session.dataBytes['rcv'] += len(msg.payload)
+                    self.session.dataMessages['rcv'] += 1
                     self.circuit.upstream.write(msg.payload)
-                    self._lastRcvDataDownstreamTs = reactor.seconds()
+                    self.session.lastRcvDataDownstreamTs = reactor.seconds()
 
                 # Otherwise, flag not recognized
                 else:
@@ -543,8 +549,8 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
     def is_channel_idle(self):
         """Return boolean on whether there has passed too much time without communication."""
-        is_idle_up = reactor.seconds() - self._lastSndDataDownstreamTs > const.MAX_LAST_DATA_TIME
-        is_idle_down = reactor.seconds() - self._lastSndDataDownstreamTs > const.MAX_LAST_DATA_TIME
+        is_idle_up = reactor.seconds() - self.session.lastSndDataDownstreamTs > const.MAX_LAST_DATA_TIME
+        is_idle_down = reactor.seconds() - self.session.lastSndDataDownstreamTs > const.MAX_LAST_DATA_TIME
         return is_idle_up and is_idle_down
 
     def timeout(self, when):
@@ -561,14 +567,14 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 self.sendControlMessage(const.OP_APP_HINT,
                                         [self.getSessId(), False])
                 return
-        if self._is_padding and self.stopCondition(self):
+        if self.session.is_padding and self.stopCondition(self):
             log.debug("[wfpad - %s] -  Padding was stopped!!", self.end)
             self.onEndPadding()
             return
         self.sendIgnore()
         if when is 'snd':
-            self._consecPaddingMsgs += 1
-            self._lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
+            self.session.consecPaddingMsgs += 1
+            self.session.lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
         delay = self._gapHistoProbdist[when].randomSample()
         if delay is const.INF_LABEL:
             return
@@ -616,24 +622,25 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         To be extended at child classes that implement
         final website fingerprinting countermeasures.
         """
+        self.session = Session()
         if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT,
                                     [self.getSessId(), True])
         else:
             self._sessId = sessId
             self._visiting = True
-        self._is_padding = True
+        self.session.is_padding = True
         log.info("[wfpad - %s] - Session has started!(sessid = %s)", self.end, sessId)
 
     def dump_session_history(self, sessId):
-        # dump history
+        # dump history TODO: remove!!
         csv_file = join(self._session_logs, "{}.csv".format(sessId))
         if isfile(csv_file):
             fileutil.removefile(csv_file)
         with open(csv_file, "w+") as f:
-            for p in self._history:
+            for p in self.session.history:
                 f.write(";".join(map(str, p)) + "\n")
-        self._history = []
+        self.session.history = []
 
     def onSessionEnds(self, sessId):
         """Send hint for session end.
@@ -651,24 +658,11 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         else:
             self._visiting = False
 
-        self.totalPadding = self.calculateTotalPadding(self)
+        self.session.totalPadding = self.calculateTotalPadding(self)
         log.info("[wfpad - %s] - Session has ended! (sessid = %s)", self.end, sessId)
 
     def onEndPadding(self):
-        self._is_padding = False
-
-        # Restart statistics
-        # self._dataBytes = {'rcv': 0, 'snd': 0}
-        # self._totalBytes = {'rcv': 0, 'snd': 0}
-        # self._numMessages = {'rcv': 0, 'snd': 0}
-        #
-        # self._lastSndDownstreamTs = 0
-        # self._lastSndDataDownstreamTs = 0
-        #         self._lastRcvDownstreamTs = 0
-        #         self._lastRcvDataDownstreamTs = 0
-        #         self._lastRcvUpstreamTs = 0
-        #         self._consecPaddingMsgs = 0
-        #         self._sentDataBytes = 0
+        self.session.is_padding = False
 
         # Notify shim observers
         if self.weAreClient and self._shim:
@@ -679,6 +673,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.cancelDeferrers('rcv')
 
         # Make sure distributions are reset
+        # TODO: review this
         self.noPaddingDistrib()
 
     def getSessId(self):

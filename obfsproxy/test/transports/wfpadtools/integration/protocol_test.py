@@ -25,8 +25,8 @@ class TestReceivedBytes(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
         # to bytes of string and bytes of padding.
 
         # Test that server num snt msgs is equal to client num rcv msgs
-        obs_cl_rcv_msgs = self.clientState["_numMessages"]['rcv']
-        obs_sv_snd_msgs = self.serverState["_numMessages"]['snd']
+        obs_cl_rcv_msgs = self.clientState["session"].numMessages['rcv']
+        obs_sv_snd_msgs = self.serverState["session"].numMessages['snd']
         log.debug("Srv_snd_msgs = %s, Clt_rcv_msgs = %s",
                   obs_sv_snd_msgs, obs_cl_rcv_msgs)
         self.assertEqual(obs_cl_rcv_msgs, obs_sv_snd_msgs,
@@ -35,8 +35,8 @@ class TestReceivedBytes(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
                          % (obs_sv_snd_msgs, obs_cl_rcv_msgs))
 
         # Test sent and received TOTAL are equal
-        obs_cl_rcv_total_bytes = self.clientState["_totalBytes"]['rcv']
-        obs_sv_snd_total_bytes = self.serverState["_totalBytes"]['snd']
+        obs_cl_rcv_total_bytes = self.clientState["session"].totalBytes['rcv']
+        obs_sv_snd_total_bytes = self.serverState["session"].totalBytes['snd']
         log.debug("Srv_snd_total_bytes = %s, Clt_rcv_total_bytes = %s",
                   obs_sv_snd_total_bytes, obs_cl_rcv_total_bytes)
         self.assertEqual(obs_cl_rcv_total_bytes, obs_sv_snd_total_bytes,
@@ -45,8 +45,8 @@ class TestReceivedBytes(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
                          % (obs_sv_snd_total_bytes, obs_cl_rcv_total_bytes))
 
         # Test sent and received DATA are equal
-        obs_cl_rcv_data_bytes = self.clientState["_dataBytes"]['rcv']
-        obs_sv_snd_data_bytes = self.serverState["_dataBytes"]['snd']
+        obs_cl_rcv_data_bytes = self.clientState["session"].dataBytes['rcv']
+        obs_sv_snd_data_bytes = self.serverState["session"].dataBytes['snd']
         log.debug("Srv_snd_data_bytes = %s, Clt_rcv_data_bytes = %s",
                   obs_sv_snd_data_bytes, obs_cl_rcv_data_bytes)
         self.assertEqual(obs_cl_rcv_data_bytes, obs_sv_snd_data_bytes,
