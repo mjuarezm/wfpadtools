@@ -20,9 +20,11 @@ class CSBuFLOTest(wfp.CSBuFLOShimConfig, wfp.PrimitiveTest,
         sleep(0.1)
         self.send_to_server(self.DATA_STR)
 
+    @unittest.skip("for now")
     def test_payload_padding(self):
         pass
 
+    @unittest.skip("for now")
     def test_total_padding(self):
         pass
 

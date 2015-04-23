@@ -18,6 +18,7 @@ class TestBuFLOStopPadding(wfp.BuFLOShimConfig, wfp.PrimitiveTest,
         # Trigger padding
         self.send_to_server(self.DATA_STR)
 
+    @unittest.skip("for now")
     def test_stop_after_mintime(self):
         padding_msgs = self.padding_msgs(self.clientMsgs)
         assert (len(padding_msgs) > 2)

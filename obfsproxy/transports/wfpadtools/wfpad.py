@@ -159,7 +159,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self._initialize_state()
 
 
-    def __initialize_state(self):
+    def _initialize_state(self):
         # TODO: Define classes for all these variables
         log.debug("[wfpad %s] Initializing %s (id=%s).",
                   self.end, const.TRANSPORT_NAME, str(id(self)))
