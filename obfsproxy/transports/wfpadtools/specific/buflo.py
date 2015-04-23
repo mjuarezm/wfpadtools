@@ -33,8 +33,8 @@ class BuFLOTransport(WFPadTransport):
         # elapsed time has exceeded the minimum padding time.
         def stopConditionHandler(s):
             elapsed = s.getElapsed()
-            log.debug("[BuFLO] - elapsed = {}, mintime = {}, visiting = {}"
-                      .format(elapsed, s._mintime, s.isVisiting()))
+            log.debug("[buflo {}] - elapsed = {}, mintime = {}, visiting = {}"
+                      .format(self.end, elapsed, s._mintime, s.isVisiting()))
             return elapsed > s._mintime and not s.isVisiting()
         self.stopCondition = stopConditionHandler
 
@@ -92,8 +92,8 @@ class BuFLOTransport(WFPadTransport):
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
         self._startTime = time.time()
-        log.debug("[buflo] - params: mintime={}, period={}, psize={}"
-                  .format(self._mintime, self._period, self._length))
+        log.debug("[buflo {}] - params: mintime={}, period={}, psize={}"
+                  .format(self.end, self._mintime, self._period, self._length))
         self.constantRatePaddingDistrib(self._period)
 
 
