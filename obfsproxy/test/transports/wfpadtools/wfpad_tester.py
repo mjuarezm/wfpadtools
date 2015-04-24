@@ -383,11 +383,12 @@ class PadPrimitiveTest(PrimitiveTest):
     DURING_SESSION_TIME = 0
     BEFORE_SESSION_END_TIME = 1
 
-    def doWhileSession(self):
+    def doBeforeSessionStarts(self):
         self.send_instruction(const.OP_SEND_PADDING, [self.junk_msgs, 0])
         for _ in xrange(self.real_msgs):
             self.send_to_server(self.DATA_STR)
 
+    def doWhileSession(self):
         self.send_instruction(self.opcode, self.args)
 
     def doAfterSessionEnds(self):
@@ -405,6 +406,10 @@ class PadPrimitiveTest(PrimitiveTest):
     def total_msgs(self):
         return self.data_msgs() + self.junk_msgs
 
+    # TODO: need to find a better way to test padding primitives.
+    # I should not record messages before the session has started.
+    # To tackle this issue we will focus on the twisted.primitives_test.py
+    @unittest.skip("Deprecated in favour of ../twisted.primitives_test.py.")
     def test_padding(self):
         total_pad = self.total_pad()
         observed_padding = self.get_units(len(self.clientMsgs))

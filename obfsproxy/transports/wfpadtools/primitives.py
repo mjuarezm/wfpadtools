@@ -1,3 +1,4 @@
+from twisted.internet import defer
 from obfsproxy.transports.wfpadtools.common import deferLater
 import obfsproxy.transports.wfpadtools.histo as hist
 from obfsproxy.transports.wfpadtools.util.mathutil import closest_power_of_two, \
@@ -29,8 +30,7 @@ class PaddingPrimitivesInterface(object):
         deferreds = []
         for _ in xrange(N):
             deferreds.append(deferLater(millisec, self.sendIgnore))
-        return deferreds
-
+        return defer.DeferredList(deferreds, consumeErrors=True)
 
     def relayAppHint(self, sessId, status):
         """A hint from the application layer for session start/end.

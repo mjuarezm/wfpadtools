@@ -48,7 +48,7 @@ class TestSendPadding(wt.WFPadShimConfig, wt.SendControlMessageTest,
 class PayloadPadTest(wt.PadPrimitiveTest):
     opcode = const.OP_PAYLOAD_PAD
 
-    real_msgs = 10
+    real_msgs = 5
     junk_msgs = 3
 
     AFTER_SESSION_TIME = AFTER_SESSION_TIME_PRIMITIVE
