@@ -668,6 +668,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
         # Notify shim observers
         if self.weAreClient and self._shim:
+            log.info("[wfpad - %s] - Padding stopped!", self.end)
             self._shim.notifyEndPadding()
 
         # Cancel deferers
