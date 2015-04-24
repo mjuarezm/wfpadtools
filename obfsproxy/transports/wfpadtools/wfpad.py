@@ -631,7 +631,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         else:
             self._sessId = sessId
             self._visiting = True
-        self.session.is_padding = True
         log.info("[wfpad - %s] - Session has started!(sessid = %s)", self.end, sessId)
 
     def dump_session_history(self, sessId):
@@ -656,6 +655,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             if self._session_logs:
                 self.dump_session_history(sessId)
             if self._shim:
+                self.session.is_padding = True
                 self._shim.notifyStartPadding()  # padding the tail of the page
         else:
             self._visiting = False
