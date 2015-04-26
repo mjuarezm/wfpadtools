@@ -562,13 +562,13 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         We call this method again in case we don't receive data after the
         delay.
         """
-        if self.weAreClient:
-            if self.is_channel_idle():
-                log.info("[wfpad - %s] - Channel has been idle more than %s ms,"
-                         "flag end of session", self.end, const.MAX_LAST_DATA_TIME)
-                self.sendControlMessage(const.OP_APP_HINT,
-                                        [self.getSessId(), False])
-                return
+        # if self.weAreClient:
+        #     if self.is_channel_idle():
+        #         log.info("[wfpad - %s] - Channel has been idle more than %s ms,"
+        #                  "flag end of session", self.end, const.MAX_LAST_DATA_TIME)
+        #         self.sendControlMessage(const.OP_APP_HINT,
+        #                                 [self.getSessId(), False])
+        #         return
         if self.session.is_padding and self.stopCondition(self):
             log.debug("[wfpad - %s] -  Padding was stopped!!", self.end)
             self.onEndPadding()
@@ -665,6 +665,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.session.is_padding = False
         # Notify shim observers
         if self.weAreClient and self._shim:
+            log.info("[wfpad - %s] - Padding stopped!", self.end)
             self._shim.notifyEndPadding()
         # Cancel deferers
         self.cancelDeferrers('snd')

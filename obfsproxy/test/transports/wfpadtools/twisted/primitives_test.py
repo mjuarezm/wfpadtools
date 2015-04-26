@@ -118,7 +118,6 @@ class WFPadTransportTestCase(PrimitiveTestCase, unittest.TestCase):
         # assert server state should be the one of a started session
         def assert_start_session():
             self.assertTrue(self.pt_server._visiting)
-            self.assertTrue(self.pt_server.session.is_padding)
             # TODO: what else?
 
         return self._run_primitive_and_assert('relayAppHint',
