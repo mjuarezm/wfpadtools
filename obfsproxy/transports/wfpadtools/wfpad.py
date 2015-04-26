@@ -649,6 +649,9 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         Interface to be extended at child classes that implement
         final website fingerprinting countermeasures.
         """
+        if len(self._buffer) > 0:  # don't end the session until the buffer is empty
+            reactor.callLater(self.onSessionEnds, sessId)
+            return
         self.session.is_padding = True
         if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT,
