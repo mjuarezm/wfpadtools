@@ -659,24 +659,18 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 self._shim.notifyStartPadding()  # padding the tail of the page
         else:
             self._visiting = False
-
-        self.session.totalPadding = self.calculateTotalPadding(self)
         log.info("[wfpad - %s] - Session has ended! (sessid = %s)", self.end, sessId)
 
     def onEndPadding(self):
         self.session.is_padding = False
-
         # Notify shim observers
         if self.weAreClient and self._shim:
             self._shim.notifyEndPadding()
-
         # Cancel deferers
         self.cancelDeferrers('snd')
         self.cancelDeferrers('rcv')
-
-        # Make sure distributions are reset
-        # TODO: review this
-        self.noPaddingDistrib()
+        self.session.totalPadding = self.calculateTotalPadding(self)
+        log.info("[wfpad - %s] - Total padding: %s", self.end, self.session.totalPadding)
 
     def getSessId(self):
         """Return current session Id."""
