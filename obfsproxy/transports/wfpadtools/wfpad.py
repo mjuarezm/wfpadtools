@@ -650,7 +650,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         final website fingerprinting countermeasures.
         """
         if len(self._buffer) > 0:  # don't end the session until the buffer is empty
-            reactor.callLater(self.onSessionEnds, sessId)
+            reactor.callLater(1, self.onSessionEnds, sessId)
             return
         self.session.is_padding = True
         if self.weAreClient:
