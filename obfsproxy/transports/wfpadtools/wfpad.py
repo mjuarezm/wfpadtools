@@ -649,13 +649,13 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         Interface to be extended at child classes that implement
         final website fingerprinting countermeasures.
         """
+        self.session.is_padding = True
         if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT,
                                     [self.getSessId(), False])
             if self._session_logs:
                 self.dump_session_history(sessId)
             if self._shim:
-                self.session.is_padding = True
                 self._shim.notifyStartPadding()  # padding the tail of the page
         else:
             self._visiting = False
