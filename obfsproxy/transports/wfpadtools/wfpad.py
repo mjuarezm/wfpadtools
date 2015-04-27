@@ -560,7 +560,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         delay.
         """
         if self.session.is_padding and self.stopCondition(self) and not self.session.is_server_padding:
-            log.debug("[wfpad - %s] -  Padding was stopped!!", self.end)
             self.onEndPadding()
             return
         self.sendIgnore()
@@ -667,7 +666,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.session.is_padding = False
         # Notify shim observers
         if self.weAreClient and self._shim:
-            if not self.session.is_server_padding:
+            if self.session.is_server_padding:
                 reactor.callLater(0.5, self.onEndPadding)
                 return
             self.session.is_server_padding = False
