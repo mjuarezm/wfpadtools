@@ -374,12 +374,9 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                   " and %s bytes padding", self.end, len(payload), paddingLen)
         self.sendDownstream(self._msgFactory.new(payload, paddingLen))
 
-    def sendControlMessage(self, opcode, args):
+    def sendControlMessage(self, opcode, args=""):
         """Send control message."""
-        if self.weAreServer:
-            raise Exception("[wfpad - %s] Server cannot send control messages.", self.end)
-        log.debug("[wfpad - %s] Sending control message: opcode=%s, args=%s."
-                  % (self.end, opcode, args))
+        log.debug("[wfpad - %s] Sending control message: opcode=%s, args=%s." % (self.end, opcode, args))
         self.sendDownstream(self._msgFactory.encapsulate("", opcode, args,
                                                          lenProbdist=self._lengthDataProbdist))
 
@@ -562,14 +559,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         We call this method again in case we don't receive data after the
         delay.
         """
-        # if self.weAreClient:
-        #     if self.is_channel_idle():
-        #         log.info("[wfpad - %s] - Channel has been idle more than %s ms,"
-        #                  "flag end of session", self.end, const.MAX_LAST_DATA_TIME)
-        #         self.sendControlMessage(const.OP_APP_HINT,
-        #                                 [self.getSessId(), False])
-        #         return
-        if self.session.is_padding and self.stopCondition(self):
+        if self.session.is_padding and self.stopCondition(self) and not self.session.is_server_padding:
             log.debug("[wfpad - %s] -  Padding was stopped!!", self.end)
             self.onEndPadding()
             return
@@ -626,11 +616,19 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         """
         self.session = Session()
         if self.weAreClient:
-            self.sendControlMessage(const.OP_APP_HINT,
-                                    [self.getSessId(), True])
+            self.sendControlMessage(const.OP_APP_HINT, [self.getSessId(), True])
         else:
             self._sessId = sessId
             self._visiting = True
+
+        # We defer flush of buffer
+        # Since flush is likely to be empty because we just started the session,
+        # we will start padding.
+        delay = self._delayDataProbdist.randomSample()
+        if not self._deferData or (self._deferData and self._deferData.called):
+            self._deferData = deferLater(delay, self.flushBuffer)
+            log.debug("[wfpad - %s] Delay buffer flush %s ms delay", self.end, delay)
+
         log.info("[wfpad - %s] - Session has started!(sessid = %s)", self.end, sessId)
 
     def dump_session_history(self, sessId):
@@ -650,10 +648,11 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         final website fingerprinting countermeasures.
         """
         if len(self._buffer) > 0:  # don't end the session until the buffer is empty
-            reactor.callLater(1, self.onSessionEnds, sessId)
+            reactor.callLater(0.5, self.onSessionEnds, sessId)
             return
         self.session.is_padding = True
         if self.weAreClient:
+            self.session.is_server_padding = True
             self.sendControlMessage(const.OP_APP_HINT,
                                     [self.getSessId(), False])
             if self._session_logs:
@@ -668,8 +667,17 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.session.is_padding = False
         # Notify shim observers
         if self.weAreClient and self._shim:
+            if not self.session.is_server_padding:
+                reactor.callLater(0.5, self.onEndPadding)
+                return
+            self.session.is_server_padding = False
             log.info("[wfpad - %s] - Padding stopped!", self.end)
             self._shim.notifyEndPadding()
+        else:
+            # Notify the client we have ended with padding
+            log.info("[wfpad - %s] - Padding stopped! Will notify client.", self.end)
+            self.sendControlMessage(const.OP_END_PADDING)
+
         # Cancel deferers
         self.cancelDeferrers('snd')
         self.cancelDeferrers('rcv')
@@ -690,41 +698,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             return self._sessionObserver._visiting
         elif self.weAreServer:
             return self._visiting
-
-    # ==========================================================================
-    # Deal with control messages
-    # ==========================================================================
-    def receiveControlMessage(self, opcode, args=None):
-        """Do operation indicated by the _opcode."""
-        log.debug("[wfpad - %s] Received control message with opcode %s and args: %s",
-                  self.end, mes.getOpcodeNames(opcode), args)
-
-        if self.weAreClient:
-            raise Exception("Client cannot receive control messages.")
-
-        # Generic primitives
-        if opcode == const.OP_SEND_PADDING:
-            self.relaySendPadding(*args)
-        elif opcode == const.OP_APP_HINT:
-            self.relayAppHint(*args)
-
-        # Adaptive padding primitives
-        elif opcode == const.OP_BURST_HISTO:
-            self.relayBurstHistogram(*args)
-        elif opcode == const.OP_GAP_HISTO:
-            self.relayGapHistogram(*args)
-
-        # CS-BuFLO primitives
-        elif opcode == const.OP_TOTAL_PAD:
-            self.relayTotalPad(*args)
-        elif opcode == const.OP_PAYLOAD_PAD:
-            self.relayPayloadPad(*args)
-
-        # Tamaraw primitives
-        elif opcode == const.OP_BATCH_PAD:
-            self.relayBatchPad(*args)
-        else:
-            log.error("[wfpad - %s] - The received opcode is not recognized.", self.end)
 
 
 class WFPadClient(WFPadTransport):

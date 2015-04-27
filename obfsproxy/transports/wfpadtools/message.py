@@ -188,6 +188,8 @@ def getOpcodeNames(opcode):
     """
     if opcode == const.OP_SEND_PADDING:
         return "RELAY SEND_PADDING"
+    elif opcode == const.OP_END_PADDING:
+        return "RELAY END_PADDING"
     elif opcode == const.OP_APP_HINT:
         return "RELAY APP_HINT"
     elif opcode == const.OP_BURST_HISTO:
@@ -241,6 +243,7 @@ def isOpCodeSane(opcode):
 
     validOpCodes = [
         const.OP_APP_HINT,
+        const.OP_END_PADDING,
         const.OP_BATCH_PAD,
         const.OP_BURST_HISTO,
         const.OP_GAP_HISTO,

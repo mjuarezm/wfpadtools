@@ -30,3 +30,6 @@ class Session(object):
 
         # Padding after end of session
         self.totalPadding = 0
+
+        # Flag server end of padding
+        self.is_server_padding = False

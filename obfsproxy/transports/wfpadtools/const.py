@@ -40,13 +40,14 @@ TOTAL_PADDING           = 'total'
 
 # Opcodes
 OP_SEND_PADDING         = 1
-OP_APP_HINT             = 2
-OP_BURST_HISTO          = 3
-OP_GAP_HISTO            = 4
-OP_INJECT_HISTO         = 5
-OP_TOTAL_PAD            = 6
-OP_PAYLOAD_PAD          = 7
-OP_BATCH_PAD            = 8
+OP_END_PADDING          = 2
+OP_APP_HINT             = 3
+OP_BURST_HISTO          = 4
+OP_GAP_HISTO            = 5
+OP_INJECT_HISTO         = 6
+OP_TOTAL_PAD            = 7
+OP_PAYLOAD_PAD          = 8
+OP_BATCH_PAD            = 9
 
 # WFPad message structure fields's constants
 TOTLENGTH_POS           = 0

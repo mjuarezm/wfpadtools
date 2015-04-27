@@ -1,6 +1,8 @@
 from twisted.internet import defer
 from obfsproxy.transports.wfpadtools.common import deferLater
 import obfsproxy.transports.wfpadtools.histo as hist
+from obfsproxy.transports.wfpadtools import const
+from obfsproxy.transports.wfpadtools import message as mes
 from obfsproxy.transports.wfpadtools.util.mathutil import closest_power_of_two, \
     closest_multiple
 
@@ -16,6 +18,43 @@ class PaddingPrimitivesInterface(object):
     See:
     gitweb.torproject.org/user/mikeperry/torspec.git/blob/refs/heads/multihop-padding-primitives:/proposals/ideas/xxx-multihop-padding-primitives.txt
     """
+    def receiveControlMessage(self, opcode, args=None):
+        """Do operation indicated by the _opcode."""
+        log.debug("[wfpad - %s] Received control message with opcode %s and args: %s",
+                  self.end, mes.getOpcodeNames(opcode), args)
+
+        if self.weAreServer:
+            # Generic primitives
+            if opcode == const.OP_SEND_PADDING:
+                self.relaySendPadding(*args)
+            elif opcode == const.OP_APP_HINT:
+                self.relayAppHint(*args)
+
+            # Adaptive padding primitives
+            elif opcode == const.OP_BURST_HISTO:
+                self.relayBurstHistogram(*args)
+            elif opcode == const.OP_GAP_HISTO:
+                self.relayGapHistogram(*args)
+
+            # CS-BuFLO primitives
+            elif opcode == const.OP_TOTAL_PAD:
+                self.relayTotalPad(*args)
+            elif opcode == const.OP_PAYLOAD_PAD:
+                self.relayPayloadPad(*args)
+
+            # Tamaraw primitives
+            elif opcode == const.OP_BATCH_PAD:
+                self.relayBatchPad(*args)
+            else:
+                Exception("Client cannot receive control messages with opcode %s." % opcode)
+
+        else:
+            # client can only receive from server an end of padding control message
+            if opcode == const.OP_END_PADDING:
+                self.relayEndPadding(*args)
+            else:
+                Exception("Server cannot receive control messages with opcode %s." % opcode)
+
     def relaySendPadding(self, N, t):
         """Send the requested number of padding cells in response.
 
@@ -49,6 +88,9 @@ class PaddingPrimitivesInterface(object):
         else:
             self.onSessionEnds(sessId)
 
+    def relayEndPadding(self):
+        """Message sent by the server to the client to flag end of padding."""
+        self.session.is_server_padding = False
 
     def relayBurstHistogram(self, histo, labels, removeToks=False,
                             interpolate=True, when="rcv"):
