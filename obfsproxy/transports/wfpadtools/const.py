@@ -76,7 +76,8 @@ PSIZE                   = 600
 
 # Header length
 MIN_HDR_LEN             = TOTLENGTH_LEN + PAYLOAD_LEN + FLAGS_LEN
-HDR_CTRL_LEN            = MIN_HDR_LEN + CONTROL_LEN + ARGS_TOTAL_LENGTH_LEN
+CTRL_FIELDS_LEN         = CONTROL_LEN + ARGS_TOTAL_LENGTH_LEN
+HDR_CTRL_LEN            = MIN_HDR_LEN + CTRL_FIELDS_LEN
 
 # Maximum payload unit of a WFPad message in bytes
 MPU                     = MTU - MIN_HDR_LEN

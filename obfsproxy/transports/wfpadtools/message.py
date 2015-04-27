@@ -101,8 +101,8 @@ class WFPadMessageFactory(object):
         if probDist:
             payloadLen = probDist.randomSample()
             if payloadLen is not const.INF_LABEL:
-                return payloadLen
-        return const.MPU_CTRL if flags & const.FLAG_CONTROL > 0 else const.MPU
+                return payloadLen - const.CTRL_FIELDS_LEN
+        return const.MPU_CTRL if flags & const.FLAG_CONTROL else const.MPU
 
     def encapsulate(self, data="", opcode=None, args="", lenProbdist=None):
         """Wrap data into WFPad protocol messages."""
@@ -138,12 +138,10 @@ class WFPadMessageFactory(object):
         strArgs = json.dumps(args)
 
         while len(strArgs) > 0:
-            payloadLen = self.getSamplePayloadLength(lenProbdist,
-                                                     const.FLAG_CONTROL)
+            payloadLen = self.getSamplePayloadLength(lenProbdist, const.FLAG_CONTROL)
             argsLen = len(strArgs)
             if argsLen > payloadLen:
-                messages.append(self.newControl(opcode, strArgs[:payloadLen],
-                                                "", 0))
+                messages.append(self.newControl(opcode, strArgs[:payloadLen], "", 0))
             else:
                 maxPiggyLen = payloadLen - argsLen
                 dataLen = len(data)
