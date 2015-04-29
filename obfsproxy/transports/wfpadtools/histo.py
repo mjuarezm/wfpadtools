@@ -3,7 +3,7 @@ The class Histo provides an interface to generate and sample probability
 distributions represented as histograms.
 """
 import random
-from bisect import bisect_right
+from bisect import bisect_right, bisect_left
 from random import randint
 
 # WFPadTools imports
@@ -60,7 +60,10 @@ class Histogram:
         is truncated up to the 3rd decimal position with for example round(x_i, 3).
         """
         self.hist = hist
+        # store labels in a list for fast search over keys
         self.labels = sorted(self.hist.keys())
+        if const.INF_LABEL in self.labels:
+            self.labels = self.labels[1:] + self.labels[:1]
         self.n = len(self.labels)
         self.template_sum = sum(self.hist.values())
         self.sum_counts = self.template_sum
@@ -70,7 +73,7 @@ class Histogram:
 
     def getLabelFromFloat(self, f):
         """Return the label for the interval to which `f` belongs."""
-        return bisect_right(self.labels, f, hi=self.n-1)
+        return self.labels[bisect_left(self.labels, f, hi=self.n-1)]
 
     def removeToken(self, f):
         # TODO: move the if below to the calls to the function `removeToken`
@@ -79,8 +82,10 @@ class Histogram:
             pos_counts = [l for l in self.labels if self.hist[l] > 0]
             # else remove tokens from label or the next non-empty label on the left
             # if there is none, continue removing tokens on the right.
-            i = bisect_right(pos_counts, label, hi=len(pos_counts)-1) - 1
-            self.hist[pos_counts[i] if i >= 0 else pos_counts[0]] -= 1
+            if label not in pos_counts:
+                i = bisect_right(pos_counts, label, hi=len(pos_counts)-1)
+                label = pos_counts[i]
+            self.hist[label] -= 1
             self.sum_counts -= 1
             # if histogram is empty, refill the histogram
             if self.sum_counts == 0:
