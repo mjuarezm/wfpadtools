@@ -35,6 +35,10 @@ def deferLater(*args, **kargs):
     return d
 
 
+def cast_dictionary_to_type(d, t):
+    return {t(k): v for k, v in d.iteritems()}
+
+
 def bytes_after_total_padding(total_bytes, psize=1):
     """Return the total bytes transmitted after 'total' padding."""
     n2 = closest_power_of_two(total_bytes)

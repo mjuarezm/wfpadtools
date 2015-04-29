@@ -1,5 +1,5 @@
 from twisted.internet import defer
-from obfsproxy.transports.wfpadtools.common import deferLater
+from obfsproxy.transports.wfpadtools.common import deferLater, cast_dictionary_to_type
 import obfsproxy.transports.wfpadtools.histo as hist
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools import message as mes
@@ -125,6 +125,7 @@ class PaddingPrimitivesInterface(object):
             arrives from upstream. In both cases, the padding packet is
             sent in the direction of the client.
         """
+        histo = cast_dictionary_to_type(histo, float)
         self._burstHistoProbdist[when] = hist.new(histo,
                                                   interpolate=bool(interpolate),
                                                   removeTokens=bool(removeTokens))
@@ -164,6 +165,7 @@ class PaddingPrimitivesInterface(object):
             BURST_HISTOGRAM initiated padding into GAP_HISTOGRAM initiated
             padding.
         """
+        histo = cast_dictionary_to_type(histo, float)
         self._gapHistoProbdist[when] = hist.new(histo,
                                                 interpolate=bool(interpolate),
                                                 removeTokens=bool(removeTokens))
