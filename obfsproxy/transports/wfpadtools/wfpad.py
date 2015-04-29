@@ -81,7 +81,7 @@ import time
 import psutil
 from twisted.internet import reactor
 
-from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.wfpadtools import histo
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools.common import deferLater
@@ -167,16 +167,16 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.session = Session()
 
         # Initialize length distribution
-        self._lengthDataProbdist = probdist.uniform(const.INF_LABEL)
+        self._lengthDataProbdist = histo.uniform(const.INF_LABEL)
 
         # Initialize delay distributions (for data and gap/burst padding)
         # By default we don't insert any dummy message and the delay for
         # data messages is always zero
-        self._delayDataProbdist = probdist.uniform(0)
-        self._burstHistoProbdist = {'rcv': probdist.uniform(const.INF_LABEL),
-                                    'snd': probdist.uniform(const.INF_LABEL)}
-        self._gapHistoProbdist = {'rcv': probdist.uniform(const.INF_LABEL),
-                                  'snd': probdist.uniform(const.INF_LABEL)}
+        self._delayDataProbdist = histo.uniform(0)
+        self._burstHistoProbdist = {'rcv': histo.uniform(const.INF_LABEL),
+                                    'snd': histo.uniform(const.INF_LABEL)}
+        self._gapHistoProbdist = {'rcv': histo.uniform(const.INF_LABEL),
+                                  'snd': histo.uniform(const.INF_LABEL)}
 
         # Initialize deferred events. The deferreds are called with the delay
         # sampled from the probability distributions above
@@ -577,16 +577,16 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         return delay
 
     def constantRatePaddingDistrib(self, t):
-        self._delayDataProbdist = probdist.uniform(t)
-        self._burstHistoProbdist['snd'] = probdist.uniform(t)
-        self._gapHistoProbdist['snd'] = probdist.uniform(t)
+        self._delayDataProbdist = histo.uniform(t)
+        self._burstHistoProbdist['snd'] = histo.uniform(t)
+        self._gapHistoProbdist['snd'] = histo.uniform(t)
 
     def noPaddingDistrib(self):
-        self._delayDataProbdist = probdist.uniform(0)
-        self._burstHistoProbdist = {'rcv': probdist.uniform(const.INF_LABEL),
-                                    'snd': probdist.uniform(const.INF_LABEL)}
-        self._gapHistoProbdist = {'rcv': probdist.uniform(const.INF_LABEL),
-                                  'snd': probdist.uniform(const.INF_LABEL)}
+        self._delayDataProbdist = histo.uniform(0)
+        self._burstHistoProbdist = {'rcv': histo.uniform(const.INF_LABEL),
+                                    'snd': histo.uniform(const.INF_LABEL)}
+        self._gapHistoProbdist = {'rcv': histo.uniform(const.INF_LABEL),
+                                  'snd': histo.uniform(const.INF_LABEL)}
 
     def cancelDeferrer(self, d):
         """Cancel padding deferrer."""

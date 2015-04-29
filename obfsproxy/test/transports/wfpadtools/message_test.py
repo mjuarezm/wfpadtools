@@ -4,7 +4,7 @@ import unittest
 # WFPadTools imports
 import obfsproxy.transports.wfpadtools.message as msg
 from obfsproxy.transports.wfpadtools import const
-from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.wfpadtools import histo
 
 
 class WFPadMessageFactoryTest(unittest.TestCase):
@@ -45,9 +45,9 @@ class WFPadMessageFactoryTest(unittest.TestCase):
 
     def test_uniform_length(self):
         # Test payload is padded to specified length
-        testData = "foo padded to MPU"
+        testData = "a message padded to MPU"
         dataMsgs = self.msgFactory.encapsulate(data=testData,
-                                               lenProbdist=probdist.uniform(const.MPU))
+                                               lenProbdist=histo.uniform(const.MPU))
         self.assertEqual(len(dataMsgs), 1,
                          "More than one message for control without args "
                          "was created.")
@@ -58,6 +58,20 @@ class WFPadMessageFactoryTest(unittest.TestCase):
                          "Observed length (%s) and "
                          "expected length (%s) do not match"
                          % (obsLength, expLength))
+
+    def test_control_and_data_have_same_length(self):
+        testData = "a message padded to MPU"
+        dataMsgs = self.msgFactory.encapsulate(data=testData,
+                                               lenProbdist=histo.uniform(const.MPU))
+        ctrlMsgs = self.msgFactory.encapsulate(data=testData, opcode=const.OP_APP_HINT,
+                                              lenProbdist=histo.uniform(const.MPU))
+
+        dataMsg, ctrlMsg = dataMsgs[0], ctrlMsgs[0]
+        self.assertTrue(len(dataMsg) == len(ctrlMsg) == const.MTU,
+                        msg="The length of the data message is %s,"
+                            " the length of the control msg is %s and"
+                            " the expected length is: %s)"
+                            % (len(dataMsg), len(ctrlMsg), const.MTU))
 
     def test_equality(self):
         testArgs = [1, 2]

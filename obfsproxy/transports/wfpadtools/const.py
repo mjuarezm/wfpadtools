@@ -19,7 +19,7 @@ TEST_DUMP_DIR           = jn(TEMP_DIR, "test_dumps")
 DUMPS                   = {"client": join(TEST_DUMP_DIR, "client.dump"),
                            "server": join(TEST_DUMP_DIR, "server.dump")}
 
-INF_LABEL               = -1
+INF_LABEL               = float("inf")
 
 # Scale is milliseconds
 SCALE                   = 1000.0

@@ -69,7 +69,6 @@ class HistogramClassTestCase(unittest.TestCase):
         h.removeToken(0.1)
         self.assertEqual(h.hist[0.2], h.template[0.2] - 1)
 
-
     def test_remove_tokens_with_interpolation_with_inf_label(self):
         h = histo.new(TEST_DICT_INF, removeTokens=True)
         h.removeToken(const.INF_LABEL)
@@ -87,7 +86,6 @@ class HistogramClassTestCase(unittest.TestCase):
         h.removeToken(0.1)
         h.removeToken(0.1)
         self.assertEqual(h.hist[0.2], h.template[0.2] - 1)
-
 
     def test_refill_histo(self):
         h = histo.new({1: 1})

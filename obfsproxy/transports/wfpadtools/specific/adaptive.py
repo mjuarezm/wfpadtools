@@ -4,7 +4,7 @@ by Shmatikov and Wang.
 """
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
-from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.wfpadtools import histo
 from obfsproxy.transports.wfpadtools.util import dumputil as du
 import obfsproxy.common.log as logging
 
@@ -25,7 +25,7 @@ class AdaptiveTransport(WFPadTransport):
         super(AdaptiveTransport, self).__init__()
 
         # Set constant length for messages
-        self._lengthDataProbdist = probdist.uniform(self._length)
+        self._lengthDataProbdist = histo.uniform(self._length)
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
@@ -69,22 +69,16 @@ class AdaptiveTransport(WFPadTransport):
 
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
-        self._delayDataProbdist = probdist.uniform(self._period)
-        # i-th position in histogram is the number of tokens for the
-        # probability of sampling a delay within [labels(i-1), labels(i)),
-        # except:
-        #     i=0 -> [0, labels(0)]
-        #     i=len(histo)-1 -> delay=infinite
-        #     i=len(histo)-2 -> [labels(len(histo)-2), MAX_DELAY]
+        self._delayDataProbdist = histo.uniform(self._period)
         if self._histograms:
-            self.relayBurstHistogram(**dict(self._histograms["burst"]["snd"],
-                                            **{"when": "snd"}))
-            self.relayBurstHistogram(**dict(self._histograms["burst"]["rcv"],
-                                            **{"when": "rcv"}))
-            self.relayGapHistogram(**dict(self._histograms["gap"]["snd"],
-                                          **{"when": "snd"}))
-            self.relayGapHistogram(**dict(self._histograms["gap"]["rcv"],
-                                          **{"when": "rcv"}))
+            self.relayBurstHistogram(
+                **dict(self._histograms["burst"]["snd"], **{"when": "snd"}))
+            self.relayBurstHistogram(
+                **dict(self._histograms["burst"]["rcv"], **{"when": "rcv"}))
+            self.relayGapHistogram(
+                **dict(self._histograms["gap"]["snd"], **{"when": "snd"}))
+            self.relayGapHistogram(
+                **dict(self._histograms["gap"]["rcv"], **{"when": "rcv"}))
 
 
 class AdaptiveClient(AdaptiveTransport):

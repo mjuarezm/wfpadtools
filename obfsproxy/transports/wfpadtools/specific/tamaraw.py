@@ -5,7 +5,7 @@ from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 
 import obfsproxy.common.log as logging
-from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.wfpadtools import histo
 
 
 log = logging.get_obfslogger()
@@ -21,7 +21,7 @@ class TamarawTransport(WFPadTransport):
     def __init__(self):
         super(TamarawTransport, self).__init__()
         # Set constant length for messages
-        self._lengthDataProbdist = probdist.uniform(self._length)
+        self._lengthDataProbdist = histo.uniform(self._length)
 
     @classmethod
     def register_external_mode_cli(cls, subparser):

@@ -8,7 +8,7 @@ from twisted.internet import reactor
 
 # WFPadTools imports
 import obfsproxy.common.log as logging
-from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.wfpadtools import histo
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 from obfsproxy.transports.wfpadtools.util import genutil as gu
@@ -33,7 +33,7 @@ class CSBuFLOTransport(WFPadTransport):
         self._rho_star = const.INIT_RHO
 
         # Set constant length for messages
-        self._lengthDataProbdist = probdist.uniform(self._length)
+        self._lengthDataProbdist = histo.uniform(self._length)
 
     @classmethod
     def register_external_mode_cli(cls, subparser):

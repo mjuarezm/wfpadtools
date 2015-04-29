@@ -101,7 +101,9 @@ class WFPadMessageFactory(object):
         if probDist:
             payloadLen = probDist.randomSample()
             if payloadLen is not const.INF_LABEL:
-                return payloadLen - const.CTRL_FIELDS_LEN
+                if flags & const.FLAG_CONTROL:
+                    return payloadLen - const.CTRL_FIELDS_LEN
+                return payloadLen
         return const.MPU_CTRL if flags & const.FLAG_CONTROL else const.MPU
 
     def encapsulate(self, data="", opcode=None, args="", lenProbdist=None):

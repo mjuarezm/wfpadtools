@@ -4,7 +4,7 @@ This module implements the BuFLO countermeasure proposed by Dyer et al.
 import time
 
 import obfsproxy.common.log as logging
-from obfsproxy.transports.scramblesuit import probdist
+from obfsproxy.transports.wfpadtools import histo
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 
@@ -26,7 +26,7 @@ class BuFLOTransport(WFPadTransport):
         self._startTime = time.time()
 
         # Set constant length for messages
-        self._lengthDataProbdist = probdist.uniform(self._length)
+        self._lengthDataProbdist = histo.uniform(self._length)
 
         # The stop condition in BuFLO:
         # BuFLO stops padding if the visit has finished and the
