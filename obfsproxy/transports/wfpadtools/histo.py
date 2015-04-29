@@ -2,9 +2,8 @@
 The class Histo provides an interface to generate and sample probability
 distributions represented as histograms.
 """
-
 import random
-import bisect
+from bisect import bisect_right
 from random import randint
 
 # WFPadTools imports
@@ -15,75 +14,112 @@ import obfsproxy.common.log as logging
 log = logging.get_obfslogger()
 
 
-class Histo:
+class Histogram:
+    """Provides methods to generate and sample histograms of prob distributions."""
 
-    """
-    Provides code to generate and sample histograms of prob distributions.
-    """
+    def __init__(self, hist, interpolate=True, removeTokens=False):
+        """Initialize an histogram.
 
-    def __init__(self, histo, labels, interpolate=False, removeToks=False):
+        `hist` is a dictionary. The keys are labels of an histogram. They represent
+        the value of the rightmost endpoint of the right-open interval of the bin. The
+        dictionary value corresponding to that key is a count of tokens representing
+        the frequency in the histogram.
+
+        For example, the histogram:
+         5-                                                     __
+         4-                  __                                |  |
+         3-        __       |  |                __             |  |
+         2-       |  |      |  |               |  |            |  |
+         1-       |  |      |  |               |  |            |  |
+                [0, x_0) [x_0, x_1), ..., [x_(n-1), x_n), [x_n, infinite)
+
+        Would be represented with the following dictionary:
+
+            h = {'x_0': 3, 'x_1': 4, ..., 'x_n': 3, INF_LABEL: 5}
+
+        `interpolate` indicates whether the value is sampled uniformly
+        from the interval defined by the bin (e.g., U([x_0, x_1)) or the value
+        of the label is returned. In case of a discrete histogram we would have:
+
+         5-                                                     __
+         4-                  __                                |  |
+         3-        __       |  |                __             |  |
+         2-       |  |      |  |               |  |            |  |
+         1-       |  |      |  |               |  |            |  |
+                  x_0       x_1      ...       x_n           infinite
+
+        `removeToks` indicates that every time a sample is drawn from the histrogram,
+        we remove one token from the count (the values in the dictionary). We keep a
+        copy of the initial value of the histogram to re assign it when the histogram
+        runs out of tokens.
+
+        We assume all values in the dictionary are positive integers and
+        that there is at least a non-zero value. For efficiency, we assume the labels
+        are floats that have been truncated up to some number of decimals. Normally, the
+        labels will be seconds and since we want a precision of milliseconds, the float
+        is truncated up to the 3rd decimal position with for example round(x_i, 3).
         """
-        Initialize a discrete probability distribution.
-
-        The parameter `histo` is a list which contains the number of tokens for
-        each bin. The parameter `labels` contains the the delay values for each
-        bin. `interpolate` indicates whether the value is sampled uniformly
-        from the interval defined by the bin or the value of the label is
-        returned. `removeToks` indicates if the the adaptive-padding token
-        removal strategy is applied or histograms are immutable.
-        """
-        self.histo = histo
-        assert(sum(self.histo) > 0)
-        self.templateHisto = list(histo)
-
-        self.labels = labels
+        self.hist = hist
+        self.labels = sorted(self.hist.keys())
+        self.n = len(self.labels)
+        self.template_sum = sum(self.hist.values())
+        self.sum_counts = self.template_sum
         self.interpolate = interpolate
-        self.removeToks = removeToks
+        self.removeTokens = removeTokens
+        self.template = dict(hist)
 
-    def getIndexFromLabel(self, l):
-        return self.labels.index(l) if l in self.labels \
-            else bisect.bisect_right(self.labels, l, hi=len(self.labels) - 1)
+    def getLabelFromFloat(self, f):
+        """Return the label for the interval to which `f` belongs."""
+        return bisect_right(self.labels, f, hi=self.n-1)
 
-    def _removeTokIter(self, index):
-        for i, value in enumerate(self.histo[index:]):
-            if value > 0:
-                self.histo[index + i] -= 1
-                log.debug("[histo] Removed token from bin %s, histo is: %s" % (index + i, self.histo))
-                return
-        for i, value in enumerate(self.histo[:index]):
-            if value > 0:
-                self.histo[i] -= 1
-                log.debug("[histo] Removed token from bin %s, histo is: %s" % (i, self.histo))
-                return
+    def removeToken(self, f):
+        # TODO: move the if below to the calls to the function `removeToken`
+        if self.removeTokens:
+            label = self.getLabelFromFloat(f)
+            pos_counts = [l for l in self.labels if self.hist[l] > 0]
+            # else remove tokens from label or the next non-empty label on the left
+            # if there is none, continue removing tokens on the right.
+            i = bisect_right(pos_counts, label, hi=len(pos_counts)-1) - 1
+            self.hist[pos_counts[i] if i >= 0 else pos_counts[0]] -= 1
+            self.sum_counts -= 1
+            # if histogram is empty, refill the histogram
+            if self.sum_counts == 0:
+                self.refillHistogram()
 
-    def refillHisto(self):
-        self.histo = list(self.templateHisto)
-        log.debug("[histo] Refilled histo: %s" % (self.histo))
+    def dumpHistogram(self):
+        """Print the values for the histogram."""
+        log.debug("Dumping histogram:")
+        if self.interpolate:
+            log.debug("[0, %s), %s", self.labels[0], self.hist[self.labels[0]])
+            for labeli, labeli1 in zip(self.labels[0:-2], self.labels[1:-1]):
+                log.debug("[%s, %s), %s", labeli, labeli1, self.hist[labeli1])
+            log.debug("[%s, infinite), %s", self.labels[-2], self.hist[self.labels[-1]])
+        else:
+            for label, count in self.hist:
+                log.debug("(%s, %s)", label, count)
 
-    def removeToken(self, label):
-        if self.removeToks:
-            indexBin = self.getIndexFromLabel(label)
-            if sum(self.histo) == 0:
-                self.refillHisto()
-            self._removeTokIter(indexBin)
+    def refillHistogram(self):
+        """Copy the template histo."""
+        self.hist = dict(self.template)
+        self.sum_counts = self.template_sum
+        log.debug("[histo] Refilled histogram: %s" % (self.hist))
 
     def randomSample(self):
-        """Draw and return a random numTokSample from the histogram."""
-        sumHisto = sum(self.histo)
-        lenHisto = len(self.histo)
-        if sumHisto == 0:
-            return const.INF_LABEL
-        numTokSample = randint(1, sumHisto) if sumHisto > 0 else 0
-        for i in xrange(lenHisto):
-            numTokSample -= self.histo[i]
-            if numTokSample > 0:
+        """Draw and return a sample from the histogram."""
+        prob = randint(1, self.sum_counts) if self.sum_counts > 0 else 0
+        for i, label_i in enumerate(self.labels):
+            prob -= self.hist[label_i]
+            if prob > 0:
                 continue
-            if not self.interpolate or i == lenHisto - 1:
-                return self.labels[i]
-            a = self.labels[i]
-            b = self.labels[i + 1] if i < lenHisto - 2 else const.MAX_DELAY
-            return a + (b - a) * random.random()
+            if not self.interpolate or i == self.n - 1:
+                return label_i
+            label_i_1 = 0 if i == 0 else self.labels[i - 1]
+            return label_i + (label_i_1 - label_i) * random.random()
+
+
+def uniform(x):
+    return new({x: 1}, interpolate=False, removeTokens=False)
 
 
 # Alias class name in order to provide a more intuitive API.
-new = Histo
+new = Histogram

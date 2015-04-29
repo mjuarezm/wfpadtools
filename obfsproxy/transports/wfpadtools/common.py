@@ -3,8 +3,7 @@ from twisted.internet.defer import CancelledError
 
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as const
-from obfsproxy.transports.wfpadtools.util.mathutil import closest_power_of_two, \
-    closest_multiple
+from obfsproxy.transports.wfpadtools.util.mathutil import closest_power_of_two, closest_multiple
 
 
 log = logging.get_obfslogger()

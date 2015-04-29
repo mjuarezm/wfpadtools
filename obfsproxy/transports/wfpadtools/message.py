@@ -211,13 +211,12 @@ def isSane(totalLen, payloadLen, flags):
     checked for their sanity.  If they are in the expected range, `True` is
     returned. If any of these fields has an invalid value, return `False`.
     """
+
     def isFine(length):
         """Check if the given length is fine."""
         return True if (0 <= length <= const.MPU) else False
-
     log.debug("[wfpad] Message header: totalLen=%d, payloadLen=%d, flags"
               "=%s" % (totalLen, payloadLen, getFlagNames(flags)))
-
     validFlags = [
         const.FLAG_DATA,
         const.FLAG_PADDING,
@@ -228,7 +227,6 @@ def isSane(totalLen, payloadLen, flags):
         const.FLAG_CONTROL | const.FLAG_PADDING | const.FLAG_LAST,
         const.FLAG_CONTROL | const.FLAG_DATA | const.FLAG_LAST
     ]
-
     return isFine(totalLen) and isFine(payloadLen) and \
         totalLen >= payloadLen and (flags in validFlags)
 
@@ -238,7 +236,6 @@ def isOpCodeSane(opcode):
 
     log.debug("[wfpad] Opcode: value=%s, name=%s"
               % (opcode, getOpcodeNames(opcode)))
-
     validOpCodes = [
         const.OP_APP_HINT,
         const.OP_END_PADDING,
@@ -250,7 +247,6 @@ def isOpCodeSane(opcode):
         const.OP_SEND_PADDING,
         const.OP_TOTAL_PAD
     ]
-
     return (opcode in validOpCodes)
 
 
@@ -261,7 +257,6 @@ class WFPadMessageExtractor(object):
     depending on the flag we continue parsing the `opcode`, `args`
     and `payload` fields.
     """
-
     def __init__(self):
         """Create a new WFPadMessageExtractor object."""
         self.totalLen = self.payloadLen = self.flags = self.opcode = None

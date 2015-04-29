@@ -59,11 +59,10 @@ class RandProbDist:
 
         Only probabilities > 0.01 are dumped.
         """
-        log.debug("Dumping probability distribution.")
-        for singleton in self.dist.iterkeys():
-            # We are not interested in tiny probabilities.
-            if self.dist[singleton] > 0.01:
-                log.debug("P(%s) = %.3f" % (str(singleton), self.dist[singleton]))
+        log.debug("Probability distribution:")
+        for singleton, prob in self.dist.iterkeys():
+            if prob > 0.01:  # We are not interested in tiny probabilities.
+                log.debug("P(%s) = %.3f", singleton, prob)
 
     def randomSample(self):
         """Draw and return a random sample from the probability distribution."""

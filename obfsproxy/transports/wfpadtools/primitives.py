@@ -50,6 +50,9 @@ class PaddingPrimitivesInterface(object):
 
         else:
             # client can only receive from server an end of padding control message
+            # TODO: review. Here we are making the assumption that the session will always
+            # start by a request sent by the client and it will end by a response sent
+            # by the server...
             if opcode == const.OP_END_PADDING:
                 self.relayEndPadding(*args)
             else:
@@ -92,8 +95,7 @@ class PaddingPrimitivesInterface(object):
         """Message sent by the server to the client to flag end of padding."""
         self.session.is_server_padding = False
 
-    def relayBurstHistogram(self, histo, labels, removeToks=False,
-                            interpolate=True, when="rcv"):
+    def relayBurstHistogram(self, histo, removeTokens=False, interpolate=True, when="rcv"):
         """Specify histogram encoding the delay distribution.
 
         The delay distribution represents the probability of sending a single
@@ -109,7 +111,7 @@ class PaddingPrimitivesInterface(object):
             Millisecond labels for the bins (with "infinity" bin to allow
             encoding the probability of not sending any padding packet in
             response to this packet).
-        removeToks : bool
+        removeTokens : bool
             If True, follow Adaptive Padding token removal rules.
             If False, histograms are immutable.
         interpolate : bool
@@ -123,14 +125,13 @@ class PaddingPrimitivesInterface(object):
             arrives from upstream. In both cases, the padding packet is
             sent in the direction of the client.
         """
-        self._burstHistoProbdist[when] = hist.new(histo, labels,
+        self._burstHistoProbdist[when] = hist.new(histo,
                                                   interpolate=bool(interpolate),
-                                                  removeToks=bool(removeToks))
+                                                  removeTokens=bool(removeTokens))
         self._deferBurstCallback[when] = self._burstHistoProbdist[when].removeToken
 
 
-    def relayGapHistogram(self, histo, labels, removeToks=False,
-                          interpolate=True, when="rcv"):
+    def relayGapHistogram(self, histo, removeTokens=False, interpolate=True, when="rcv"):
         """Specify histogram that encodes the delay distribution
 
         The delay distribution represents the probability of sending a
@@ -147,7 +148,7 @@ class PaddingPrimitivesInterface(object):
             Millisecond labels for the bins (with "infinity" bin to allow
             encoding the probability of not sending any padding packet in
             response to this packet).
-        removeToks : bool
+        removeTokens : bool
             If True, follow Adaptive Padding token removal rules.
             If False, histograms are immutable.
         interpolate : bool
@@ -163,9 +164,9 @@ class PaddingPrimitivesInterface(object):
             BURST_HISTOGRAM initiated padding into GAP_HISTOGRAM initiated
             padding.
         """
-        self._gapHistoProbdist[when] = hist.new(histo, labels,
+        self._gapHistoProbdist[when] = hist.new(histo,
                                                 interpolate=bool(interpolate),
-                                                removeToks=bool(removeToks))
+                                                removeTokens=bool(removeTokens))
         self._deferGapCallback[when] = self._gapHistoProbdist[when].removeToken
 
 
