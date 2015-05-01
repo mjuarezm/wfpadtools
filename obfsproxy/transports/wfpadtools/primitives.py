@@ -49,14 +49,15 @@ class PaddingPrimitivesInterface(object):
                 Exception("Client cannot receive control messages with opcode %s." % opcode)
 
         else:
-            # client can only receive from server an end of padding control message
-            # TODO: review. Here we are making the assumption that the session will always
-            # start by a request sent by the client and it will end by a response sent
-            # by the server...
-            if opcode == const.OP_END_PADDING:
-                self.relayEndPadding(*args)
-            else:
-                Exception("Server cannot receive control messages with opcode %s." % opcode)
+            pass
+
+        # TODO: review. We are making the assumption that the session will always
+        # start by a request sent by the client and it will end by a response sent
+        # by the server...
+        if opcode == const.OP_END_PADDING:
+            self.relayEndPadding(*args)
+        else:
+            Exception("Unknown opcode message: %s." % opcode)
 
     def relaySendPadding(self, N, t):
         """Send the requested number of padding cells in response.
