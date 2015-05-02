@@ -20,14 +20,12 @@ from obfsproxy.transports.wfpadtools.common import deferLater
 import obfsproxy.transports.wfpadtools.const as const
 from obfsproxy.transports.wfpadtools.primitives import PaddingPrimitivesInterface
 from obfsproxy.transports.wfpadtools.session import Session
-from obfsproxy.transports.wfpadtools.util import fileutil
 import obfsproxy.transports.wfpadtools.util.testutil as test_ut
 from obfsproxy.transports.wfpadtools import message as mes
 from obfsproxy.transports.wfpadtools import message, socks_shim
 from obfsproxy.transports.wfpadtools import wfpad_shim
 from obfsproxy.transports.wfpadtools.kist import estimate_write_capacity
 from obfsproxy.transports.base import BaseTransport, PluggableTransportError
-
 
 log = logging.get_obfslogger()
 
@@ -39,17 +37,16 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
     different existing website fingerprinting countermeasures, and
     that can also be used to generate new ones.
     """
-    enable_test = False
-    dump_path = "/dev/null"
-
-    shim_ports = None
 
     def __init__(self):
         """Initialize a WFPadTransport object."""
-        super(WFPadTransport, self).__init__()
+        # Initialize circuit
+        self.circuit = None
+        self.name = "wfpad_transport_%s" % hex(id(self))
 
         # which end are we?
         self.end = "client" if self.weAreClient else "server"
+
         log.debug("[wfpad - %s] Initializing %s (id=%s).",
                   self.end, const.TRANSPORT_NAME, str(id(self)))
 
@@ -155,22 +152,14 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         """
         parentalApproval = super(
             WFPadTransport, cls).validate_external_mode_cli(args)
-
         if not parentalApproval:
             raise PluggableTransportError(
                 "Pluggable Transport args invalid: %s" % args)
-
         cls.dest = args.dest if args.dest else None
-
         # By default, shim doesn't connect to socks
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
             log.debug("[wfpad] Shim ports: %s", cls.shim_ports)
-        if args.test:
-            cls.enable_test = True
-            cls.dump_path = args.test
-        if args.session_logs:
-            cls._session_logs = args.session_logs
 
     @classmethod
     def setup(cls, transportConfig):
@@ -180,7 +169,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                      "####################################################\n"
                      " WFPad alone isn't a Website Fingerprinting defense \n"
                      "####################################################\n")
-
         # Check whether this object is the client or the server
         cls.weAreClient = transportConfig.weAreClient
         cls.weAreServer = not cls.weAreClient
@@ -201,14 +189,11 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         # Change state to ST_CONNECTED
         self._state = const.ST_CONNECTED
         log.debug("[wfpad - %s] Connected with the other WFPad end.", self.end)
-
         # Once we are connected we can flush data accumulated in the buffer.
         if len(self._buffer) > 0:
             self.flushBuffer()
-
         # Get peer address
         self.peer_addr = self.circuit.downstream.peer_addr
-
         # Load sockets
         self.connections = self.process.get_connections()
         for pconn in self.connections:
@@ -216,7 +201,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 self.downstreamSocket = socket.fromfd(pconn.fd, pconn.family, pconn.type)
                 break
 
-    @test_ut.instrument_rcv_upstream
     def receivedUpstream(self, data):
         """Got data from upstream; relay them downstream.
 
@@ -225,11 +209,9 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         """
         d = data.read()
         self.session.lastRcvUpstreamTs = reactor.seconds()
-
         if self._state >= const.ST_CONNECTED:
             self.pushData(d)
             self.whenReceivedUpstream()
-
         else:
             self._buffer.write(d)
             log.debug("[wfpad - %s] Buffered %d bytes of outgoing data.",
@@ -352,9 +334,9 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             log.debug("[wfpad - %s] Delay buffer flush %s ms delay", self.end, delay)
 
     def elapsedSinceLastMsg(self):
-        elap = reactor.seconds() - self.session.lastSndDownstreamTs  # @UndefinedVariable
-        log.debug("[wfpad - %s] Cancel padding. Elapsed = %s ms", self.end, elap)
-        return elap
+        elapsed = reactor.seconds() - self.session.lastSndDownstreamTs
+        log.debug("[wfpad - %s] Cancel padding. Elapsed = %s ms", self.end, elapsed)
+        return elapsed
 
     def getElapsed(self):
         """Returns time elapsed since the beginning of the session.
@@ -400,7 +382,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
         log.debug("[wfpad - %s] Sent data message of length %d.", self.end, msgTotalLen)
 
-        self.session.lastSndDataDownstreamTs = self.session.lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
+        self.session.lastSndDataDownstreamTs = self.session.lastSndDownstreamTs = reactor.seconds()
 
         # If buffer is empty, generate padding messages.
         if len(self._buffer) > 0:
@@ -412,7 +394,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             self.deferBurstPadding('snd')
             log.debug("[wfpad - %s] buffer is empty, pad `snd` burst.", self.end)
 
-    @test_ut.instrument_dump
     def processMessages(self, data):
         """Extract WFPad protocol messages.
 
@@ -499,7 +480,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.sendIgnore()
         if when is 'snd':
             self.session.consecPaddingMsgs += 1
-            self.session.lastSndDownstreamTs = reactor.seconds()  # @UndefinedVariable
+            self.session.lastSndDownstreamTs = reactor.seconds()
         delay = self._gapHistoProbdist[when].randomSample()
         if delay is const.INF_LABEL:
             return
@@ -576,8 +557,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.session.is_padding = True
         if self.weAreClient:
             self.session.is_server_padding = True
-            self.sendControlMessage(const.OP_APP_HINT,
-                                    [self.getSessId(), False])
+            self.sendControlMessage(const.OP_APP_HINT, [self.getSessId(), False])
             if self._shim:
                 self._shim.notifyStartPadding()  # padding the tail of the page
         else:
