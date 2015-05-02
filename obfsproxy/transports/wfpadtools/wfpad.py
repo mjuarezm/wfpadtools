@@ -134,13 +134,13 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self._msgFactory = message.WFPadMessageFactory()
         self._msgExtractor = message.WFPadMessageExtractor()
 
-        # Get pid and process
-        self.pid = os.getpid()
-        self.process = psutil.Process(self.pid)
-        self.connections = []
-        self.downstreamSocket = None
-
         # Get the global shim object
+        self._initializeShim()
+
+        # Initialize state
+        self._initializeState()
+
+    def _initializeShim(self):
         self._shim = None
         if self.weAreClient:
             self._sessionObserver = False
@@ -159,10 +159,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             self._sessId = const.DEFAULT_SESSION
             self._visiting = False
 
-        self._initialize_state()
-
-
-    def _initialize_state(self):
+    def _initializeState(self):
         # Initialize session
         self.session = Session()
 
@@ -196,6 +193,11 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         # method to calculate total padding
         self.calculateTotalPadding = lambda Self: None
 
+        # Get pid and process
+        self.pid = os.getpid()
+        self.process = psutil.Process(self.pid)
+        self.connections = []
+        self.downstreamSocket = None
 
     @classmethod
     def register_external_mode_cli(cls, subparser):
@@ -427,6 +429,13 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         log.debug("[wfpad - %s] Cancel padding. Elapsed = %s ms", self.end, elap)
         return elap
 
+    def getElapsed(self):
+        """Returns time elapsed since the beginning of the session.
+
+        If a session has not yet started, it returns time since __init__.
+        """
+        return (time.time() - self.session.startTime) * const.SCALE
+
     def flushBuffer(self):
         """Encapsulate data from buffer in messages and send over the link.
 
@@ -435,7 +444,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         start padding.
         """
         dataLen = len(self._buffer)
-        if dataLen < 0:
+        if dataLen <= 0:
             self.deferBurstPadding('snd')
             log.debug("[wfpad - %s] buffer is empty, pad `snd` burst.", self.end)
             return
@@ -557,7 +566,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
         We sample the delay to wait from the `when` gap prob distribution.
         We call this method again in case we don't receive data after the
-        delay.
+        delay.o
         """
         if self.session.is_padding and self.stopCondition(self) and not self.session.is_server_padding:
             self.onEndPadding()
