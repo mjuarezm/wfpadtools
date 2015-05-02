@@ -107,9 +107,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
     different existing website fingerprinting countermeasures, and
     that can also be used to generate new ones.
     """
-
-    _session_logs = None
-
     enable_test = False
     dump_path = "/dev/null"
 
@@ -336,8 +333,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 if data.flags & const.FLAG_DATA:
                     self.session.dataMessages['snd'] += 1
                     self.session.dataBytes['snd'] += len(data.payload)
-            if self._session_logs:
-                self.session.history.append((reactor.seconds(), message.getFlagNames(data.flags), data.totalLen))
             return [data]
         elif isinstance(data, list):
             listMsgs = []
@@ -510,8 +505,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         for msg in msgs:
             log.debug("[wfpad - %s] A new message has been parsed!", self.end)
             msg.rcvTime = time.clock()
-            if self._session_logs:
-                self.session.history.append((reactor.seconds(), message.getFlagNames(msg.flags), -1 * msg.totalLen))
             if msg.flags & const.FLAG_CONTROL:
                 # Process control messages
                 payload = msg.payload
@@ -639,16 +632,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
         log.info("[wfpad - %s] - Session has started!(sessid = %s)", self.end, sessId)
 
-    def dump_session_history(self, sessId):
-        # dump history TODO: remove!!
-        csv_file = join(self._session_logs, "{}.csv".format(sessId))
-        if isfile(csv_file):
-            fileutil.removefile(csv_file)
-        with open(csv_file, "w+") as f:
-            for p in self.session.history:
-                f.write(";".join(map(str, p)) + "\n")
-        self.session.history = []
-
     def onSessionEnds(self, sessId):
         """Send hint for session end.
 
@@ -663,8 +646,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             self.session.is_server_padding = True
             self.sendControlMessage(const.OP_APP_HINT,
                                     [self.getSessId(), False])
-            if self._session_logs:
-                self.dump_session_history(sessId)
             if self._shim:
                 self._shim.notifyStartPadding()  # padding the tail of the page
         else:
