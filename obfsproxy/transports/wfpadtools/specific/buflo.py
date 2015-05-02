@@ -22,8 +22,6 @@ class BuFLOTransport(WFPadTransport):
 
     def __init__(self):
         super(BuFLOTransport, self).__init__()
-        # Initialize start time
-        self._startTime = time.time()
 
         # Set constant length for messages
         self._lengthDataProbdist = histo.uniform(self._length)
@@ -82,16 +80,8 @@ class BuFLOTransport(WFPadTransport):
         if args.psize:
             cls._length = args.psize
 
-    def getElapsed(self):
-        """Returns time elapsed since the beginning of the session.
-
-        If a session has not yet started, it returns time since __init__.
-        """
-        return (time.time() - self._startTime) * const.SCALE
-
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
-        self._startTime = time.time()
         log.debug("[buflo {}] - params: mintime={}, period={}, psize={}"
                   .format(self.end, self._mintime, self._period, self._length))
         self.constantRatePaddingDistrib(self._period)

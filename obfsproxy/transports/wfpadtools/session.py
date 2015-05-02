@@ -1,3 +1,4 @@
+import time
 
 
 class Session(object):
@@ -31,5 +32,9 @@ class Session(object):
         # Padding after end of session
         self.totalPadding = 0
 
+        # Initialize start time
+        self.startTime = time.time()
+
         # Flag server end of padding
         self.is_server_padding = False
+

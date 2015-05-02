@@ -27,15 +27,25 @@ class AdaptiveTransport(WFPadTransport):
         # Set constant length for messages
         self._lengthDataProbdist = histo.uniform(self._length)
 
+        # The stop condition in Adaptive:
+        # Adaptive stops padding if the visit has finished and the
+        # elapsed time has exceeded the minimum padding time.
+        def stopConditionHandler(s):
+            elapsed = s.getElapsed()
+            log.debug("[adaptive {}] - elapsed = {}, mintime = {}, visiting = {}"
+                      .format(self.end, elapsed, 120, s.isVisiting()))
+            return elapsed > 120 and not s.isVisiting()
+        self.stopCondition = stopConditionHandler
+
     @classmethod
     def register_external_mode_cli(cls, subparser):
         """Register CLI arguments for Adaptive Padding parameters."""
-        subparser.add_argument("--period",
-                               required=False,
-                               type=float,
-                               help="Time rate at which transport sends "
-                                    "messages (Default: 0ms).",
-                               dest="period")
+        # subparser.add_argument("--period",
+        #                        required=False,
+        #                        type=float,
+        #                        help="Time rate at which transport sends "
+        #                             "messages (Default: 0ms).",
+        #                        dest="period")
         subparser.add_argument("--psize",
                                required=False,
                                type=int,
@@ -55,13 +65,13 @@ class AdaptiveTransport(WFPadTransport):
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables."""
         # Defaults for Adaptive Padding specifications.
-        cls._period = 0
+        # cls._period = 0
         cls._length = const.MPU
 
         super(AdaptiveTransport, cls).validate_external_mode_cli(args)
 
-        if args.period:
-            cls._period = args.period
+        # if args.period:
+        #     cls._period = args.period
         if args.psize:
             cls._length = args.psize
         if args.histo_file:
@@ -69,7 +79,7 @@ class AdaptiveTransport(WFPadTransport):
 
     def onSessionStarts(self, sessId):
         WFPadTransport.onSessionStarts(self, sessId)
-        self._delayDataProbdist = histo.uniform(self._period)
+        # self._delayDataProbdist = histo.uniform(self._period)
         if self._histograms:
             self.relayBurstHistogram(
                 **dict(self._histograms["burst"]["snd"], **{"when": "snd"}))
