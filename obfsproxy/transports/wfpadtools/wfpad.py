@@ -585,11 +585,11 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.cancelDeferrers('rcv')
         self.session.totalPadding = self.calculateTotalPadding(self)
         log.info("[wfpad - %s] - Num of data messages is: rcvd=%s/%s, sent=%s/%s", self.end,
-                 self.session.numMessages['rcv'], self.session.dataMessages['rcv'],
-                 self.session.numMessages['snd'], self.session.dataMessages['snd'])
+                 self.session.dataMessages['rcv'], self.session.numMessages['rcv'],
+                 self.session.dataMessages['snd'], self.session.numMessages['snd'])
         log.info("[wfpad - %s] - Num of data bytes is: rcvd=%s/%s, sent=%s/%s", self.end,
-                 self.session.totalBytes['rcv'], self.session.dataBytes['rcv'],
-                 self.session.totalBytes['snd'], self.session.dataBytes['snd'])
+                 self.session.dataBytes['rcv'], self.session.totalBytes['rcv'],
+                 self.session.dataBytes['snd'], self.session.totalBytes['snd'])
 
     def getSessId(self):
         """Return current session Id."""
