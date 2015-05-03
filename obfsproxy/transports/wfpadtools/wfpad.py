@@ -157,6 +157,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 "Pluggable Transport args invalid: %s" % args)
         cls.dest = args.dest if args.dest else None
         # By default, shim doesn't connect to socks
+        cls.shim_ports = None
         if args.shim:
             cls.shim_ports = map(int, args.shim.split(','))
             log.debug("[wfpad] Shim ports: %s", cls.shim_ports)
@@ -474,7 +475,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         We call this method again in case we don't receive data after the
         delay.o
         """
-        if self.session.is_padding and self.stopCondition(self) and not self.session.is_server_padding:
+        if self.session.is_padding and self.stopCondition(self):
             self.onEndPadding()
             return
         self.sendIgnore()
