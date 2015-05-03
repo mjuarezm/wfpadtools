@@ -565,24 +565,12 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             self._visiting = False
         log.info("[wfpad - %s] - Session has ended! (sessid = %s)", self.end, sessId)
 
-    def onEndPadding(self):
-        self.session.is_padding = False
-        # Notify shim observers
-        if self.weAreClient and self._shim:
-            if self.session.is_server_padding:
-                reactor.callLater(0.5, self.onEndPadding)
-                return
-            self.session.is_server_padding = False
-            log.info("[wfpad - %s] - Padding stopped!", self.end)
-            self._shim.notifyEndPadding()
-        else:
-            # Notify the client we have ended with padding
-            log.info("[wfpad - %s] - Padding stopped! Will notify client.", self.end)
-            self.sendControlMessage(const.OP_END_PADDING)
-
-        # Cancel deferers
-        self.cancelDeferrers('snd')
-        self.cancelDeferrers('rcv')
+    def _waitServerStopPadding(self):
+        if self.session.is_server_padding:
+            reactor.callLater(0.5, self._waitServerStopPadding)
+            return
+        self.session.is_server_padding = False
+        self._shim.notifyEndPadding()
         self.session.totalPadding = self.calculateTotalPadding(self)
         log.info("[wfpad - %s] - Num of data messages is: rcvd=%s/%s, sent=%s/%s", self.end,
                  self.session.dataMessages['rcv'], self.session.numMessages['rcv'],
@@ -590,6 +578,21 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         log.info("[wfpad - %s] - Num of data bytes is: rcvd=%s/%s, sent=%s/%s", self.end,
                  self.session.dataBytes['rcv'], self.session.totalBytes['rcv'],
                  self.session.dataBytes['snd'], self.session.totalBytes['snd'])
+
+    def onEndPadding(self):
+        self.session.is_padding = False
+        # Notify shim observers
+        if self.weAreClient and self._shim:
+            log.info("[wfpad - %s] - Padding stopped!", self.end)
+            self._waitServerStopPadding()
+        else:
+            # Notify the client we have ended with padding
+            log.info("[wfpad - %s] - Padding stopped! Will notify client.", self.end)
+            self.sendControlMessage(const.OP_END_PADDING)
+        # Cancel deferers
+        self.cancelDeferrers('snd')
+        self.cancelDeferrers('rcv')
+
 
     def getSessId(self):
         """Return current session Id."""
