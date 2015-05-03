@@ -582,7 +582,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
     def onEndPadding(self):
         self.session.is_padding = False
         # Notify shim observers
-        if self.weAreClient and self._shim:
+        if self.weAreClient:
             log.info("[wfpad - %s] - Padding stopped!", self.end)
             self._waitServerStopPadding()
         else:
@@ -592,7 +592,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         # Cancel deferers
         self.cancelDeferrers('snd')
         self.cancelDeferrers('rcv')
-
 
     def getSessId(self):
         """Return current session Id."""
