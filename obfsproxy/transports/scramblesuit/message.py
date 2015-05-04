@@ -107,7 +107,6 @@ class ProtocolMessage( object ):
 
         payloadLen = len(payload)
         if (payloadLen + paddingLen) > const.MPU:
-            log.error("Payloadlen: %s, Paddinglen: %s, MPU: %s", payloadLen, paddingLen, const.MPU)
             raise base.PluggableTransportError("No overly long messages.")
 
         self.totalLen = payloadLen + paddingLen

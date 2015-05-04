@@ -108,9 +108,9 @@ class ScrambleSuitTransport( base.BaseTransport ):
         Called once when obfsproxy starts.
         """
 
-        log.info("\n\n################################################\n"
-                 "Do NOT rely on ScrambleSuit for strong security!\n"
-                 "################################################\n")
+        log.error("\n\n################################################\n"
+                  "Do NOT rely on ScrambleSuit for strong security!\n"
+                  "################################################\n")
 
         util.setStateLocation(transportConfig.getStateLocation())
 

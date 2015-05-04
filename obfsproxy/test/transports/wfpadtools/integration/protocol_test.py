@@ -5,6 +5,7 @@ import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.util import testutil as tu
 from obfsproxy.test.transports.wfpadtools import wfpad_tester as wt
+import unittest
 
 # Logging settings:
 log = logging.get_obfslogger()
@@ -17,6 +18,7 @@ class TestReceivedBytes(wt.WFPadShimConfig, wt.SendDataServerTest, tu.STTest):
 
     AFTER_SESSION_TIME = 5
 
+    @unittest.skip("")
     def test_correctness_of_transmission(self):
         """Test the correctness of the data manipulated by wfpad.
 
