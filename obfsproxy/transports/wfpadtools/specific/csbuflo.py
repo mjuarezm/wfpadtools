@@ -88,7 +88,7 @@ class CSBuFLOTransport(WFPadTransport):
             cls._length = args.psize
         if args.padding:
             cls._padding_mode = args.padding
-        if cls._early_termination:
+        if args.early:
             cls._early_termination = args.early
 
     def onSessionStarts(self, sessId):
@@ -103,8 +103,9 @@ class CSBuFLOTransport(WFPadTransport):
             raise RuntimeError("Value passed for padding mode is not valid: %s" % self._padding_mode)
 
         if self._early_termination and self.weAreServer:
+            stopCond = self.stopCondition
             def earlyTermination(self):
-                return not self.session.is_peer_padding or self.stopCondition()
+                return not self.session.is_peer_padding or stopCond()
             self.stopCondition = earlyTermination
 
     def onSessionEnds(self, sessId):
