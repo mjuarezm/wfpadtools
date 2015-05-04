@@ -55,7 +55,7 @@ class TransportTestCase(object):
         return pt_config
 
     def _configure_transport_class(self, mode, pt_config):
-        transport_args = [mode, ADDR, "--dest=%s" % ADDR]
+        transport_args = [mode, ADDR, "--dest=%s" % ADDR] + self.args
         transport_class = get_transport_class(self.transport, mode)
         transport_class.setup(pt_config)
         p = argparse.ArgumentParser()
@@ -96,7 +96,7 @@ class PrimitiveTestCase(TransportTestCase):
 
 class WFPadTransportTestCase(PrimitiveTestCase, unittest.TestCase):
     transport = 'wfpad'
-
+    args = []
 
     def test_send_padding(self):
         delay = 0
@@ -127,11 +127,14 @@ class WFPadTransportTestCase(PrimitiveTestCase, unittest.TestCase):
 
 class BuFLOTransportTestCase(WFPadTransportTestCase):
     transport = 'buflo'
+    period = 20
+    psize = const.MPU
+    min_time= 10000
+    args = ['--period', str(period),
+            "--psize", str(psize),
+            "--mintime", str(min_time)]
+
+    def test_relay_app_hint(self):
+        pass
 
 
-class CSBuFLOTransportTestCase(WFPadTransportTestCase):
-    transport = 'csbuflo'
-
-
-class AdaptiveTransportTestCase(WFPadTransportTestCase):
-    transport = 'adaptive'
