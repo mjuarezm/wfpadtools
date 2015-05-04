@@ -2,13 +2,13 @@ import argparse
 
 import twisted
 from twisted.internet import task, reactor
+from twisted.internet.task import deferLater
 from twisted.trial import unittest
 from twisted.test import proto_helpers
 from twisted.internet.address import IPv4Address
 
 from obfsproxy.common import transport_config
 from obfsproxy.transports.transports import get_transport_class
-
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.network import network as net
 
@@ -105,6 +105,7 @@ class WFPadTransportTestCase(PrimitiveTestCase, unittest.TestCase):
         # assert total bytes received by server is the number of messages times MPU
         def assert_total_bytes():
             expected_bytes = num_padding_messages * const.MPU
+            self.assertEqual(self.pt_server.session.dataBytes['rcv'], 0)
             self.assertEqual(self.pt_server.session.totalBytes['rcv'], expected_bytes)
 
         return self._run_primitive_and_assert('relaySendPadding',
@@ -125,16 +126,45 @@ class WFPadTransportTestCase(PrimitiveTestCase, unittest.TestCase):
                                               assert_start_session)
 
 
-class BuFLOTransportTestCase(WFPadTransportTestCase):
-    transport = 'buflo'
-    period = 20
-    psize = const.MPU
-    min_time= 10000
-    args = ['--period', str(period),
-            "--psize", str(psize),
-            "--mintime", str(min_time)]
+class SessionTransportTestCase(PrimitiveTestCase):
+    # TODO: start and end a session
+    # session id
+    sess_id = "12345"
 
-    def test_relay_app_hint(self):
-        pass
+    def setUp(self):
+        PrimitiveTestCase.setUp(self),
+        self.pt_client.onSessionStarts(self.sess_id)
+
+    def test_send_padding(self):
+        delay = 0
+        num_padding_messages = 5
+
+        # assert total bytes received by server is the number of messages times MPU
+        def assert_total_bytes():
+            expected_bytes = num_padding_messages * const.MPU
+            self.assertEqual(self.pt_server.session.dataBytes['rcv'], 0)
+            self.assertEqual(self.pt_server.session.totalBytes['rcv'], expected_bytes)
+
+        return self._run_primitive_and_assert('relaySendPadding',
+                                              (num_padding_messages, delay),
+                                              assert_total_bytes)
+
+    def tearDown(self):
+        self.pt_client.onSessionEnds(self.sess_id)
+        self.pt_client.onEndPadding()
+        self.pt_server.onEndPadding()
+        self.pt_client.session.is_server_padding = False
+        return task.deferLater(reactor, 5, self._wait_before_tearing_down)
+
+    def _wait_before_tearing_down(self):
+        return PrimitiveTestCase.tearDown(self)
 
 
+# class BuFLOTransportTestCase(SessionTransportTestCase, unittest.TestCase):
+#     transport = 'buflo'
+#     period = 20
+#     psize = const.MPU
+#     min_time = 1
+#     args = ['--period', str(period),
+#             "--psize", str(psize),
+#             "--mintime", str(min_time)]
