@@ -22,10 +22,8 @@ class BuFLOTransport(WFPadTransport):
 
     def __init__(self):
         super(BuFLOTransport, self).__init__()
-
         # Set constant length for messages
         self._lengthDataProbdist = histo.uniform(self._length)
-
         # The stop condition in BuFLO:
         # BuFLO stops padding if the visit has finished and the
         # elapsed time has exceeded the minimum padding time.
