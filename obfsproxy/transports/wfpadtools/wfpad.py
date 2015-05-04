@@ -557,7 +557,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             return
         self.session.is_padding = True
         if self.weAreClient:
-            self.session.is_server_padding = True
+            self.session.is_peer_padding = True
             self.sendControlMessage(const.OP_APP_HINT, [self.getSessId(), False])
             if self._shim:
                 self._shim.notifyStartPadding()  # padding the tail of the page
@@ -566,10 +566,10 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         log.info("[wfpad - %s] - Session has ended! (sessid = %s)", self.end, sessId)
 
     def _waitServerStopPadding(self):
-        if self.session.is_server_padding:
+        if self.session.is_peer_padding:
             reactor.callLater(0.5, self._waitServerStopPadding)
             return
-        self.session.is_server_padding = False
+        self.session.is_peer_padding = False
         self._shim.notifyEndPadding()
         self.session.totalPadding = self.calculateTotalPadding(self)
         log.info("[wfpad - %s] - Num of data messages is: rcvd=%s/%s, sent=%s/%s", self.end,

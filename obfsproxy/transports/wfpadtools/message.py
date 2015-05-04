@@ -1,16 +1,15 @@
-"""This module provides methods to handle WFPad protocol messages.
+"""This module provides methods that define and handle WFPad protocol messages.
 
 The exported classes and functions provide interfaces to handle protocol
-messages, check message headers for validity and create protocol messages out
+messages, check message headers for validity and create protocol messages from
 of application data.
 
-This module is basically the same as ScrambleSuit's message but modified to
-our protocol specification.
+This module is heavily inspired in ScrambleSuit's message module:
+https://gitweb.torproject.org/pluggable-transports/obfsproxy.git/tree/obfsproxy/transports/scramblesuit/message.py?id=2bf9d096bb45a4e6c69f1cbdc3d2565f54a44efc#n1
 """
 import json
 import math
 
-# WFPadTools imports
 import obfsproxy.common.log as logging
 import obfsproxy.transports.base as base
 import obfsproxy.common.serialize as pack
@@ -21,18 +20,14 @@ log = logging.get_obfslogger()
 
 
 class WFPadMessage(object):
-    """Represents a WFPad protocol data unit."""
+    """Represents a WFPad protocol message."""
 
-    def __init__(self, payload='', paddingLen=0,
-                 flags=const.FLAG_DATA, opcode=None, args=""):
-        """Create a new instance of `WFPadMessage`."""
+    def __init__(self, payload='', paddingLen=0, flags=const.FLAG_DATA, opcode=None, args=""):
         self.payload = payload
         self.payloadLen = len(self.payload)
         self.totalLen = self.payloadLen + paddingLen
-
         if (self.totalLen) > const.MPU:
-            raise base.PluggableTransportError("No overly long messages.")
-
+            raise base.PluggableTransportError("The transport created a message longer than TCP's MTU.")
         self.sndTime = 0
         self.rcvTime = 0
         self.flags = flags
@@ -45,43 +40,52 @@ class WFPadMessage(object):
 
     def __str__(self):
         """Return string representation of the message."""
-        opCodeStr = argsLenStr = ""
         totalLenStr = pack.htons(self.totalLen)
         payloadLenStr = pack.htons(self.payloadLen)
         flagsStr = chr(self.flags)
-
         headerStr = totalLenStr + payloadLenStr + flagsStr
-        if self.opcode:
+        if isControl(self):
             opCodeStr = chr(self.opcode)
             argsLenStr = pack.htons(self.argsLen)
             headerStr += opCodeStr + argsLenStr
-
         paddingStr = self.generatePadding()
         payloadStr = self.args + self.payload + paddingStr
         return headerStr + payloadStr
 
     def __len__(self):
         """Return the length of this protocol message."""
-        headerLen = const.HDR_CTRL_LEN if self.flags & const.FLAG_CONTROL \
-            else const.MIN_HDR_LEN
+        headerLen = const.HDR_CTRL_LEN if isControl(self) else const.MIN_HDR_LEN
         msgLen = headerLen + self.totalLen
         if self.args:
             msgLen += self.argsLen
         return msgLen
 
     def __eq__(self, other):
-        return (isinstance(other, self.__class__)
-                and self.__dict__ == other.__dict__)
+        return (isinstance(other, self.__class__) and self.__dict__ == other.__dict__)
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
 
-class WFPadMessageFactory(object):
-    """Creates WFPad's protocol messages."""
+def isControl(msg):
+    return msg.flags & const.FLAG_CONTROL
 
-    def new(self, payload="", paddingLen=0,
-            flags=const.FLAG_DATA, opcode=None, args=""):
+
+def isData(msg):
+    return msg.flags & const.FLAG_DATA
+
+
+def isPadding(msg):
+    return msg.flags & const.FLAG_PADDING
+
+
+def isLast(msg):
+    return msg.flags & const.FLAG_LAST
+
+
+class WFPadMessageFactory(object):
+
+    def new(self, payload="", paddingLen=0, flags=const.FLAG_DATA, opcode=None, args=""):
         """Create a new WFPad message."""
         return WFPadMessage(payload, paddingLen, flags, opcode, args)
 
@@ -92,9 +96,8 @@ class WFPadMessageFactory(object):
     def newControl(self, opcode, args="", payload="", paddingLen=0):
         """Shortcut to create a single control message."""
         if len(args) > const.MPU:
-            raise base.PluggableTransportError("Args are too long.")
-        return self.new(payload, paddingLen,
-                        const.FLAG_CONTROL, opcode, args)
+            raise base.PluggableTransportError("Arguments are too long.")
+        return self.new(payload, paddingLen, const.FLAG_CONTROL, opcode, args)
 
     def getSamplePayloadLength(self, probDist, flags=const.FLAG_DATA):
         """Return payload length sampling from probability distribution."""
@@ -109,14 +112,11 @@ class WFPadMessageFactory(object):
     def encapsulate(self, data="", opcode=None, args="", lenProbdist=None):
         """Wrap data into WFPad protocol messages."""
         assert(data or opcode)
-
-        messages = []
         if opcode:
             messages = self._encapsulateCtrl(opcode, args, data, lenProbdist)
         else:
             messages = self._encapsulateData(data, lenProbdist)
         log.debug("[wfpad] Encapsulated in %d messages." % len(messages))
-
         return messages
 
     def _encapsulateData(self, data, lenProbdist=None):
@@ -138,8 +138,7 @@ class WFPadMessageFactory(object):
         """Wrap data into WFPad control messages."""
         messages = []
         strArgs = json.dumps(args)
-
-        while len(strArgs) > 0:
+        while len(strArgs) > 0:  # prioritize arguments over piggybacked data
             payloadLen = self.getSamplePayloadLength(lenProbdist, const.FLAG_CONTROL)
             argsLen = len(strArgs)
             if argsLen > payloadLen:
@@ -151,14 +150,13 @@ class WFPadMessageFactory(object):
                 paddingLen = maxPiggyLen - dataLen if maxPiggyLen > dataLen else 0
                 flags = const.FLAG_CONTROL | const.FLAG_LAST
                 flags |= const.FLAG_DATA if dataLen > 0 else const.FLAG_PADDING
-                messages.append(self.new(piggyData, paddingLen, flags, opcode,
-                                         strArgs[:payloadLen]))
+                maxArgs = strArgs[:payloadLen]
+                new_msg = self.new(piggyData, paddingLen, flags, opcode, maxArgs)
+                messages.append(new_msg)
                 data = data[maxPiggyLen:]
             strArgs = strArgs[payloadLen:]
-
         if len(data) > 0:
             messages += self.encapsulate(data, lenProbdist)
-
         return messages
 
 
@@ -213,7 +211,6 @@ def isSane(totalLen, payloadLen, flags):
     checked for their sanity.  If they are in the expected range, `True` is
     returned. If any of these fields has an invalid value, return `False`.
     """
-
     def isFine(length):
         """Check if the given length is fine."""
         return True if (0 <= length <= const.MPU) else False
@@ -235,7 +232,6 @@ def isSane(totalLen, payloadLen, flags):
 
 def isOpCodeSane(opcode):
     """Verify the the extra control message fields are correct."""
-
     log.debug("[wfpad] Opcode: value=%s, name=%s"
               % (opcode, getOpcodeNames(opcode)))
     validOpCodes = [
@@ -328,7 +324,6 @@ class WFPadMessageExtractor(object):
                 + "Parsed args length: " + str(self.argsParseLen) + "\n" \
                 + "Args: " + self.args + "\n" \
                 + "Rcv buffer: " + self.recvBuf
-
         if toLog:
             log.debug(state)
         else:
@@ -348,7 +343,6 @@ class WFPadMessageExtractor(object):
         if self.flags & const.FLAG_CONTROL:
             readLen += self.argsLen
         self.recvBuf = self.recvBuf[readLen:]
-
         if self.flags & const.FLAG_LAST > 0:
             self.args = ""
         self.totalLen = self.payloadLen = self.flags = self.opcode = None
@@ -358,12 +352,10 @@ class WFPadMessageExtractor(object):
         """Extract common header fields, if necessary."""
         if not self.totalLen == self.payloadLen == self.flags == None:
             return
-
         # Parse common header fields
         self.totalLen = self.getTotalLen()
         self.payloadLen = self.getPayloadLen()
         self.flags = self.getFlags()
-
         # Sanity check of the fields
         if not isSane(self.totalLen, self.payloadLen, self.flags):
             log.error("TotalLen: %s, PayloadLen: %s, Flags: %s", self.totalLen, self.payloadLen, self.flags)
@@ -376,9 +368,7 @@ class WFPadMessageExtractor(object):
             self.opcode = self.getOpCode()
         # Sanity check of the opcode
         if not isOpCodeSane(self.opcode):
-            raise base.PluggableTransportError("Invalid control opcode: %s"
-                                               % self.opcode)
-
+            raise base.PluggableTransportError("Invalid control opcode: %s" % self.opcode)
         # Parse args
         self.argsLen = self.getargsLen()
         self.args += self.getMessageField(const.ARGS_POS, self.argsLen)
@@ -387,7 +377,7 @@ class WFPadMessageExtractor(object):
         """Filter padding messages out and remove data messages from buffer."""
         headerLen = self.getHeaderLen(self.flags)
         start = headerLen
-        if self.flags & const.FLAG_CONTROL > 0:
+        if isControl(self):
             start += self.argsLen
         return self.getPayload(start)
 
@@ -420,41 +410,30 @@ class WFPadMessageExtractor(object):
         """
         self.recvBuf += data
         msgs = []
-
         # Keep trying to unpack as long as there is at least a header.
         while len(self.recvBuf) >= const.MIN_HDR_LEN:
-
             # Parse common header fields
             self.parseMinHeaderFields()
-
             # Parts of the message are still on the wire; waiting.
             if len(self.recvBuf) - const.MIN_HDR_LEN < self.totalLen:
                 break
-
             if self.flags & const.FLAG_CONTROL > 0:
                 # Parse control message fields
                 self.parseControlFields()
-
                 if len(self.recvBuf) - const.HDR_CTRL_LEN < self.totalLen:
                     break
-
             # Wait till last control message
-            if not self.flags & const.FLAG_CONTROL or \
-                    self.flags & const.FLAG_LAST:
-
+            if not isControl(self) or isLast(self):
                 # Extract data
                 extracted = self.filterPaddingOut()
-
                 args = json.loads(self.args) if self.args else ""
-
+                padLen = self.totalLen - self.payloadLen
                 # Create WFPadMessage
                 msgs.append(WFPadMessage(payload=extracted,
-                                         paddingLen=self.totalLen - self.payloadLen,
+                                         paddingLen=padLen,
                                          flags=self.flags,
                                          opcode=self.opcode,
                                          args=args))
-
             # Reset extractor attributes
             self.reset()
-
         return msgs

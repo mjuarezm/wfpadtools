@@ -153,7 +153,7 @@ class SessionTransportTestCase(PrimitiveTestCase):
         self.pt_client.onSessionEnds(self.sess_id)
         self.pt_client.onEndPadding()
         self.pt_server.onEndPadding()
-        self.pt_client.session.is_server_padding = False
+        self.pt_client.session.is_peer_padding = False
         return task.deferLater(reactor, 5, self._wait_before_tearing_down)
 
     def _wait_before_tearing_down(self):

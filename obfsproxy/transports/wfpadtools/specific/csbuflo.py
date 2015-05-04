@@ -28,10 +28,8 @@ class CSBuFLOTransport(WFPadTransport):
     """
     def __init__(self):
         super(CSBuFLOTransport, self).__init__()
-
         self._rho_stats = [[]]
-        self._rho_star = const.INIT_RHO
-
+        self._rho_star = self._initial_rho
         # Set constant length for messages
         self._lengthDataProbdist = histo.uniform(self._length)
 
@@ -41,25 +39,32 @@ class CSBuFLOTransport(WFPadTransport):
         subparser.add_argument("--period",
                                required=False,
                                type=float,
-                               help="Time rate at which transport sends "
-                                    "messages (Default: 1ms).",
+                               help="Initial transmission rate at which transport sends "
+                                    "messages (Default: 40ms).",
                                dest="period")
         subparser.add_argument("--psize",
                                required=False,
                                type=int,
                                help="Length of messages to be transmitted"
-                                    " (Default: MTU).",
+                                    " (Default: MPU).",
                                dest="psize")
+        subparser.add_argument("--early",
+                               required=False,
+                               type=bool,
+                               help="Whether the client will notify the server"
+                                    " that has ended padding, so that the server "
+                                    "saves on padding by skipping the long tail.",
+                               default=False)
         subparser.add_argument("--padding",
                                required=False,
                                type=str,
                                help="Padding mode for this endpoint. There"
                                     " are two possible values: \n"
-                                    "- payload: pads to the closest multiple "
+                                    "- payload (CPSP): pads to the closest multiple "
                                     "of 2^N for N st 2^N closest power of two"
                                     " greater than the payload size.\n"
-                                    "- total: pads to closest power of two.\n"
-                                    "(Default: total).",
+                                    "- total (CTSP): pads to closest power of two.\n"
+                                    "(Default: CTSP).",
                                dest="padding")
 
         super(CSBuFLOTransport, cls).register_external_mode_cli(subparser)
@@ -68,18 +73,23 @@ class CSBuFLOTransport(WFPadTransport):
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables."""
         # Defaults for BuFLO specifications.
-        cls._period = 1
+        cls._initial_rho = const.INIT_RHO
+        cls._period = const.INIT_RHO
         cls._length = const.MPU
         cls._padding_mode = const.TOTAL_PADDING
+        cls._early_termination = False
 
         super(CSBuFLOTransport, cls).validate_external_mode_cli(args)
 
         if args.period:
+            cls._initial_rho = args.period
             cls._period = args.period
         if args.psize:
             cls._length = args.psize
         if args.padding:
             cls._padding_mode = args.padding
+        if cls._early_termination:
+            cls._early_termination = args.early
 
     def onSessionStarts(self, sessId):
         # Initialize rho stats
@@ -92,11 +102,22 @@ class CSBuFLOTransport(WFPadTransport):
         else:
             raise RuntimeError("Value passed for padding mode is not valid: %s" % self._padding_mode)
 
+        if self._early_termination and self.weAreServer:
+            def earlyTermination(self):
+                return not self.session.is_peer_padding or self.stopCondition()
+            self.stopCondition = earlyTermination
+
     def onSessionEnds(self, sessId):
         super(CSBuFLOTransport, self).onSessionEnds(sessId)
         # Reset rho stats
         self._rho_stats = [[]]
-        self._rho_star = const.INIT_RHO
+        self._rho_star = self._initial_rho
+
+    def onEndPadding(self):
+        WFPadTransport.onEndPadding(self)
+        if self._early_termination and self.weAreClient:
+            self.sendControlMessage(const.OP_END_PADDING)
+            log.info("[csbuflo - client] - Padding stopped! Will notify server.")
 
     def whenReceivedUpstream(self):
         self._rho_stats += []
@@ -107,7 +128,7 @@ class CSBuFLOTransport(WFPadTransport):
 
     def whenReceived(self):
         if self._rho_star == 0:
-            self._rho_star = const.INIT_RHO
+            self._rho_star = self._initial_rho
         else:
             self._rho_star = self.estimate_rho(self._rho_star)
 
@@ -135,37 +156,10 @@ class CSBuFLOTransport(WFPadTransport):
             return math.pow(2, math.floor(math.log(mu.median(time_intervals), 2)))
 
     def update_transmission_rate(self):
+        prev_period = self._period
         self._period = uniform(0, 2 * self._rho_star)
         self.constantRatePaddingDistrib(self._period)
-
-    def relayBatchPad(self, sessId, L, t, msg_level=True):
-        """Pad all batches of cells to the nearest multiple of `L` cells/bytes total.
-
-        Set the stop condition to satisfy the number of messages (or bytes)
-        sent within the session is a multiple of the parameter `L` and that the
-        session has finished.
-
-        Parameters
-        ----------
-        sessId : str
-            The session ID from relayAppHint().
-        L : int
-            The multiple of cells to pad to.
-        t : int
-            The number of milliseconds to wait between cells to consider them
-            part of the same batch.
-        """
-        self._sessId = sessId
-        self.constantRatePaddingDistrib(t)
-        to_pad = self.session.numMessages['snd'] if msg_level else self.session.dataBytes['snd']
-
-        def stopConditionBatchPad(self):
-            stopCond = to_pad > 0 and to_pad % L == 0 and not self.isVisiting()
-            log.debug("[wfpad] - Batch pad stop condition is %self."
-                      "\n Visiting: %self, Num snd msgs: %self, L: %self"
-                      % (stopCond, self.isVisiting(), self.session.numMessages, L))
-            return stopCond
-        self.stopCondition = stopConditionBatchPad
+        log.debug("Transmission rate has been updated from %s to %s.", prev_period, self._period)
 
 
 class CSBuFLOClient(CSBuFLOTransport):

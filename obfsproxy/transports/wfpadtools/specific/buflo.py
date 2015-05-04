@@ -41,7 +41,7 @@ class BuFLOTransport(WFPadTransport):
                                required=False,
                                type=float,
                                help="Time rate at which transport sends "
-                                    "messages (Default: 1ms).",
+                                    "messages (Default: 40ms).",
                                dest="period")
         subparser.add_argument("--psize",
                                required=False,
@@ -52,7 +52,8 @@ class BuFLOTransport(WFPadTransport):
         subparser.add_argument("--mintime",
                                required=False,
                                type=int,
-                               help="Minimum padding time per visit.",
+                               help="Minimum padding time per visit."
+				    " (Default: no minimum time).",
                                dest="mintime")
 
         super(BuFLOTransport, cls).register_external_mode_cli(subparser)
@@ -66,7 +67,7 @@ class BuFLOTransport(WFPadTransport):
         """
         # Defaults for BuFLO specifications.
         cls._mintime = -1
-        cls._period = 1
+        cls._period = 40
         cls._length = const.MPU
 
         super(BuFLOTransport, cls).validate_external_mode_cli(args)

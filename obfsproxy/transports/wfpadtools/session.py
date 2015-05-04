@@ -35,6 +35,6 @@ class Session(object):
         # Initialize start time
         self.startTime = time.time()
 
-        # Flag server end of padding
-        self.is_server_padding = False
+        # Flag peer is padding or not
+        self.is_peer_padding = False
 

@@ -94,7 +94,7 @@ class PaddingPrimitivesInterface(object):
 
     def relayEndPadding(self):
         """Message sent by the server to the client to flag end of padding."""
-        self.session.is_server_padding = False
+        self.session.is_peer_padding = False
 
     def relayBurstHistogram(self, histo, removeTokens=False, interpolate=True, when="rcv"):
         """Specify histogram encoding the delay distribution.

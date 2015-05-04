@@ -29,10 +29,10 @@ ST_WAIT                 = 0
 ST_CONNECTED            = 1
 
 # Flags header protocol
-FLAG_DATA               = (1 << 0)
-FLAG_PADDING            = (1 << 1)
-FLAG_CONTROL            = (1 << 2)
-FLAG_LAST               = (1 << 3)
+FLAG_DATA               = (1 << 0)  # 0001 = 1
+FLAG_PADDING            = (1 << 1)  # 0010 = 2
+FLAG_CONTROL            = (1 << 2)  # 0100 = 4
+FLAG_LAST               = (1 << 3)  # 1000 = 8
 
 # CS-BuFLO padding modes
 PAYLOAD_PADDING         = 'payload'
@@ -68,7 +68,7 @@ ARGS_TOTAL_LENGTH_LEN   = 2
 ARGS_POS                = 8
 
 # Length of WFPad's MTU in bytes.  Note that this is *not* the link MTU
-# which is probably 1500 (we substract 52 bytes = TCP+IP headers)
+# which is probably 1500 (we substract 52 bytes = TCP (32B) + IP (20B) headers)
 TOR_CELL_SIZE           = 512
 MTU                     = 1448
 MSS                     = 1460
@@ -85,7 +85,7 @@ MPU_CTRL                = MTU - HDR_CTRL_LEN
 
 # Max delay
 MAX_DELAY               = 262144
-INIT_RHO                = 1
+INIT_RHO                = 40
 
 # Default shim ports
 SHIM_PORT               = 4997
