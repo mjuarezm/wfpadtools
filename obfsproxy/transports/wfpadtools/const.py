@@ -86,6 +86,7 @@ MPU_CTRL                = MTU - HDR_CTRL_LEN
 # Max delay
 MAX_DELAY               = 262144
 INIT_RHO                = 40
+MAX_RHO                 = 10000
 
 # Default shim ports
 SHIM_PORT               = 4997

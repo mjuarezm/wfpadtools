@@ -32,7 +32,7 @@ class AdaptiveTransport(WFPadTransport):
             elapsed = s.getElapsed()
             log.debug("[adaptive {}] - elapsed = {}, mintime = {}, visiting = {}"
                       .format(self.end, elapsed, 120, s.isVisiting()))
-            return elapsed > 120 and not s.isVisiting()
+            return elapsed % 120 and not s.isVisiting()
         self.stopCondition = stopConditionHandler
 
     @classmethod

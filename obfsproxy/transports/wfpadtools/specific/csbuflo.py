@@ -132,6 +132,7 @@ class CSBuFLOTransport(WFPadTransport):
             self._rho_star = self._initial_rho
         else:
             self._rho_star = self.estimate_rho(self._rho_star)
+        log.debug("[cs-buflo] rho star = %s", self._rho_star)
 
     def crossed_threshold(self, total_sent_bytes):
         """Return boolean whether we need to update the transmission rate
@@ -145,22 +146,27 @@ class CSBuFLOTransport(WFPadTransport):
         """Send data message."""
         super(CSBuFLOTransport, self).sendDataMessage(payload, paddingLen)
         self._rho_stats[-1].append(reactor.seconds())
-        self.update_transmission_rate()
+        if self.crossed_threshold(self.session.totalBytes['snd']):
+            self.update_transmission_rate()
+        elif self._rho_star >= const.MAX_RHO:
+            self._rho_star = self._initial_rho
 
     def estimate_rho(self, rho_star):
         """Estimate new value of rho based on past network performance."""
         time_intervals = gu.flatten_list([gu.apply_consecutive_elements(burst_list, lambda x, y: y - x)
                                           for burst_list in self._rho_stats])
+        log.debug("[cs-buflo] Time intervals = %s", time_intervals)
         if len(time_intervals) == 0:
             return rho_star
         else:
             return math.pow(2, math.floor(math.log(mu.median(time_intervals), 2)))
 
     def update_transmission_rate(self):
+        """Transmission rate."""
         prev_period = self._period
         self._period = uniform(0, 2 * self._rho_star)
         self.constantRatePaddingDistrib(self._period)
-        log.debug("Transmission rate has been updated from %s to %s.", prev_period, self._period)
+        log.debug("[cs-buflo] Transmission rate has been updated from %s to %s.", prev_period, self._period)
 
 
 class CSBuFLOClient(CSBuFLOTransport):
