@@ -2,6 +2,7 @@
 This module implements the CS-CSBuFLO countermeasure proposed by Cai et al.
 """
 import math
+import time
 from random import uniform
 
 from twisted.internet import reactor
@@ -134,28 +135,34 @@ class CSBuFLOTransport(WFPadTransport):
             self._rho_star = self.estimate_rho(self._rho_star)
         log.debug("[cs-buflo] rho star = %s", self._rho_star)
 
-    def crossed_threshold(self, total_sent_bytes):
+    def crossed_threshold(self):
         """Return boolean whether we need to update the transmission rate
 
-        total_sent_bytes: amount of bytes sent downstream, namely,
-        junk bytes + real data bytes.
+        CSBuFLO updates transmission rate when the amount of bytes sent
+        downstream, namely, junk bytes + real data bytes is 
         """
-        return math.log(total_sent_bytes - const.MTU, 2) < math.log(total_sent_bytes, 2)
+        total_sent_bytes = self.session.totalBytes['snd']
+        if total_sent_bytes - const.MTU <= 0:
+            return False
+        crossed = int(math.log(total_sent_bytes - const.MTU, 2)) < int(math.log(total_sent_bytes, 2))
+        #log.debug("[cs-buflo] Total sent bytes = %s, MTU = %s, Crossed = %s", total_sent_bytes, const.MTU, crossed)
+        return crossed
 
     def sendDataMessage(self, payload="", paddingLen=0):
         """Send data message."""
         super(CSBuFLOTransport, self).sendDataMessage(payload, paddingLen)
-        self._rho_stats[-1].append(reactor.seconds())
-        if self.crossed_threshold(self.session.totalBytes['snd']):
+        self._rho_stats[-1].append(time.time())
+        if self.crossed_threshold():
             self.update_transmission_rate()
         elif self._rho_star >= const.MAX_RHO:
             self._rho_star = self._initial_rho
 
     def estimate_rho(self, rho_star):
         """Estimate new value of rho based on past network performance."""
-        time_intervals = gu.flatten_list([gu.apply_consecutive_elements(burst_list, lambda x, y: y - x)
+        #log.debug("[cs-buflo] rho stats: %s" % self._rho_stats)
+        time_intervals = gu.flatten_list([gu.apply_consecutive_elements(burst_list, lambda x, y: (y - x) * const.SCALE)
                                           for burst_list in self._rho_stats])
-        log.debug("[cs-buflo] Time intervals = %s", time_intervals)
+        #log.debug("[cs-buflo] Time intervals = %s", time_intervals)
         if len(time_intervals) == 0:
             return rho_star
         else:
