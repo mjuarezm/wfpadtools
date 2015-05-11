@@ -1,5 +1,5 @@
 """
-This module implements the CS-CSBuFLO countermeasure proposed by Cai et al.
+This module implements the BW differentials adaptive countermeasure.
 """
 import math
 import time
@@ -9,6 +9,7 @@ from twisted.internet import reactor
 
 # WFPadTools imports
 import obfsproxy.common.log as logging
+from obfsproxy.transports.wfpadtools import common as cm
 from obfsproxy.transports.wfpadtools import histo
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
@@ -20,29 +21,27 @@ from obfsproxy.transports.wfpadtools.util import mathutil as mu
 log = logging.get_obfslogger()
 
 
-class CSBuFLOTransport(WFPadTransport):
+class BWDiffTransport(WFPadTransport):
     """Implementation of the CSBuFLO countermeasure.
 
     It extends the BasePadder by choosing a constant probability distribution
     for time, and a constant probability distribution for packet lengths. The
     minimum time for which the link will be padded is also specified.
     """
-    def __init__(self):
-        super(CSBuFLOTransport, self).__init__()
-        self._rho_stats = [[]]
-        self._rho_star = self._initial_rho
-        # Set constant length for messages
-        self._lengthDataProbdist = histo.uniform(self._length)
-
     @classmethod
     def register_external_mode_cli(cls, subparser):
         """Register CLI arguments for CSBuFLO parameters."""
         subparser.add_argument("--period",
                                required=False,
                                type=float,
-                               help="Initial transmission rate at which transport sends "
-                                    "messages (Default: 0ms).",
+                               help="Period for sampling bandwidth differentials. "
+                                    "(Default: 100msec).",
                                dest="period")
+        subparser.add_argument("--threshold",
+                               required=False,
+                               type=float,
+                               help="Threshold for the bandwidth differential.",
+                               dest="threshold")
         subparser.add_argument("--psize",
                                required=False,
                                type=int,
@@ -68,23 +67,24 @@ class CSBuFLOTransport(WFPadTransport):
                                     "(Default: CTSP).",
                                dest="padding")
 
-        super(CSBuFLOTransport, cls).register_external_mode_cli(subparser)
+        super(BWDiffTransport, cls).register_external_mode_cli(subparser)
 
     @classmethod
     def validate_external_mode_cli(cls, args):
         """Assign the given command line arguments to local variables."""
         # Defaults for BuFLO specifications.
-        cls._initial_rho = const.INIT_RHO
-        cls._period = const.INIT_RHO
+        cls._threshold = 0.5
+        cls._period = 100
         cls._length = const.MPU
         cls._padding_mode = const.TOTAL_PADDING
         cls._early_termination = False
 
-        super(CSBuFLOTransport, cls).validate_external_mode_cli(args)
+        super(BWDiffTransport, cls).validate_external_mode_cli(args)
 
         if args.period:
-            cls._initial_rho = args.period
             cls._period = args.period
+        if args.threshold:
+            cls._threshold = args.threshold
         if args.psize:
             cls._length = args.psize
         if args.padding:
@@ -92,8 +92,32 @@ class CSBuFLOTransport(WFPadTransport):
         if args.early:
             cls._early_termination = args.early
 
+    def getBwDifferential(self):
+        self.iat_length_tuples = [l for l in self.iat_length_tuples if len(l) > 0]
+        if time.time() - self.session.startTime > 0.2 and len(self.iat_length_tuples) > 1:
+            lengths0 = [t[1] for t in self.iat_length_tuples[-2]]
+            lengths1 = [t[1] for t in self.iat_length_tuples[-1]]
+            bw0 = sum(lengths0) / self._period
+            bw1 = sum(lengths1) / self._period
+            bw_diff = (bw1 - bw0) / self._period
+            self.session.bw_diffs.append(bw_diff)
+
+            if abs(bw_diff) > self._threshold:
+                # we should sample uniformly from the passed iats
+                # convert self.iat_length_tuples to distribution
+                # and pass it to wfpad iat distribution as dict.
+                histo = {t[0]: 1 for t in self.iat_length_tuples[-2]}
+                log.debug("[bwdiff] -  abs bwdiff (%s) > threshold (%s) histogram: %s",
+                          abs(bw_diff), self._threshold, histo)
+                self.relayBurstHistogram(histo, when="snd")
+                self.relayGapHistogram(histo, when="snd")
+        self.iat_length_tuples.append([])
+        log.debug("[bwdiff] A period has passed: %s", self.iat_length_tuples)
+        cm.deferLater(self._period, self.getBwDifferential)
+
     def onSessionStarts(self, sessId):
-        # Initialize rho stats
+        WFPadTransport.onSessionStarts(self, sessId)
+        self._lengthDataProbdist = histo.uniform(self._length)
         self.constantRatePaddingDistrib(self._period)
         if self._padding_mode == const.TOTAL_PADDING:
             self.relayTotalPad(sessId, self._period, False)
@@ -101,92 +125,35 @@ class CSBuFLOTransport(WFPadTransport):
             self.relayPayloadPad(sessId, self._period, False)
         else:
             raise RuntimeError("Value passed for padding mode is not valid: %s" % self._padding_mode)
-
         if self._early_termination and self.weAreServer:
             stopCond = self.stopCondition
             def earlyTermination(self):
                 return not self.session.is_peer_padding or stopCond()
             self.stopCondition = earlyTermination
-        WFPadTransport.onSessionStarts(self, sessId)
-
-    def onSessionEnds(self, sessId):
-        super(CSBuFLOTransport, self).onSessionEnds(sessId)
-        # Reset rho stats
-        self._rho_stats = [[]]
-        self._rho_star = self._initial_rho
+        self.iat_length_tuples = [[]]
+        self.getBwDifferential()
 
     def onEndPadding(self):
         WFPadTransport.onEndPadding(self)
         if self._early_termination and self.weAreClient:
             self.sendControlMessage(const.OP_END_PADDING)
-            log.info("[csbuflo - client] - Padding stopped! Will notify server.")
+            log.info("[bwdiff - client] - Padding stopped! Will notify server.")
 
-    def whenReceivedUpstream(self):
-        self._rho_stats.append([])
-        self.whenReceived()
-
-    def whenReceivedDownstream(self):
-        self.whenReceived()
-
-    def whenReceived(self):
-        if self._rho_star == 0:
-            self._rho_star = self._initial_rho
-        else:
-            self._rho_star = self.estimate_rho(self._rho_star)
-        log.debug("[cs-buflo] rho star = %s", self._rho_star)
-
-    def crossed_threshold(self):
-        """Return boolean whether we need to update the transmission rate
-
-        CSBuFLO updates transmission rate when the amount of bytes sent
-        downstream, namely, junk bytes + real data bytes is 
-        """
-        total_sent_bytes = self.session.totalBytes['snd']
-        if total_sent_bytes - const.MTU <= 0:
-            return False
-        crossed = int(math.log(total_sent_bytes - const.MTU, 2)) < int(math.log(total_sent_bytes, 2))
-        #log.debug("[cs-buflo] Total sent bytes = %s, MTU = %s, Crossed = %s", total_sent_bytes, const.MTU, crossed)
-        return crossed
-
-    def sendDataMessage(self, payload="", paddingLen=0):
-        """Send data message."""
-        super(CSBuFLOTransport, self).sendDataMessage(payload, paddingLen)
-        self._rho_stats[-1].append(time.time())
-        if self.crossed_threshold():
-            self.update_transmission_rate()
-        elif self._rho_star >= const.MAX_RHO:
-            self._rho_star = self._initial_rho
-
-    def estimate_rho(self, rho_star):
-        """Estimate new value of rho based on past network performance."""
-        #log.debug("[cs-buflo] rho stats: %s" % self._rho_stats)
-        time_intervals = gu.flatten_list([gu.apply_consecutive_elements(burst_list, lambda x, y: (y - x) * const.SCALE)
-                                          for burst_list in self._rho_stats])
-        #log.debug("[cs-buflo] Time intervals = %s", time_intervals)
-        if len(time_intervals) == 0:
-            return rho_star
-        else:
-            return math.pow(2, math.floor(math.log(mu.median(time_intervals), 2)))
-
-    def update_transmission_rate(self):
-        """Transmission rate."""
-        prev_period = self._period
-        self._period = uniform(0, 2 * self._rho_star)
-        self.constantRatePaddingDistrib(self._period)
-        log.debug("[cs-buflo] Transmission rate has been updated from %s to %s.", prev_period, self._period)
+    def whenReceivedUpstream(self, data):
+        self.iat_length_tuples[-1].append((time.time(), len(data)))
 
 
-class CSBuFLOClient(CSBuFLOTransport):
-    """Extend the CSBuFLOTransport class."""
+class BWDiffClient(BWDiffTransport):
+    """Extend the BWDiffTransport class."""
 
     def __init__(self):
-        """Initialize a CSBuFLOClient object."""
-        CSBuFLOTransport.__init__(self)
+        """Initialize a BWDiffClient object."""
+        BWDiffTransport.__init__(self)
 
 
-class CSBuFLOServer(CSBuFLOTransport):
-    """Extend the CSBuFLOTransport class."""
+class BWDiffServer(BWDiffTransport):
+    """Extend the BWDiffTransport class."""
 
     def __init__(self):
-        """Initialize a CSBuFLOServer object."""
-        CSBuFLOTransport.__init__(self)
+        """Initialize a BWDiffServer object."""
+        BWDiffTransport.__init__(self)

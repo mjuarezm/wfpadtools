@@ -41,3 +41,5 @@ class Session(object):
         # Current iat
         self.current_iat = 0
 
+        # bw differentials
+        self.bw_diffs = []

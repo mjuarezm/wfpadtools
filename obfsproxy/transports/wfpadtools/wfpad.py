@@ -53,7 +53,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         # Initialize the protocol's state machine
         self._state = const.ST_WAIT
 
-        # Buffer used to queue pending data messages
+        # Buffer used to 0queue pending data messages
         self._buffer = Buffer()
 
         # Objects to extract and parse protocol messages
@@ -63,7 +63,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         # Get the global shim object
         self._initializeShim()
 
-        # Initialize state
+        # Initialize state0
         self._initializeState()
 
 
@@ -213,13 +213,13 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.session.lastRcvUpstreamTs = time.time()
         if self._state >= const.ST_CONNECTED:
             self.pushData(d)
-            self.whenReceivedUpstream()
+            self.whenReceivedUpstream(d)
         else:
             self._buffer.write(d)
             log.debug("[wfpad - %s] Buffered %d bytes of outgoing data.",
                       self.end, len(self._buffer))
 
-    def whenReceivedUpstream(self):
+    def whenReceivedUpstream(self, data):
         """Template method for child WF defense transport."""
         pass
 

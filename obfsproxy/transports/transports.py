@@ -6,7 +6,7 @@ import obfsproxy.transports.obfs3 as obfs3
 import obfsproxy.transports.scramblesuit.scramblesuit as scramblesuit
 import obfsproxy.transports.wfpadtools.wfpad as wfpad
 from obfsproxy.transports.wfpadtools.specific import buflo, csbuflo, tamaraw,\
-    adaptive
+    adaptive, bwdiff
 
 transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyClient, 'server' : dummy.DummyServer },
                'b64'   : {'base': b64.B64Transport, 'client' : b64.B64Client, 'server' : b64.B64Server },
@@ -19,6 +19,7 @@ transports = { 'dummy' : {'base': dummy.DummyTransport, 'client' : dummy.DummyCl
                'wfpad': {'base': wfpad.WFPadTransport, 'client': wfpad.WFPadClient, 'server': wfpad.WFPadServer},
                'csbuflo': {'base': csbuflo.CSBuFLOTransport, 'client': csbuflo.CSBuFLOClient, 'server': csbuflo.CSBuFLOServer},
                'tamaraw': {'base': tamaraw.TamarawTransport, 'client': tamaraw.TamarawClient, 'server': tamaraw.TamarawServer},
+               'bwdiff': {'base': bwdiff.BWDiffTransport, 'client': bwdiff.BWDiffClient, 'server': bwdiff.BWDiffServer},
                'adaptive': {'base': adaptive.AdaptiveTransport, 'client': adaptive.AdaptiveClient, 'server': adaptive.AdaptiveServer} }
 
 def get_transport_class(name, role):
