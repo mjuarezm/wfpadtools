@@ -85,6 +85,7 @@ class StaticTransportTestCase(object):
         self.clock.getDelayedCalls()
         self._lose_protocol_connection(self.proto_client)
         self._lose_protocol_connection(self.proto_server)
+        return deferLater(reactor, 0.2, self._wait_deferred)
 
 
 class OnlineTransportTestCase(object):
