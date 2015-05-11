@@ -37,4 +37,7 @@ class Session(object):
 
         # Flag peer is padding or not
         self.is_peer_padding = False
+        
+        # Current iat
+        self.current_iat = 0
 

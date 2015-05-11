@@ -80,10 +80,10 @@ class BuFLOTransport(WFPadTransport):
             cls._length = args.psize
 
     def onSessionStarts(self, sessId):
-        WFPadTransport.onSessionStarts(self, sessId)
         log.debug("[buflo {}] - params: mintime={}, period={}, psize={}"
                   .format(self.end, self._mintime, self._period, self._length))
         self.constantRatePaddingDistrib(self._period)
+        WFPadTransport.onSessionStarts(self, sessId)
 
 
 class BuFLOClient(BuFLOTransport):

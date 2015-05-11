@@ -67,7 +67,7 @@ class AdaptiveTransport(WFPadTransport):
             cls._histograms = du.load_json(args.histo_file)
 
     def onSessionStarts(self, sessId):
-        WFPadTransport.onSessionStarts(self, sessId)
+        self._delayDataProbdist = histo.uniform(const.INF_LABEL)
         if self._histograms:
             self.relayBurstHistogram(
                 **dict(self._histograms["burst"]["snd"], **{"when": "snd"}))
@@ -77,6 +77,7 @@ class AdaptiveTransport(WFPadTransport):
                 **dict(self._histograms["gap"]["snd"], **{"when": "snd"}))
             self.relayGapHistogram(
                 **dict(self._histograms["gap"]["rcv"], **{"when": "rcv"}))
+        WFPadTransport.onSessionStarts(self, sessId)
 
 
 class AdaptiveClient(AdaptiveTransport):

@@ -94,7 +94,6 @@ class CSBuFLOTransport(WFPadTransport):
 
     def onSessionStarts(self, sessId):
         # Initialize rho stats
-        WFPadTransport.onSessionStarts(self, sessId)
         self.constantRatePaddingDistrib(self._period)
         if self._padding_mode == const.TOTAL_PADDING:
             self.relayTotalPad(sessId, self._period, False)
@@ -108,6 +107,7 @@ class CSBuFLOTransport(WFPadTransport):
             def earlyTermination(self):
                 return not self.session.is_peer_padding or stopCond()
             self.stopCondition = earlyTermination
+        WFPadTransport.onSessionStarts(self, sessId)
 
     def onSessionEnds(self, sessId):
         super(CSBuFLOTransport, self).onSessionEnds(sessId)
