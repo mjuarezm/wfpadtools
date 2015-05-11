@@ -38,3 +38,5 @@ class Session(object):
         # Flag peer is padding or not
         self.is_peer_padding = False
 
+        # bw differentials
+        self.bw_diffs = []
