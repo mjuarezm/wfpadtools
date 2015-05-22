@@ -115,7 +115,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                                   'snd': lambda d: None}
 
         # This method is evaluated to decide when to stop padding
-        self.stopCondition = lambda Self: False
+        self.stopCondition = lambda Self: True
 
         # method to calculate total padding
         self.calculateTotalPadding = lambda Self: None
@@ -480,6 +480,8 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         We call this method again in case we don't receive data after the
         delay.o
         """
+        log.debug("[wfpad %s] - Padding = %s and stop condition = %s",
+                  self.end, self.session.is_padding, self.stopCondition(self))
         if self.session.is_padding and self.stopCondition(self):
             self.onEndPadding()
             return
@@ -531,15 +533,15 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
     def onSessionStarts(self, sessId):
         """Sens hint for session start.
 
-        To be extended at child classes that implement
-        final website fingerprinting countermeasures.
+        To be extended at child classes that implement final website
+        fingerprinting countermeasures.
         """
         self.session = Session()
-        if self.weAreClient:
+        if self.weAreClient: 
             self.sendControlMessage(const.OP_APP_HINT, [self.getSessId(), True])
         else:
             self._sessId = sessId
-            self._visiting = True
+        self._visiting = True
 
         # We defer flush of buffer
         # Since flush is likely to be empty because we just started the session,
@@ -561,14 +563,16 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             reactor.callLater(0.5, self.onSessionEnds, sessId)
             return
         self.session.is_padding = True
+        self._visiting = False
+        log.info("[wfpad - %s] - Session has ended! (sessid = %s)", self.end, sessId)
         if self.weAreClient:
             self.session.is_peer_padding = True
             self.sendControlMessage(const.OP_APP_HINT, [self.getSessId(), False])
             if self._shim:
                 self._shim.notifyStartPadding()  # padding the tail of the page
-        else:
-            self._visiting = False
-        log.info("[wfpad - %s] - Session has ended! (sessid = %s)", self.end, sessId)
+        if self.session.is_padding and self.stopCondition(self):
+            self.onEndPadding()
+            return
 
     def _waitServerStopPadding(self):
         if self.session.is_peer_padding:
@@ -585,7 +589,8 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         log.info("[wfpad - %s] - Num of data bytes is: rcvd=%s/%s, sent=%s/%s", self.end,
                  self.session.dataBytes['rcv'], self.session.totalBytes['rcv'],
                  self.session.dataBytes['snd'], self.session.totalBytes['snd'])
-        log.info("[wfpad - %s] Sesion last iat: %s", self.session.current_iat)
+        log.info("[wfpad - %s] Sesion last iat: %s", self.end,
+                 self.session.current_iat)
 
     def onEndPadding(self):
         self.session.is_padding = False
@@ -611,10 +616,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
     def isVisiting(self):
         """Return a bool indicating if we're in the middle of a session."""
-        if self.weAreClient:
-            return self._sessionObserver._visiting
-        elif self.weAreServer:
-            return self._visiting
+        return self._visiting
 
 
 class WFPadClient(WFPadTransport):

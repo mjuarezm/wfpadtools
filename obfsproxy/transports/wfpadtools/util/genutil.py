@@ -96,3 +96,7 @@ def sort_tuple_list(l, tup_idx=0):
 def apply_consecutive_elements(l, fn):
     """Apply `fn` taking as arguments consecutive elements of `l`."""
     return [fn(i, j) for i, j in zip(l[:-1], l[1:])]
+
+
+def get_iats(list_ts):
+    return [b - a for a, b in zip(list_ts[:-1], list_ts[1:])]
