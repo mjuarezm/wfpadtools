@@ -565,7 +565,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.session.is_padding = True
         self._visiting = False
         log.info("[wfpad - %s] - Session has ended! (sessid = %s)", self.end, sessId)
-        if self.weAreClient:
+        if self.weAreClient and self.circuit:
             self.session.is_peer_padding = True
             self.sendControlMessage(const.OP_APP_HINT, [self.getSessId(), False])
             if self._shim:
@@ -602,7 +602,8 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         else:
             # Notify the client we have ended with padding
             log.info("[wfpad - %s] - Padding stopped! Will notify client.", self.end)
-            self.sendControlMessage(const.OP_END_PADDING)
+            if self.circuit:
+                self.sendControlMessage(const.OP_END_PADDING)
         # Cancel deferers
         self.cancelDeferrers('snd')
         self.cancelDeferrers('rcv')
