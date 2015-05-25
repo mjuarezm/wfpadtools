@@ -1,14 +1,18 @@
 import time
 
+from twisted.internet.defer import Deferred
+
 
 class Session(object):
     """Contains state and variables for the current session.
 
     A session is defines as a visit to a web page.
     """
+
     def __init__(self):
         # Flag padding
         self.is_padding = False
+        self.stop_padding = Deferred()
 
         # Statistics to keep track of past messages
         # Used for debugging
@@ -37,7 +41,7 @@ class Session(object):
 
         # Flag peer is padding or not
         self.is_peer_padding = False
-        
+
         # Current iat
         self.current_iat = 0
 

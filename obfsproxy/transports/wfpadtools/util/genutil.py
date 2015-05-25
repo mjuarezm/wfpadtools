@@ -99,4 +99,21 @@ def apply_consecutive_elements(l, fn):
 
 
 def get_iats(list_ts):
-    return [b - a for a, b in zip(list_ts[:-1], list_ts[1:])]
+    return apply_consecutive_elements(list_ts, lambda tsi, tsi1: tsi1 - tsi)
+
+
+def map_to_each_n_elements_in_list(l, f, n=2):
+    return sum([f(l[i:i + n]) for i in xrange(0, len(l), n)], [])
+
+
+def combine_lists_alternate(l1, l2):
+    num = min(len(l1), len(l2))
+    result = [None] * (num * 2)
+    result[::2] = l1[:num]
+    result[1::2] = l2[:num]
+    result.extend(l1[num:])
+    result.extend(l2[num:])
+    return result
+
+
+iden = lambda _: _

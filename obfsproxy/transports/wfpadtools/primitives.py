@@ -216,6 +216,7 @@ class PaddingPrimitivesInterface(object):
 
         self.stopCondition = stopConditionTotalPad
         self.calculateTotalPadding = stopConditionTotalPadding
+        return self.session.stop_padding
 
 
     def relayPayloadPad(self, sessId, t, msg_level=True):
@@ -261,6 +262,7 @@ class PaddingPrimitivesInterface(object):
 
         self.stopCondition = stopConditionPayloadPad
         self.calculateTotalPadding = stopConditionPayloadPadding
+        return self.session.stop_padding
 
 
     def relayBatchPad(self, sessId, L, t, msg_level=True):
@@ -306,3 +308,4 @@ class PaddingPrimitivesInterface(object):
 
         self.stopCondition = stopConditionBatchPad
         self.calculateTotalPadding = stopConditionBatchPadding
+        return self.session.stop_padding

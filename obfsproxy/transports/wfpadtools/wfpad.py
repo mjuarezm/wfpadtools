@@ -245,7 +245,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         if isinstance(data, str):
             self.circuit.downstream.write(data)
         elif isinstance(data, mes.WFPadMessage):
-            data.sndTime = time.clock()
+            data.sndTime = time.time()
             self.circuit.downstream.write(str(data))
             log.debug("[wfpad - %s] A new message (flag=%s) sent!", self.end, data.flags)
             if not data.flags & const.FLAG_CONTROL:
@@ -423,34 +423,34 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         self.session.lastRcvDownstreamTs = time.time()
         for msg in msgs:
             log.debug("[wfpad - %s] A new message has been parsed!", self.end)
-            msg.rcvTime = time.clock()
+            msg.rcvTime = time.time()
             if msg.flags & const.FLAG_CONTROL:
                 # Process control messages
                 payload = msg.payload
                 if len(payload) > 0:
                     self.circuit.upstream.write(payload)
                 self.receiveControlMessage(msg.opcode, msg.args)
+
+            self.deferBurstPadding('rcv')
+            self.session.numMessages['rcv'] += 1
+            self.session.totalBytes['rcv'] += msg.totalLen
+            log.debug("total bytes and total len of message: %s" % msg.totalLen)
+
+            # Filter padding messages out.
+            if msg.flags & const.FLAG_PADDING:
+                log.debug("[wfpad - %s] Padding message ignored.", self.end)
+
+            # Forward data to the application.
+            elif msg.flags & const.FLAG_DATA:
+                log.debug("[wfpad - %s] Data flag detected, relaying upstream", self.end)
+                self.session.dataBytes['rcv'] += len(msg.payload)
+                self.session.dataMessages['rcv'] += 1
+                self.circuit.upstream.write(msg.payload)
+                self.session.lastRcvDataDownstreamTs = time.time()
+
+            # Otherwise, flag not recognized
             else:
-                self.deferBurstPadding('rcv')
-                self.session.numMessages['rcv'] += 1
-                self.session.totalBytes['rcv'] += msg.totalLen
-                log.debug("total bytes and total len of message: %s" % msg.totalLen)
-
-                # Filter padding messages out.
-                if msg.flags & const.FLAG_PADDING:
-                    log.debug("[wfpad - %s] Padding message ignored.", self.end)
-
-                # Forward data to the application.
-                elif msg.flags & const.FLAG_DATA:
-                    log.debug("[wfpad - %s] Data flag detected, relaying upstream", self.end)
-                    self.session.dataBytes['rcv'] += len(msg.payload)
-                    self.session.dataMessages['rcv'] += 1
-                    self.circuit.upstream.write(msg.payload)
-                    self.session.lastRcvDataDownstreamTs = time.time()
-
-                # Otherwise, flag not recognized
-                else:
-                    log.error("[wfpad - %s] Invalid message flags: %d.", self.end, msg.flags)
+                log.error("[wfpad - %s] Invalid message flags: %d.", self.end, msg.flags)
         return msgs
 
     def deferBurstPadding(self, when):
@@ -570,6 +570,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             self.sendControlMessage(const.OP_APP_HINT, [self.getSessId(), False])
             if self._shim:
                 self._shim.notifyStartPadding()  # padding the tail of the page
+        self.session.totalPadding = self.calculateTotalPadding(self)
         if self.session.is_padding and self.stopCondition(self):
             self.onEndPadding()
             return
@@ -580,7 +581,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             return
         self.session.is_peer_padding = False
         self._shim.notifyEndPadding()
-        self.session.totalPadding = self.calculateTotalPadding(self)
         # TODO: dump all the session object
         # TODO: refactor logging function so that we don't pass self.end everywhere...
         log.info("[wfpad - %s] - Num of data messages is: rcvd=%s/%s, sent=%s/%s", self.end,
@@ -594,6 +594,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
 
     def onEndPadding(self):
         self.session.is_padding = False
+        self.session.stop_padding.callback(True)
         # Notify shim observers
         if self.weAreClient:
             log.info("[wfpad - %s] - Padding stopped!", self.end)
