@@ -227,11 +227,11 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         """Got data from downstream; relay them upstream."""
         d = data.read()
         if self._state >= const.ST_CONNECTED:
-            self.whenReceivedDownstream()
+            self.whenReceivedDownstream(d)
             self.cancelDeferrers('rcv')
             return self.processMessages(d)
 
-    def whenReceivedDownstream(self):
+    def whenReceivedDownstream(self, data):
         """Template method for child WF defense transport."""
         pass
 
@@ -239,9 +239,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         """Sends `data` downstream over the wire."""
         if self.session.numMessages['snd'] > 2:
             self.session.current_iat = time.time() - self.session.lastSndDataDownstreamTs
-            #with open(str(id(self)) + ".iats", "a") as f:
-            #    f.write("%s\n" % self.session.current_iat)
-        
         if isinstance(data, str):
             self.circuit.downstream.write(data)
         elif isinstance(data, mes.WFPadMessage):
