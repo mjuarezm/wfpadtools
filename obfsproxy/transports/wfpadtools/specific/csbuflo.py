@@ -5,8 +5,6 @@ import math
 import time
 from random import uniform
 
-from twisted.internet import reactor
-
 # WFPadTools imports
 import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools import histo
@@ -15,7 +13,6 @@ from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 from obfsproxy.transports.wfpadtools.util import genutil as gu
 from obfsproxy.transports.wfpadtools.util import mathutil as mu
 
-
 # Logging
 log = logging.get_obfslogger()
 
@@ -23,9 +20,9 @@ log = logging.get_obfslogger()
 class CSBuFLOTransport(WFPadTransport):
     """Implementation of the CSBuFLO countermeasure.
 
-    It extends the BasePadder by choosing a constant probability distribution
-    for time, and a constant probability distribution for packet lengths. The
-    minimum time for which the link will be padded is also specified.
+    It extends the WFPad transport by adding congestion awareness and
+    and offering two possible conditions to stop the padding that
+    reduce the overhead of the one in BuFLO.
     """
     def __init__(self):
         super(CSBuFLOTransport, self).__init__()
@@ -121,11 +118,11 @@ class CSBuFLOTransport(WFPadTransport):
             self.sendControlMessage(const.OP_END_PADDING)
             log.info("[csbuflo - client] - Padding stopped! Will notify server.")
 
-    def whenReceivedUpstream(self):
+    def whenReceivedUpstream(self, data):
         self._rho_stats.append([])
         self.whenReceived()
 
-    def whenReceivedDownstream(self):
+    def whenReceivedDownstream(self, data):
         self.whenReceived()
 
     def whenReceived(self):
