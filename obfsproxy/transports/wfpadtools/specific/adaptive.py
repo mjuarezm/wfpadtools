@@ -77,7 +77,33 @@ class AdaptiveTransport(WFPadTransport):
                 **dict(self._histograms["gap"]["snd"], **{"when": "snd"}))
             self.relayGapHistogram(
                 **dict(self._histograms["gap"]["rcv"], **{"when": "rcv"}))
+        else:
+            hist_dict = self.getHistoFromDistrParams("weibull", 0.432052048, scale=0.004555816)  # estimated from real web traffic
+            low_bins, high_bins = self.divideHistogram(hist_dict)
+            self.relayBurstHistogram(low_bins, "rcv")
+            self.relayBurstHistogram(low_bins, "snd")
+            self.relayGapHistogram(high_bins, "rcv")
+            self.relayGapHistogram(high_bins, "snd")
         WFPadTransport.onSessionStarts(self, sessId)
+
+    def divideHistogram(self, histogram, divide_by=None):
+        if divide_by == None:
+            divide_by = max(histogram.iteritems(), key=operator.itemgetter(1))[0]
+        sorted_histo = sorted(histogram.items(), key=operator.itemgetter(1))
+        high_bins = {k: v for k, v in sorted_histo if v > divide_by}
+        low_bins = {k: v for k, v in sorted_histo if v <= divide_by}
+        return low_bins, high_bins
+
+    def getHistoFromDistrParams(self, name, params, samples=1000, scale=1.0):
+        import numpy as np
+        if name == "weibull":
+            shape = params
+            counts, bins = np.histogram(np.random.weibull(shape, samples) * scale)
+            return histo.Histogram(dict(zip([0] + list(counts), bins)))
+        elif name == "gamma":
+            pass
+        else:
+            raise ValueError("Unknown probability distribution.")
 
 
 class AdaptiveClient(AdaptiveTransport):
