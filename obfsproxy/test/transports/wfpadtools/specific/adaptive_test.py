@@ -15,9 +15,9 @@ class AdaptiveTest(unittest.TestCase):
         pass
 
     def test_divide_histogram(self):
-        test_histo = {1: 40, 2: 50, 3: 20, 4: 20}
-        test_high = {3: 20, 4: 20}
-        test_low = {1: 40, 2: 50}
+        test_histo = {1: 0, 2: 50, 3: 20, 4: 20, "inf": 0}
+        test_high = {2: 0, 3: 20, 4: 20, "inf": 0}
+        test_low = {1: 0, 2: 50, "inf": 0}
         low, high = AdaptiveTransport.divideHistogram(test_histo)
         self.assertDictEqual(test_high, high)
         self.assertDictEqual(test_low, low)

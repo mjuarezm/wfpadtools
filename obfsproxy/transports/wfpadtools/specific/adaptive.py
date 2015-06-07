@@ -87,10 +87,10 @@ class AdaptiveTransport(WFPadTransport):
                 self.relayBurstHistogram(low_bins_inc, "snd")
                 self.relayGapHistogram(high_bins_inc, "rcv")
                 self.relayGapHistogram(high_bins_inc, "snd")
-                self.sendControlMessage(const.OP_BURST_HISTO, [low_bins_out, False, True, "rcv"])
-                self.sendControlMessage(const.OP_BURST_HISTO, [low_bins_out, False, True, "snd"])
-                self.sendControlMessage(const.OP_GAP_HISTO, [high_bins_out, False, True, "rcv"])
-                self.sendControlMessage(const.OP_GAP_HISTO, [high_bins_out, False, True, "snd"])
+                self.sendControlMessage(const.OP_BURST_HISTO, [low_bins_out, True, True, "rcv"])
+                self.sendControlMessage(const.OP_BURST_HISTO, [low_bins_out, True, True, "snd"])
+                self.sendControlMessage(const.OP_GAP_HISTO, [high_bins_out, True, True, "rcv"])
+                self.sendControlMessage(const.OP_GAP_HISTO, [high_bins_out, True, True, "snd"])
 
         WFPadTransport.onSessionStarts(self, sessId)
 
@@ -98,8 +98,10 @@ class AdaptiveTransport(WFPadTransport):
     def divideHistogram(self, histogram, divide_by=None):
         if divide_by == None:
             divide_by = max(histogram.iteritems(), key=operator.itemgetter(1))[0]
-        high_bins = {k: v for k, v in histogram.iteritems()  if k > divide_by}
+        high_bins = {k: v for k, v in histogram.iteritems()  if k >= divide_by}
         low_bins = {k: v for k, v in histogram.iteritems() if k <= divide_by}
+        low_bins.update({"inf": 0})
+        high_bins.update({divide_by: 0})
         return low_bins, high_bins
 
     @classmethod
@@ -120,7 +122,7 @@ class AdaptiveTransport(WFPadTransport):
         else:
             raise ValueError("Unknown probability distribution.")
 
-        return dict(zip(bins, [0] + list(counts)))
+        return dict(zip(list(bins) + ["inf"], [0] + list(counts) + [0]))
 
 class AdaptiveClient(AdaptiveTransport):
     """Extend the AdaptiveTransport class."""
