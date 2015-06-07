@@ -2,6 +2,7 @@
 This module implements the Adaptive Padding countermeasure proposed
 by Shmatikov and Wang.
 """
+import operator
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.wfpad import WFPadTransport
 from obfsproxy.transports.wfpadtools import histo
@@ -78,33 +79,49 @@ class AdaptiveTransport(WFPadTransport):
             self.relayGapHistogram(
                 **dict(self._histograms["gap"]["rcv"], **{"when": "rcv"}))
         else:
-            hist_dict = self.getHistoFromDistrParams("weibull", 0.432052048, scale=0.004555816)  # estimated from real web traffic
-            low_bins, high_bins = self.divideHistogram(hist_dict)
-            self.relayBurstHistogram(low_bins, "rcv")
-            self.relayBurstHistogram(low_bins, "snd")
-            self.relayGapHistogram(high_bins, "rcv")
-            self.relayGapHistogram(high_bins, "snd")
+            if self.weAreClient:
+                hist_dict_incoming = self.getHistoFromDistrParams("weibull", 0.432052048, scale=0.004555816)  # estimated from real web traffic
+                hist_dict_outgoing = self.getHistoFromDistrParams("beta", (0.1899451, 60.4645585))  # estimated from real web traffic
+                low_bins_inc, high_bins_inc = self.divideHistogram(hist_dict_incoming)
+                low_bins_out, high_bins_out = self.divideHistogram(hist_dict_outgoing)
+                self.relayBurstHistogram(low_bins_inc, "rcv")
+                self.relayBurstHistogram(low_bins_inc, "snd")
+                self.relayGapHistogram(high_bins_inc, "rcv")
+                self.relayGapHistogram(high_bins_inc, "snd")
+                self.sendControlMessage(const.OP_BURST_HISTO, [low_bins_out, False, True, "rcv"])
+                self.sendControlMessage(const.OP_BURST_HISTO, [low_bins_out, False, True, "snd"])
+                self.sendControlMessage(const.OP_GAP_HISTO, [high_bins_out, False, True, "rcv"])
+                self.sendControlMessage(const.OP_GAP_HISTO, [high_bins_out, False, True, "snd"])
+
         WFPadTransport.onSessionStarts(self, sessId)
 
+    @classmethod
     def divideHistogram(self, histogram, divide_by=None):
         if divide_by == None:
             divide_by = max(histogram.iteritems(), key=operator.itemgetter(1))[0]
-        sorted_histo = sorted(histogram.items(), key=operator.itemgetter(1))
-        high_bins = {k: v for k, v in sorted_histo if v > divide_by}
-        low_bins = {k: v for k, v in sorted_histo if v <= divide_by}
+        high_bins = {k: v for k, v in histogram.iteritems()  if k > divide_by}
+        low_bins = {k: v for k, v in histogram.iteritems() if k <= divide_by}
         return low_bins, high_bins
 
+    @classmethod
     def getHistoFromDistrParams(self, name, params, samples=1000, scale=1.0):
         import numpy as np
+        counts, bins = [], []
         if name == "weibull":
             shape = params
             counts, bins = np.histogram(np.random.weibull(shape, samples) * scale)
-            return histo.Histogram(dict(zip([0] + list(counts), bins)))
+
+        elif name == "beta":
+            a, b = params
+            counts, bins = np.histogram(np.random.beta(a, b, samples) * scale)
+
         elif name == "gamma":
             pass
+
         else:
             raise ValueError("Unknown probability distribution.")
 
+        return dict(zip(bins, [0] + list(counts)))
 
 class AdaptiveClient(AdaptiveTransport):
     """Extend the AdaptiveTransport class."""
