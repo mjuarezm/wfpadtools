@@ -46,7 +46,6 @@ class AdaptiveTransport(WFPadTransport):
                                     " (Default: MTU).",
                                dest="psize")
         subparser.add_argument("--histo-file",
-                               required=True,
                                type=str,
                                help="Fail containing histograms governing "
                                     "padding. (Default: uniform histograms).",
