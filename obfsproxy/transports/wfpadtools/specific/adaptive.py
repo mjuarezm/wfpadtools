@@ -10,9 +10,9 @@ from obfsproxy.transports.wfpadtools import histo
 from obfsproxy.transports.wfpadtools.util import dumputil as du
 import obfsproxy.common.log as logging
 
-
 log = logging.get_obfslogger()
 
+ADAPTIVE_MAX_VISIT_TIME = 120000  # ms
 
 class AdaptiveTransport(WFPadTransport):
     """Implementation of the Adaptive Padding countermeasure.
@@ -33,8 +33,8 @@ class AdaptiveTransport(WFPadTransport):
         def stopConditionHandler(s):
             elapsed = s.getElapsed()
             log.debug("[adaptive {}] - elapsed = {}, mintime = {}, visiting = {}"
-                      .format(self.end, elapsed, 120, s.isVisiting()))
-            return elapsed % 120 and not s.isVisiting()
+                      .format(self.end, elapsed, ADAPTIVE_MAX_VISIT_TIME, s.isVisiting()))
+            return elapsed >= ADAPTIVE_MAX_VISIT_TIME and not s.isVisiting()
         self.stopCondition = stopConditionHandler
 
     @classmethod
@@ -68,7 +68,7 @@ class AdaptiveTransport(WFPadTransport):
             cls._histograms = du.load_json(args.histo_file)
 
     def onSessionStarts(self, sessId):
-        self._delayDataProbdist = histo.uniform(const.INF_LABEL)
+        self._delayDataProbdist = histo.uniform(0)
         if self._histograms:
             self.relayBurstHistogram(
                 **dict(self._histograms["burst"]["snd"], **{"when": "snd"}))
