@@ -1,6 +1,7 @@
 """
 This module implements the Adaptive Padding countermeasure proposed
-by Shmatikov and Wang.
+by Shmatikov and Wang in the 2006 paper "Timing analysis in low-latency mix networks:
+attacks and defenses" (http://freehaven.net/anonbib/cache/ShWa-Timing06.pdf)
 """
 import operator
 from obfsproxy.transports.wfpadtools import const
