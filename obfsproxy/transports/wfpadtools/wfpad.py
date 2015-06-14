@@ -197,6 +197,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         # Get peer address
         self.peer_addr = self.circuit.downstream.peer_addr
         # Load sockets
+        print "process: ", self.process
         self.connections = self.process.get_connections()
         for pconn in self.connections:
             if pconn.status == 'ESTABLISHED' and pconn.raddr[1] == self.peer_addr.port:
@@ -534,7 +535,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         fingerprinting countermeasures.
         """
         self.session = Session()
-        if self.weAreClient: 
+        if self.weAreClient:
             self.sendControlMessage(const.OP_APP_HINT, [self.getSessId(), True])
         else:
             self._sessId = sessId
