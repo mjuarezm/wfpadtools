@@ -95,6 +95,27 @@ class AdaptiveTransport(WFPadTransport):
         WFPadTransport.onSessionStarts(self, sessId)
 
     @classmethod
+    def create_exponential_bins(self, sample=None, min_bin=None,
+                                a=None, b=None, n=None):
+        """Return a partition of the interval [a, b] with n number of bins.
+
+        Alternatively, it can take a sample of the data and extract the interval
+        endpoints by taking the minimum and the maximum.
+        """
+        if sample:
+            a = min(sample)
+            b = max(sample)
+            if not min_bin:
+                n = 20  # TODO: what is the best number of bins?
+            n = int(b - a / min_bin)
+        return ([b] + [(b - a) / 2.0 ** k for k in xrange(1, n)] + [a])[::-1]
+
+    @classmethod
+    def get_intervals_from_endpoints(self, ep_list):
+        """Return list of intervals built from a list of endpoints."""
+        return [[i, j] for i, j in zip(ep_list[:-1], ep_list[1:])]
+
+    @classmethod
     def divideHistogram(self, histogram, divide_by=None):
         if divide_by == None:
             divide_by = max(histogram.iteritems(), key=operator.itemgetter(1))[0]
@@ -110,11 +131,13 @@ class AdaptiveTransport(WFPadTransport):
         counts, bins = [], []
         if name == "weibull":
             shape = params
-            counts, bins = np.histogram(np.random.weibull(shape, samples) * scale)
+            counts, bins = np.histogram(np.random.weibull(shape, samples) * scale,
+                                        bins=self.create_exponential_bins(a=0, b=10, n=20))
 
         elif name == "beta":
             a, b = params
-            counts, bins = np.histogram(np.random.beta(a, b, samples) * scale)
+            counts, bins = np.histogram(np.random.beta(a, b, samples) * scale,
+                                        bins=self.create_exponential_bins(a=0, b=10, n=20))
 
         elif name == "gamma":
             pass
