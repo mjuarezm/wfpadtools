@@ -37,6 +37,7 @@ setup(
         'pyptlib >= 0.0.6',
         #'numpy'
         'pyyaml',
+        'psutil'
         ],
 
     extras_require = {
