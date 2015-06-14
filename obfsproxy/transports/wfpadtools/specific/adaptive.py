@@ -80,8 +80,9 @@ class AdaptiveTransport(WFPadTransport):
                 **dict(self._histograms["gap"]["rcv"], **{"when": "rcv"}))
         else:
             if self.weAreClient:
-                hist_dict_incoming = self.getHistoFromDistrParams("weibull", 0.432052048, scale=0.004555816)  # estimated from real web traffic
-                hist_dict_outgoing = self.getHistoFromDistrParams("beta", (0.1899451, 60.4645585))  # estimated from real web traffic
+                # parameters have been estimated from real web traffic
+                hist_dict_incoming = self.getHistoFromDistrParams("weibull", 0.406831232, scale=0.002465967)
+                hist_dict_outgoing = self.getHistoFromDistrParams("beta", (0.1620305, 35.3933556))
                 low_bins_inc, high_bins_inc = self.divideHistogram(hist_dict_incoming)
                 low_bins_out, high_bins_out = self.divideHistogram(hist_dict_outgoing)
                 self.relayBurstHistogram(low_bins_inc, "rcv")
