@@ -35,8 +35,8 @@ setup(
         'Twisted',
         'argparse',
         'pyptlib >= 0.0.6',
+        #'numpy'
         'pyyaml',
-        'numpy'
         ],
 
     extras_require = {
