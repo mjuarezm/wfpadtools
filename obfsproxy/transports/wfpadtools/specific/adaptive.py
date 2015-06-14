@@ -116,8 +116,10 @@ class AdaptiveTransport(WFPadTransport):
         return [[i, j] for i, j in zip(ep_list[:-1], ep_list[1:])]
 
     @classmethod
-    def divideHistogram(self, histogram, divide_by=None):
+    def divideHistogram(self, histogram, divide_by='mean'):
         if divide_by == None:
+            return histogram, histogram
+        if divide_by == 'mean':
             divide_by = max(histogram.iteritems(), key=operator.itemgetter(1))[0]
         high_bins = {k: v for k, v in histogram.iteritems()  if k >= divide_by}
         low_bins = {k: v for k, v in histogram.iteritems() if k <= divide_by}
