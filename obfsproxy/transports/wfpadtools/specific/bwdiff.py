@@ -1,11 +1,7 @@
 """
 This module implements the BW differentials adaptive countermeasure.
 """
-import math
 import time
-from random import uniform
-
-from twisted.internet import reactor
 
 # WFPadTools imports
 import obfsproxy.common.log as logging
@@ -42,6 +38,11 @@ class BWDiffTransport(WFPadTransport):
                                type=float,
                                help="Threshold for the bandwidth differential.",
                                dest="threshold")
+        subparser.add_argument("--window-size",
+                               required=False,
+                               type=float,
+                               help="Window size to estimate the bandwidth.",
+                               dest="window_size")
         subparser.add_argument("--psize",
                                required=False,
                                type=int,
