@@ -46,31 +46,23 @@ class ClockTransportTestCase(object):
         def decorate_intercept(end):
             old_rcv_f = end.circuit.transport.receivedDownstream
             old_snd_f = end.circuit.transport.sendDownstream
-
             def curry_intercept(old_f, dir):
                 def new_f(data):
                     msgs = old_f(data)
                     end.history[dir].append((self.clock.seconds(), msgs))
-
                 return new_f
-
             end.circuit.transport.receivedDownstream = curry_intercept(old_rcv_f, 'rcv')
             end.circuit.transport.sendDownstream = curry_intercept(old_snd_f, 'snd')
-
         decorate_intercept(client)
         decorate_intercept(server)
 
     def _bypass_connection(self, client, server):
-
         def curry_bypass_connection(up, down):
             old_write = up.circuit.downstream.write
-
             def write(data):
                 old_write(data)
                 down.dataReceived(data)
-
             return write
-
         client.circuit.downstream.write = curry_bypass_connection(client, server)
         server.circuit.downstream.write = curry_bypass_connection(server, client)
 
@@ -166,11 +158,27 @@ class SessionPrimitiveTestCase(WFPadPrimitiveTestCase):
         WFPadPrimitiveTestCase.setUp(self)
         self.pt_client.onSessionStarts(self.sess_id)
 
-    def send_message(self, endpoint):
-        b = Buffer()
-        b.write(str(gu.timestamp()))
-        endpoint.receivedUpstream(b)
+    def send_message(self, endpoint, msg):
+        endpoint.receivedUpstream(msg)
 
+    def send_str(self, endpoint, txt):
+        b = Buffer()
+        b.write(txt)
+        self.send_message(endpoint, b)
+
+    def send_timestamp(self, endpoint):
+        self.send_str(endpoint, str(gu.timestamp()))
+
+    def replay(self, trace):
+        for p in trace:
+            bytes_padding = self._lengthDataProbdist.randomSample()
+            if p.direction == const.IN:
+                self.send_str(self.pt_server, '\0' * bytes_padding)
+            elif p.direction == const.OUT:
+                self.send_str(self.pt_client, '\0' * bytes_padding)
+
+    def dump_capture(self):
+        pass
 
     def extract_ts(self, history, selector=gu.iden):
         return [ts for ts, msgs in history if len(msgs) > 0
@@ -186,7 +194,7 @@ class SessionPrimitiveTestCase(WFPadPrimitiveTestCase):
         endpoint = kwargs.get('endpoint', self.pt_client)
         getattr(self.pt_client, self.primitive)(*args)
         for i in xrange(N_SAMPLES):
-            self.send_message(endpoint)
+            self.send_timestamp(endpoint)
             self.advance_delayed_calls()  # call flush buffer
             self.advance_delayed_calls()  # call timeouts set in flushbuffer
         self.advance_delayed_calls()
@@ -294,7 +302,7 @@ class GapHistogramTestCase(SessionPrimitiveTestCase, unittest.TestCase):
         endpoint = kwargs.get('endpoint', self.pt_client)
         self.pt_client.relayBurstHistogram(*args)
         getattr(self.pt_client, self.primitive)(*args)
-        self.send_message(endpoint)
+        self.send_timestamp(endpoint)
         self.advance_delayed_calls()
 
     def test_snd_discrete_histogram_random_time(self):
@@ -358,7 +366,7 @@ class TotalPadTestCase(SessionPrimitiveTestCase, unittest.TestCase):
         n_padd_msgs = 11
         self.pt_client.relayTotalPad(sess_id, t, msg_level)
         self.pt_server.relayTotalPad(sess_id, t, msg_level)
-        self.send_message(self.pt_client)
+        self.send_timestamp(self.pt_client)
         self.advance_delayed_calls(n_samples=n_padd_msgs)
         self.pt_client.onSessionEnds(self.sess_id)
         self.advance_delayed_calls()
@@ -382,7 +390,7 @@ class PayloadPadTestCase(SessionPrimitiveTestCase, unittest.TestCase):
         self.pt_server.relayPayloadPad(sess_id, t, msg_level)
         self.advance_next_delayed_call()
         for _ in xrange(n_data_msgs):
-            self.send_message(self.pt_client)
+            self.send_timestamp(self.pt_client)
             self.advance_next_delayed_call()
         self.advance_delayed_calls(n_samples=n_padd_msgs)
         self.pt_client.onSessionEnds(self.sess_id)
@@ -409,7 +417,7 @@ class BatchPadTestCase(SessionPrimitiveTestCase, unittest.TestCase):
         self.pt_server.relayBatchPad(sess_id, L, t, msg_level)
         self.advance_next_delayed_call()
         for _ in xrange(n_data_msgs):
-            self.send_message(self.pt_client)
+            self.send_timestamp(self.pt_client)
             self.advance_next_delayed_call()
         self.advance_delayed_calls(n_samples=n_padd_msgs)
         self.pt_client.onSessionEnds(self.sess_id)
@@ -431,7 +439,7 @@ class BatchPadTestCase(SessionPrimitiveTestCase, unittest.TestCase):
         self.pt_server.relayBatchPad(sess_id, L, t, msg_level)
         self.advance_next_delayed_call()
         for _ in xrange(n_data_msgs):
-            self.send_message(self.pt_client)
+            self.send_timestamp(self.pt_client)
             self.advance_next_delayed_call()
         self.advance_delayed_calls(n_samples=n_padd_msgs)
         self.pt_client.onSessionEnds(self.sess_id)

@@ -116,7 +116,7 @@ class AdaptiveTransport(WFPadTransport):
         return [[i, j] for i, j in zip(ep_list[:-1], ep_list[1:])]
 
     @classmethod
-    def divideHistogram(self, histogram, divide_by='mean'):
+    def divideHistogram(self, histogram, divide_by=None):
         if divide_by == None:
             return histogram, histogram
         if divide_by == 'mean':
@@ -128,7 +128,7 @@ class AdaptiveTransport(WFPadTransport):
         return low_bins, high_bins
 
     @classmethod
-    def getHistoFromDistrParams(self, name, params, samples=1000, scale=1.0):
+    def getDictHistoFromDistrParams(self, name, params, samples=1000, scale=1.0):
         import numpy as np
         counts, bins = [], []
         if name == "weibull":
