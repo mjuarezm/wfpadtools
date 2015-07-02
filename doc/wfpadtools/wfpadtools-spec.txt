@@ -138,7 +138,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 	
 	Flag value      | Description
 	----------------+-----------------------------------------------------
-	   000		    | Parse the payload and forward it.
+	   000          | Parse the payload and forward it.
 	----------------+-----------------------------------------------------
 	   001	        | Discard the message.
 	----------------+-----------------------------------------------------
@@ -211,8 +211,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 	a particular handshaking that will specify the probability distributions to
 	be used in the server as depicted below:
 		
-		    Client                         Server  Legend:
-              |  	  (Bs, Gs, Br, Gr)       |      Bs: Burst send probability distribution
+		    Client                         Server   Legend:
+                     |       (Bs, Gs, Br, Gr)       |      Bs: Burst send probability distribution
 		      | ---------------------------> |      Gs: Gap send probability distribution 
 		      |         SessId, start        |      Br: Burst receive probability distribution
 		      | ---------------------------> |      Gr: Burst receive probability distribution 
