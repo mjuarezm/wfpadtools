@@ -114,7 +114,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 	The 1-byte flag field in the headers is used for protocol signaling. Below, all
 	defined flags along with their semantics are explained.
 	
-	Flag name       | Bit # | Description
+    Flag name       | Bit # | Description
     ----------------+-------+--------------------------------------------------
     FLAG_DATA       |   0   | The payload holds data (may be mixed with padding).
     ----------------+-------+--------------------------------------------------	
