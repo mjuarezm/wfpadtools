@@ -51,7 +51,6 @@ class SimpleRequestResponsePattern(pt.SessionPrimitiveTestCase, unittest.TestCas
         The end result should look like a single multi-cell request, followed by
         a single, continuous, and longer multi-cell response.
         """
-        
         interpolate = False
         removeTokens = False
         
@@ -90,4 +89,3 @@ class SimpleRequestResponsePattern(pt.SessionPrimitiveTestCase, unittest.TestCas
         ts_l = self.extract_ts(self.proto_server.history['rcv'])
         iats = gu.map_to_each_n_elements_in_list(ts_l, gu.get_iats)
         mean_iat = mathutil.mean(iats)
-
