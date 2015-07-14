@@ -324,9 +324,9 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             log.debug("[wfpad - %s] New delay is %s", self.end, delay)
 
         if deferBurstCancelled and hasattr(self._burstHistoProbdist['snd'], "histo"):
-            self._burstHistoProbdist['snd'].removeToken(elapsed)
+            self._burstHistoProbdist['snd'].removeToken(elapsed, False)
         if deferGapCancelled and hasattr(self._gapHistoProbdist['snd'], "histo"):
-            self._gapHistoProbdist['snd'].removeToken(elapsed)
+            self._gapHistoProbdist['snd'].removeToken(elapsed, False)
 
         # Push data message to data buffer
         self._buffer.write(data)

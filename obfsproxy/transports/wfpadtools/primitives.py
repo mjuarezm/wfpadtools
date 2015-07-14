@@ -96,7 +96,8 @@ class PaddingPrimitivesInterface(object):
         """Message sent by the server to the client to flag end of padding."""
         self.session.is_peer_padding = False
 
-    def relayBurstHistogram(self, histo, removeTokens=False, interpolate=True, when="rcv"):
+    def relayBurstHistogram(self, histo, removeTokens=False, interpolate=True,
+                            when="rcv", decay_by=0):
         """Specify histogram encoding the delay distribution.
 
         The delay distribution represents the probability of sending a single
@@ -133,7 +134,8 @@ class PaddingPrimitivesInterface(object):
         self._deferBurstCallback[when] = self._burstHistoProbdist[when].removeToken
 
 
-    def relayGapHistogram(self, histo, removeTokens=False, interpolate=True, when="rcv"):
+    def relayGapHistogram(self, histo, removeTokens=False, interpolate=True,
+                          when="rcv", decay_by=0):
         """Specify histogram that encodes the delay distribution
 
         The delay distribution represents the probability of sending a
@@ -165,11 +167,16 @@ class PaddingPrimitivesInterface(object):
             metadata as internal state as the system transitions from
             BURST_HISTOGRAM initiated padding into GAP_HISTOGRAM initiated
             padding.
+        decay_by: int
+            To add to the "Infinity" bin after each successive padding packet
+            is sent. Used to create an increasing likelihood of hitting the
+            termination condition with each successive padding packet.
         """
         histo = cast_dictionary_to_type(histo, float)
         self._gapHistoProbdist[when] = hist.new(histo,
                                                 interpolate=bool(interpolate),
-                                                removeTokens=bool(removeTokens))
+                                                removeTokens=bool(removeTokens),
+                                                decay_by=decay_by)
         self._deferGapCallback[when] = self._gapHistoProbdist[when].removeToken
 
 

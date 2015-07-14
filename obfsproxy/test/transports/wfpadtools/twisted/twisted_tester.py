@@ -28,6 +28,7 @@ class TransportTestCase(object):
         """
         self.clock = Clock()
         reactor.callLater = self.clock.callLater
+        self.dump = []
         self.proto_client = self._build_protocol(const.CLIENT)
         self.proto_server = self._build_protocol(const.SERVER)
         self.pt_client = self.proto_client.circuit.transport
@@ -56,15 +57,16 @@ class TransportTestCase(object):
         """Instead of requiring TCP connections between client and server
         transports, we directly pass the data written from one end to the
         received function at the other.
-        """ 
-        def curry_bypass_connection(up, down):
+        """
+        def curry_bypass_connection(up, down, direction):
             old_write = up.circuit.downstream.write
             def write(data):
                 old_write(data)
                 down.dataReceived(data)
+                self.dump.append((self.clock.seconds(), direction * len(data)))
             return write
-        client.circuit.downstream.write = curry_bypass_connection(client, server)
-        server.circuit.downstream.write = curry_bypass_connection(server, client)
+        client.circuit.downstream.write = curry_bypass_connection(client, server, const.OUT)
+        server.circuit.downstream.write = curry_bypass_connection(server, client, const.IN)
 
     def _build_protocol(self, mode):
         """Build client and server protocols for an end point."""
@@ -72,7 +74,7 @@ class TransportTestCase(object):
         address = IPv4Address('TCP', HOST, PORT)
         pt_config = self._build_transport_configuration(mode)
         transport_class = self._configure_transport_class(mode, pt_config)
-        f_server = net.StaticDestinationServerFactory(addr_tuple, mode, transport_class, pt_config)        
+        f_server = net.StaticDestinationServerFactory(addr_tuple, mode, transport_class, pt_config)
         protocol_server = self._set_protocol(f_server, address)
         f_client = net.StaticDestinationClientFactory(protocol_server.circuit, const.CLIENT)
         protocol_client = self._set_protocol(f_client, address)
@@ -82,9 +84,9 @@ class TransportTestCase(object):
             return protocol_server
         else:
             raise ValueError("Transport mode '%s' not recognized." % mode)
-    
+
     def _set_protocol(self, factory, address):
-        """Make protocol connection with a Twisted string transport."""  
+        """Make protocol connection with a Twisted string transport."""
         protocol = factory.buildProtocol(address)
         protocol.makeConnection(proto_helpers.StringTransport())
         protocol.history = {'rcv': [], 'snd': []}
@@ -127,7 +129,7 @@ class TransportTestCase(object):
         self.clock.advance(first_delayed_call.getTime() - self.clock.seconds())
 
     def is_timeout(self, call):
-        """Check if the call has actually timed out.""" 
+        """Check if the call has actually timed out."""
         return isinstance(call.args[0], TimeoutError)
 
     def advance_delayed_calls(self, max_dcalls=NUM_DCALLS, no_timeout=True):

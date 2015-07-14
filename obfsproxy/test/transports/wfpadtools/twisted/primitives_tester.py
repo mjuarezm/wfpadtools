@@ -59,26 +59,6 @@ class SessionPrimitiveTestCase(WFPadPrimitiveTestCase):
             self.advance_delayed_calls()  # call timeouts set in flushbuffer
         self.advance_delayed_calls()
 
-    def replay(self, trace):
-        """Replay a trace over the transports.
-        
-        We assume the packets are encrypted and the attacker can't extract
-        any useful info from the contents. Therefore, we can ignore the
-        actual content and generate a packet with the same size full of
-        random padding.
-        """
-        for p in trace:  # for each packet in the trace
-            padding = '\0' * len(p)
-            if p.direction == const.IN:
-                self.send_str(self.pt_server, padding)
-            elif p.direction == const.OUT:
-                self.send_str(self.pt_client, padding)
-
-    def dump_capture(self):
-        """Write the capture to disk."""
-        # TODO
-        pass
-    
     def tearDown(self):
         """Close session and tear down the setting."""
         if self.pt_client.isVisiting():
