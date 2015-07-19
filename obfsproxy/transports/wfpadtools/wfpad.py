@@ -244,6 +244,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             self.circuit.downstream.write(data)
         elif isinstance(data, mes.WFPadMessage):
             data.sndTime = time.time()
+            direction = const.OUT if self.weAreClient else const.IN
             self.circuit.downstream.write(str(data))
             log.debug("[wfpad - %s] A new message (flag=%s) sent!", self.end, data.flags)
             if not data.flags & const.FLAG_CONTROL:
@@ -252,6 +253,11 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 if data.flags & const.FLAG_DATA:
                     self.session.dataMessages['snd'] += 1
                     self.session.dataBytes['snd'] += len(data.payload)
+                    self.session.history.append((time.time(), const.FLAG_DATA, direction, data.totalLen, len(data.payload)))
+                if data.flags & const.FLAG_PADDING:
+                    self.session.history.append((time.time(), const.FLAG_PADDING, direction, data.totalLen, len(data.payload)))
+            else:
+                self.session.history.append((time.time(), const.FLAG_CONTROL, direction, data.totalLen, len(data.payload)))
             return [data]
         elif isinstance(data, list):
             listMsgs = []
@@ -419,6 +425,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                           "messages from stream: %s", self.end, str(e))
 
         self.session.lastRcvDownstreamTs = time.time()
+        direction = const.IN if self.weAreClient else const.OUT
         for msg in msgs:
             log.debug("[wfpad - %s] A new message has been parsed!", self.end)
             msg.rcvTime = time.time()
@@ -428,6 +435,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 if len(payload) > 0:
                     self.circuit.upstream.write(payload)
                 self.receiveControlMessage(msg.opcode, msg.args)
+                self.session.history.append((time.time(), const.FLAG_CONTROL, direction, msg.totalLen, len(msg.payload)))
 
             self.deferBurstPadding('rcv')
             self.session.numMessages['rcv'] += 1
@@ -437,6 +445,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
             # Filter padding messages out.
             if msg.flags & const.FLAG_PADDING:
                 log.debug("[wfpad - %s] Padding message ignored.", self.end)
+                self.session.history.append((time.time(), const.FLAG_PADDING, direction, msg.totalLen, len(msg.payload)))
 
             # Forward data to the application.
             elif msg.flags & const.FLAG_DATA:
@@ -445,6 +454,7 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
                 self.session.dataMessages['rcv'] += 1
                 self.circuit.upstream.write(msg.payload)
                 self.session.lastRcvDataDownstreamTs = time.time()
+                self.session.history.append((time.time(), const.FLAG_DATA, direction, msg.totalLen, len(msg.payload)))
 
             # Otherwise, flag not recognized
             else:
