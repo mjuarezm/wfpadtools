@@ -121,11 +121,11 @@ class AdaptiveTransport(WFPadTransport):
     def divideHistogram(self, histogram, divide_by=None):
         if divide_by == None:
             return histogram, histogram
-        if divide_by == 'mean':
+        if divide_by == 'mode':
             divide_by = max(histogram.iteritems(), key=operator.itemgetter(1))[0]
         high_bins = {k: v for k, v in histogram.iteritems()  if k >= divide_by}
         low_bins = {k: v for k, v in histogram.iteritems() if k <= divide_by}
-        low_bins.update({"inf": 0})
+        low_bins.update({const.INF_LABEL: 0})
         high_bins.update({divide_by: 0})
         return low_bins, high_bins
 
