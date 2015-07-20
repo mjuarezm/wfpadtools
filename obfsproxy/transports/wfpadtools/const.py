@@ -22,6 +22,7 @@ DUMPS                   = {CLIENT: join(TEST_DUMP_DIR, "client.dump"),
                            SERVER: join(TEST_DUMP_DIR, "server.dump")}
 
 INF_LABEL               = float("inf")
+NO_SEND_HISTO           = {INF_LABEL: 1}
 
 # Scale is milliseconds
 SCALE                   = 1000.0
