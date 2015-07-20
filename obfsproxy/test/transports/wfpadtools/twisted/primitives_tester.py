@@ -1,6 +1,6 @@
 from random import randint
 
-from obfsproxy.test.transports.wfpadtools.twisted.twisted_tester import TransportTestCase
+from obfsproxy.test.transports.wfpadtools.twisted.twisted_tester import TransportTestCase, TCPTransportTestCase
 from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools.message import isControl
@@ -11,7 +11,7 @@ from obfsproxy.transports.wfpadtools.util import genutil as gu
 N_SAMPLES = 30
 
 
-class WFPadPrimitiveTestCase(TransportTestCase):
+class WFPadPrimitiveTestCase(TCPTransportTestCase):
     """Define a test case for primitives that do not need a session."""
     transport = 'wfpad'
     args = []
@@ -65,3 +65,12 @@ class SessionPrimitiveTestCase(WFPadPrimitiveTestCase):
             self.pt_client.onSessionEnds(self.sess_id)
         self.pt_client.session.is_peer_padding = False
         WFPadPrimitiveTestCase.tearDown(self)
+
+
+class DumpTrafficTestCase(SessionPrimitiveTestCase):
+    
+    def setUp(self):
+        SessionPrimitiveTestCase.setUp(self)
+        
+    def tearDown(self):
+        SessionPrimitiveTestCase.tearDown(self)

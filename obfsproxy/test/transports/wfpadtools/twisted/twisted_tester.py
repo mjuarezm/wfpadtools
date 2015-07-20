@@ -1,17 +1,18 @@
 from argparse import ArgumentParser
 from os.path import join
-import sys
 from twisted.internet import reactor
 from twisted.internet.address import IPv4Address
 from twisted.internet.error import TimeoutError
 from twisted.internet.task import Clock
 from twisted.test import proto_helpers
+from twisted.trial import unittest
+import sys
 
 from obfsproxy.common import transport_config
 from obfsproxy.network import network as net
 from obfsproxy.pyobfsproxy import consider_cli_args, set_up_cli_parsing
-from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.transports import get_transport_class
+from obfsproxy.transports.wfpadtools import const
 
 
 # Global variables for all the test cases
@@ -22,6 +23,12 @@ NUM_DCALLS = 30  # default maximum number of delayed calls to call.
 
 
 class TransportTestCase(object):
+    """PT client and server connect over a string transport.
+
+    We bypass the communication between client and server and intercept the
+    messages sent over the string transport.
+    """
+
     def setUp(self):
         """Set the reactor's callLater to our clock's callLater function
         and build the protocols.
@@ -162,3 +169,4 @@ class TransportTestCase(object):
         self._lose_protocol_connection(self.proto_client)
         self._lose_protocol_connection(self.proto_server)
         self.advance_delayed_calls()
+
