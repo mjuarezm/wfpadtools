@@ -67,6 +67,12 @@ class AdaptiveTransport(WFPadTransport):
         if args.histo_file:
             cls._histograms = du.load_json(args.histo_file)
 
+    @classmethod
+    def drop_first_n_bins(self, h, n):
+        for k in sorted(h.keys())[:n]:
+            del h[k]
+        return h
+
     def onSessionStarts(self, sessId):
         self._delayDataProbdist = histo.uniform(0)
         if self._histograms:

@@ -1,7 +1,8 @@
-import unittest
-
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools import histo
+from obfsproxy.transports.wfpadtools.specific.adaptive import AdaptiveTransport
+import unittest
+
 
 TEST_DICTIONARY = {0.1: 1,
                    0.2: 5,
@@ -91,3 +92,31 @@ class HistogramClassTestCase(unittest.TestCase):
         h = histo.new({1: 1})
         h.removeToken(1)
         self.assertEqual(h.hist[1], 1)
+        
+
+class AdaptiveHistoMethodsTestCase(unittest.TestCase):
+
+    def test_create_exponential_bins(self):
+        a, b = 0, 10
+        n = 5
+        expected_eps = [0, 0.625, 1.25, 2.5, 5, 10]
+        partition = AdaptiveTransport.create_exponential_bins(a=a, b=b, n=n)
+        self.assertListEqual(expected_eps, partition)
+
+    def test_get_intervals_from_endpoints(self):
+        a, b = 0, 10
+        n = 5
+        expected_partition = [[0, 0.625], [0.625, 1.25], [1.25, 2.5], [2.5, 5], [5, 10]]
+        eps = AdaptiveTransport.create_exponential_bins(a=a, b=b, n=n)
+        partition = AdaptiveTransport.get_intervals_from_endpoints(eps)
+        self.assertListEqual(expected_partition, partition)
+
+    def test_drop_n_keys(self):
+        test_dict = {float(0.001): 34,
+                     float(0.23): 4,
+                     float(0.00001): 32,
+                     float(0.2): 234}
+        AdaptiveTransport.drop_first_n_bins(test_dict, 2)
+        expd_dict = {float(0.23): 4,
+                     float(0.2): 234}
+        self.assertDictEqual(test_dict, expd_dict)
