@@ -1,6 +1,5 @@
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools import histo
-from obfsproxy.transports.wfpadtools.specific.adaptive import AdaptiveTransport
 import unittest
 
 
@@ -57,13 +56,13 @@ class HistogramClassTestCase(unittest.TestCase):
         h.removeToken(x)
         label = h.getLabelFromFloat(x)
         self.assertEqual(h.hist[label], h.template[label] - 1)
-    
+
     def test_remove_tokens_with_gaps(self):
         h = histo.new(TEST_DICTIONARY, removeTokens=True)
         h.removeToken(0.5)
         h.removeToken(0.5)
         self.assertEqual(h.hist[0.4], h.template[0.4] -1)
-    
+
     def test_remove_tokens_with_only_positive_on_right(self):
         h = histo.new(TEST_DICTIONARY, removeTokens=True)
         h.removeToken(0.1)
@@ -75,13 +74,13 @@ class HistogramClassTestCase(unittest.TestCase):
         h.removeToken(const.INF_LABEL)
         self.assertEqual(h.hist[const.INF_LABEL],
                          h.template[const.INF_LABEL] - 1)
-    
+
     def test_remove_tokens_with_gaps_with_inf_label(self):
         h = histo.new(TEST_DICT_INF, removeTokens=True)
         h.removeToken(0.5)
         h.removeToken(0.5)
         self.assertEqual(h.hist[0.4], h.template[0.4] -1)
-    
+
     def test_remove_tokens_with_only_positive_on_right_with_inf_label(self):
         h = histo.new(TEST_DICT_INF, removeTokens=True)
         h.removeToken(0.1)
@@ -92,7 +91,7 @@ class HistogramClassTestCase(unittest.TestCase):
         h = histo.new({1: 1})
         h.removeToken(1)
         self.assertEqual(h.hist[1], 1)
-        
+
 
 class AdaptiveHistoMethodsTestCase(unittest.TestCase):
 
@@ -100,15 +99,15 @@ class AdaptiveHistoMethodsTestCase(unittest.TestCase):
         a, b = 0, 10
         n = 5
         expected_eps = [0, 0.625, 1.25, 2.5, 5, 10]
-        partition = AdaptiveTransport.create_exponential_bins(a=a, b=b, n=n)
+        partition = histo.Histogram.create_exponential_bins(a=a, b=b, n=n)
         self.assertListEqual(expected_eps, partition)
 
     def test_get_intervals_from_endpoints(self):
         a, b = 0, 10
         n = 5
         expected_partition = [[0, 0.625], [0.625, 1.25], [1.25, 2.5], [2.5, 5], [5, 10]]
-        eps = AdaptiveTransport.create_exponential_bins(a=a, b=b, n=n)
-        partition = AdaptiveTransport.get_intervals_from_endpoints(eps)
+        eps = histo.Histogram.create_exponential_bins(a=a, b=b, n=n)
+        partition = histo.Histogram.get_intervals_from_endpoints(eps)
         self.assertListEqual(expected_partition, partition)
 
     def test_drop_n_keys(self):
@@ -116,7 +115,7 @@ class AdaptiveHistoMethodsTestCase(unittest.TestCase):
                      float(0.23): 4,
                      float(0.00001): 32,
                      float(0.2): 234}
-        AdaptiveTransport.drop_first_n_bins(test_dict, 2)
+        histo.Histogram.drop_first_n_bins(test_dict, 2)
         expd_dict = {float(0.23): 4,
                      float(0.2): 234}
         self.assertDictEqual(test_dict, expd_dict)
