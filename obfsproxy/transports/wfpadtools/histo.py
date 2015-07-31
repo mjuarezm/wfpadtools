@@ -64,6 +64,9 @@ class Histogram:
         self.interpolate = interpolate
         self.removeTokens = removeTokens
 
+        if Histogram.isEmpty(hist):
+            self.removeTokens = False
+
         # create template histogram
         self.template = dict(hist)
 
