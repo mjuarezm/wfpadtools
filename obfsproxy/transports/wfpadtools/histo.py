@@ -6,12 +6,10 @@ from bisect import bisect_right
 import operator
 from random import randint
 import random
-import warnings
 
 import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools.const import INF_LABEL
 import obfsproxy.transports.wfpadtools.const as ct
-from IPython.utils.sysinfo import num_cpus
 
 
 log = logging.get_obfslogger()
