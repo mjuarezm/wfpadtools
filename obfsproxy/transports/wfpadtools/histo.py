@@ -149,6 +149,10 @@ class Histogram:
         return [[i, j] for i, j in zip(ep_list[:-1], ep_list[1:])]
 
     @classmethod
+    def isEmpty(self, d):
+        return len(d.keys()) == 1 and INF_LABEL in d.keys()
+
+    @classmethod
     def divideHistogram(self, histogram, divide_by=None):
         if divide_by == None:
             return histogram, histogram

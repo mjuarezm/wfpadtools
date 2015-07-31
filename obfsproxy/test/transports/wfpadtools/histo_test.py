@@ -1,6 +1,7 @@
 from obfsproxy.transports.wfpadtools import const
 from obfsproxy.transports.wfpadtools import histo
 import unittest
+from obfsproxy.transports.wfpadtools.const import INF_LABEL
 
 
 TEST_DICTIONARY = {0.1: 1,
@@ -119,3 +120,7 @@ class AdaptiveHistoMethodsTestCase(unittest.TestCase):
         expd_dict = {float(0.23): 4,
                      float(0.2): 234}
         self.assertDictEqual(test_dict, expd_dict)
+
+    def test_histo_is_empty(self):
+        d = {INF_LABEL: 1}
+        self.assertTrue(histo.Histogram.isEmpty(d))
