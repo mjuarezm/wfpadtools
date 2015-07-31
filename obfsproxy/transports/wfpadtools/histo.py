@@ -11,6 +11,7 @@ import warnings
 import obfsproxy.common.log as logging
 from obfsproxy.transports.wfpadtools.const import INF_LABEL
 import obfsproxy.transports.wfpadtools.const as ct
+from IPython.utils.sysinfo import num_cpus
 
 
 log = logging.get_obfslogger()
@@ -192,21 +193,42 @@ class Histogram:
         return dict(zip(list(bins) + [INF_LABEL], [0] + list(counts) + [0]))
 
     @classmethod
-    def getDictHistoFromDistrParams(self, name, params, samples=1000, scale=1.0):
+    def dictFromDistr(self, name, params, scale=1.0, num_samples=1000):
         import numpy as np
         counts, bins = [], []
+
         if name == "weibull":
             shape = params
-            counts, bins = np.histogram(np.random.weibull(shape, samples) * scale,
+            counts, bins = np.histogram(np.random.weibull(shape, num_samples) * scale,
                                         bins=self.create_exponential_bins(a=0, b=10, n=20))
 
         elif name == "beta":
             a, b = params
-            counts, bins = np.histogram(np.random.beta(a, b, samples) * scale,
+            counts, bins = np.histogram(np.random.beta(a, b, num_samples) * scale,
                                         bins=self.create_exponential_bins(a=0, b=10, n=20))
 
+        elif name == "logis":
+            location, scale = params
+            counts, bins = np.histogram(np.random.logistic(location, scale, num_samples),
+                                        bins=self.create_exponential_bins(a=0, b=10, n=20))
+        
+        elif name == "lnorm":
+            mu, sigma = params
+            counts, bins = np.histogram(np.random.lognormal(mu, sigma, num_samples),
+                                        bins=self.create_exponential_bins(a=0, b=10, n=20))
+        
+        elif name == "norm":
+            mu, sigma = params
+            counts, bins = np.histogram(np.random.normal(mu, sigma, num_samples),
+                                        bins=self.create_exponential_bins(a=0, b=10, n=20))
+        
         elif name == "gamma":
-            pass
+            shape, scale = params
+            counts, bins = np.histogram(np.random.gamma(shape, scale, num_samples),
+                                        bins=self.create_exponential_bins(a=0, b=10, n=20))
+        
+        elif name == "empty":
+            return ct.NO_SEND_HISTO
 
         else:
             raise ValueError("Unknown probability distribution.")
