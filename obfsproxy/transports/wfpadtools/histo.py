@@ -198,6 +198,13 @@ class Histogram:
         return dict(zip(list(bins) + [INF_LABEL], [0] + list(counts) + [0]))
 
     @classmethod
+    def dictFromList(self, l, num_samples=1000):
+        import numpy as np
+        counts, bins = np.histogram(random.sample(l, num_samples),
+                                    bins=self.create_exponential_bins(a=0, b=10, n=20))
+        return dict(zip(list(bins) + [INF_LABEL], [0] + list(counts) + [0]))
+
+    @classmethod
     def dictFromDistr(self, name, params, scale=1.0, num_samples=1000):
         import numpy as np
         counts, bins = [], []
