@@ -61,6 +61,7 @@ class Histogram:
         is truncated up to the 3rd decimal position with for example round(x_i, 3).
         """
         self.hist = hist
+        self.inf = False
         self.interpolate = interpolate
         self.removeTokens = removeTokens
 
