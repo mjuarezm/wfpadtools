@@ -115,14 +115,14 @@ class Histogram:
             self.hist[label] -= 1
 
     def mean(self):
-        return sum([k * v for k, v in self.hist.iteritems()]) / sum(self.hist.values())
+        return sum([k * v for k, v in self.hist.iteritems() if k != INF_LABEL]) / sum(self.hist.values())
 
     def variance(self):
         m = self.mean()
         n = sum(self.hist.values())
         if n < 2:
             raise ValueError("The sample is not big enough for an unbiased variance.")
-        return sum([k * ((v - m) ** 2) for k, v in self.hist.iteritems()]) / (n - 1)
+        return sum([k * ((v - m) ** 2) for k, v in self.hist.iteritems() if k != INF_LABEL]) / (n - 1)
 
     def dumpHistogram(self):
         """Print the values for the histogram."""
