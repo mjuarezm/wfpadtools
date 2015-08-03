@@ -18,7 +18,7 @@ log = logging.get_obfslogger()
 class Histogram:
     """Provides methods to generate and sample histograms of prob distributions."""
 
-    def __init__(self, hist, interpolate=True, removeTokens=False, decay_by=0):
+    def __init__(self, hist, interpolate=True, removeTokens=False, decay_by=0, name=''):
         """Initialize an histogram.
 
         `hist` is a dictionary. The keys are labels of an histogram. They represent
@@ -60,6 +60,7 @@ class Histogram:
         labels will be seconds and since we want a precision of milliseconds, the float
         is truncated up to the 3rd decimal position with for example round(x_i, 3).
         """
+        self.name = ''
         self.hist = hist
         self.inf = False
         self.interpolate = interpolate
@@ -90,18 +91,17 @@ class Histogram:
 
     def removeToken(self, f, padding=True):
         # TODO: move the if below to the calls to the function `removeToken`
-
-        # if histogram is empty, refill the histogram
-        if sum(self.hist.values()) == 0:
-            self.refillHistogram()
-
-        if padding:
-            if ct.INF_LABEL in self.hist:
-                self.hist[ct.INF_LABEL] += self.decay_by
-            if ct.INF_LABEL in self.template:
-                self.template[ct.INF_LABEL] += self.decay_by
-
         if self.removeTokens:
+            # if histogram is empty, refill the histogram
+            if sum(self.hist.values()) == 0:
+                self.refillHistogram()
+
+            if padding:
+                if ct.INF_LABEL in self.hist:
+                    self.hist[ct.INF_LABEL] += self.decay_by
+                if ct.INF_LABEL in self.template:
+                    self.template[ct.INF_LABEL] += self.decay_by
+
             label = self.getLabelFromFloat(f)
             pos_counts = [l for l in self.labels if self.hist[l] > 0]
 
@@ -114,9 +114,18 @@ class Histogram:
                     label = pos_counts[bisect_right(pos_counts, label) - 1]
             self.hist[label] -= 1
 
+    def mean(self):
+        return sum([k * v for k, v in self.hist.iteritems()]) / sum(self.hist.values())
+
+    def variance(self):
+        m = self.mean()
+        return sum([k * ((v - m) ** 2) for k, v in self.hist.iteritems()]) / (sum(self.hist.values()) - 1)
+
     def dumpHistogram(self):
         """Print the values for the histogram."""
-        log.debug("Dumping histogram:")
+        log.debug("Dumping histogram: %s" % self.name)
+        log.debug("Mean: %s" % self.mean())
+        log.debug("Variance: %s" % self.variance())
         if self.interpolate:
             log.debug("[0, %s), %s", self.labels[0], self.hist[self.labels[0]])
             for labeli, labeli1 in zip(self.labels[0:-1], self.labels[1:]):
@@ -224,22 +233,22 @@ class Histogram:
             location, scale = params
             counts, bins = np.histogram(np.random.logistic(location, scale, num_samples),
                                         bins=self.create_exponential_bins(a=0, b=10, n=100))
-        
+
         elif name == "lnorm":
             mu, sigma = params
             counts, bins = np.histogram(np.random.lognormal(mu, sigma, num_samples),
                                         bins=self.create_exponential_bins(a=0, b=10, n=100))
-        
+
         elif name == "norm":
             mu, sigma = params
             counts, bins = np.histogram(np.random.normal(mu, sigma, num_samples),
                                         bins=self.create_exponential_bins(a=0, b=10, n=100))
-        
+
         elif name == "gamma":
             shape, scale = params
             counts, bins = np.histogram(np.random.gamma(shape, scale, num_samples),
                                         bins=self.create_exponential_bins(a=0, b=10, n=100))
-        
+
         elif name == "empty":
             return ct.NO_SEND_HISTO
 
