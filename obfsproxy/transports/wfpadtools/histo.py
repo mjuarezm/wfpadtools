@@ -119,13 +119,17 @@ class Histogram:
 
     def variance(self):
         m = self.mean()
-        return sum([k * ((v - m) ** 2) for k, v in self.hist.iteritems()]) / (sum(self.hist.values()) - 1)
+        n = sum(self.hist.values())
+        if n < 2:
+            raise ValueError("The sample is not big enough for an unbiased variance.")
+        return sum([k * ((v - m) ** 2) for k, v in self.hist.iteritems()]) / (n - 1)
 
     def dumpHistogram(self):
         """Print the values for the histogram."""
         log.debug("Dumping histogram: %s" % self.name)
-        log.debug("Mean: %s" % self.mean())
-        log.debug("Variance: %s" % self.variance())
+        if sum(self.hist.values()) > 3:
+            log.debug("Mean: %s" % self.mean())
+            log.debug("Variance: %s" % self.variance())
         if self.interpolate:
             log.debug("[0, %s), %s", self.labels[0], self.hist[self.labels[0]])
             for labeli, labeli1 in zip(self.labels[0:-1], self.labels[1:]):
