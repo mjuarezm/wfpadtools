@@ -60,13 +60,14 @@ class Histogram:
         labels will be seconds and since we want a precision of milliseconds, the float
         is truncated up to the 3rd decimal position with for example round(x_i, 3).
         """
-        self.name = ''
+        self.name = name
         self.hist = hist
         self.inf = False
         self.interpolate = interpolate
         self.removeTokens = removeTokens
 
         if Histogram.isEmpty(hist):
+            self.interpolate = False
             self.removeTokens = False
 
         # create template histogram
@@ -92,9 +93,6 @@ class Histogram:
     def removeToken(self, f, padding=True):
         # TODO: move the if below to the calls to the function `removeToken`
         if self.removeTokens:
-            # if histogram is empty, refill the histogram
-            if sum(self.hist.values()) == 0:
-                self.refillHistogram()
 
             if padding:
                 if ct.INF_LABEL in self.hist:
@@ -113,6 +111,11 @@ class Histogram:
                 else:
                     label = pos_counts[bisect_right(pos_counts, label) - 1]
             self.hist[label] -= 1
+            #log.debug("[histo] Remove token! Tokens: %s" % sum(self.hist.values()))
+            
+            # if histogram is empty, refill the histogram
+            if sum(self.hist.values()) == 0:
+                self.refillHistogram()
 
     def mean(self):
         return sum([k * v for k, v in self.hist.iteritems() if k != INF_LABEL]) / sum(self.hist.values())
@@ -158,7 +161,8 @@ class Histogram:
                 return ct.INF_LABEL
             p = label_i + (label_i_1 - label_i) * random.random()
             return p
-        return 0
+        log.exception("[histo - sample] Tokens = %s, prob = %s", sum(self.hist.values()), prob)
+        raise ValueError("In `histo.randomSample`: probability is larger than range of counts!")
 
     @classmethod
     def get_intervals_from_endpoints(self, ep_list):
@@ -209,14 +213,18 @@ class Histogram:
     def getDictHistoFromList(self, l):
         import numpy as np
         counts, bins = np.histogram(l, bins=self.create_exponential_bins(a=0, b=10, n=20))
-        return dict(zip(list(bins) + [INF_LABEL], [0] + list(counts) + [0]))
+        d = dict(zip(list(bins) + [INF_LABEL], [0] + list(counts) + [0]))
+        d[0] = 0  # remove 0 iner-arrival times
+        return d
 
     @classmethod
     def dictFromList(self, l, num_samples=1000):
         import numpy as np
         counts, bins = np.histogram(random.sample(l, num_samples),
                                     bins=self.create_exponential_bins(a=0, b=10, n=20))
-        return dict(zip(list(bins) + [INF_LABEL], [0] + list(counts) + [0]))
+        d = dict(zip(list(bins) + [INF_LABEL], [0] + list(counts) + [0]))
+        d[0] = 0  # remove 0 iner-arrival times
+        return d
 
     @classmethod
     def dictFromDistr(self, name, params, scale=1.0, num_samples=10000):
@@ -259,7 +267,9 @@ class Histogram:
         else:
             raise ValueError("Unknown probability distribution.")
 
-        return dict(zip(list(bins) + [INF_LABEL], [0] + list(counts) + [0]))
+        d = dict(zip(list(bins) + [INF_LABEL], [0] + list(counts) + [0]))
+        d[0] = 0  # remove 0 iner-arrival times
+        return d
 
     @classmethod
     def create_exponential_bins(self, sample=None, min_bin=None,
