@@ -3,12 +3,13 @@ The class Histogram provides an interface to generate and sample probability
 distributions represented as histograms.
 """
 from bisect import bisect_right
-import operator
+from obfsproxy.transports.wfpadtools.const import INF_LABEL
 from random import randint
+import operator
 import random
+from scipy.stats import genpareto
 
 import obfsproxy.common.log as logging
-from obfsproxy.transports.wfpadtools.const import INF_LABEL
 import obfsproxy.transports.wfpadtools.const as ct
 
 
@@ -227,39 +228,44 @@ class Histogram:
         return d
 
     @classmethod
-    def dictFromDistr(self, name, params, scale=1.0, num_samples=10000):
+    def dictFromDistr(self, name, params, scale=1.0, num_samples=10000, bin_size=50):
         import numpy as np
         counts, bins = [], []
 
         if name == "weibull":
             shape = params
             counts, bins = np.histogram(np.random.weibull(shape, num_samples) * scale,
-                                        bins=self.create_exponential_bins(a=0, b=10, n=100))
+                                        bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
 
         elif name == "beta":
             a, b = params
             counts, bins = np.histogram(np.random.beta(a, b, num_samples) * scale,
-                                        bins=self.create_exponential_bins(a=0, b=10, n=100))
+                                        bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
 
         elif name == "logis":
             location, scale = params
             counts, bins = np.histogram(np.random.logistic(location, scale, num_samples),
-                                        bins=self.create_exponential_bins(a=0, b=10, n=100))
+                                        bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
 
         elif name == "lnorm":
             mu, sigma = params
             counts, bins = np.histogram(np.random.lognormal(mu, sigma, num_samples),
-                                        bins=self.create_exponential_bins(a=0, b=10, n=100))
+                                        bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
 
         elif name == "norm":
             mu, sigma = params
-            counts, bins = np.histogram(np.random.normal(mu, sigma, num_samples),
-                                        bins=self.create_exponential_bins(a=0, b=10, n=100))
+            counts, bins = np.histogram([s for s in np.random.normal(mu, sigma, num_samples) if s > 0],
+                                        bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
 
         elif name == "gamma":
             shape, scale = params
             counts, bins = np.histogram(np.random.gamma(shape, scale, num_samples),
-                                        bins=self.create_exponential_bins(a=0, b=10, n=100))
+                                        bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
+
+        elif name == "pareto":
+            shape, scale = params
+            counts, bins = np.histogram(genpareto.rvs(shape, scale=scale, size=num_samples),
+                                        bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
 
         elif name == "empty":
             return ct.NO_SEND_HISTO
