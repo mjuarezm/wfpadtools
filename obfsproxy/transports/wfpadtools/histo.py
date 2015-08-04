@@ -7,7 +7,7 @@ from obfsproxy.transports.wfpadtools.const import INF_LABEL
 from random import randint
 import operator
 import random
-from scipy.stats import genpareto
+#from scipy.stats import genpareto
 
 import obfsproxy.common.log as logging
 import obfsproxy.transports.wfpadtools.const as ct
@@ -113,7 +113,7 @@ class Histogram:
                     label = pos_counts[bisect_right(pos_counts, label) - 1]
             self.hist[label] -= 1
             #log.debug("[histo] Remove token! Tokens: %s" % sum(self.hist.values()))
-            
+
             # if histogram is empty, refill the histogram
             if sum(self.hist.values()) == 0:
                 self.refillHistogram()
@@ -262,10 +262,10 @@ class Histogram:
             counts, bins = np.histogram(np.random.gamma(shape, scale, num_samples),
                                         bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
 
-        elif name == "pareto":
-            shape, scale = params
-            counts, bins = np.histogram(genpareto.rvs(shape, scale=scale, size=num_samples),
-                                        bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
+        #elif name == "pareto":
+        #    shape, scale = params
+        #    counts, bins = np.histogram(genpareto.rvs(shape, scale=scale, size=num_samples),
+        #                                bins=self.create_exponential_bins(a=0, b=10, n=bin_size))
 
         elif name == "empty":
             return ct.NO_SEND_HISTO
