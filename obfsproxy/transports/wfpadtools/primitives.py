@@ -16,7 +16,7 @@ class PaddingPrimitivesInterface(object):
     """Padding primitives that can be used by any PT transport.
 
     See:
-    gitweb.torproject.org/user/mikeperry/torspec.git/blob/refs/heads/multihop-padding-primitives:/proposals/ideas/xxx-multihop-padding-primitives.txt
+        https://gitweb.torproject.org/user/mikeperry/torspec.git/blob/refs/heads/multihop-padding-primitives:/proposals/ideas/xxx-multihop-padding-primitives.txt
     """
     def receiveControlMessage(self, opcode, args=None):
         """Do operation indicated by the _opcode."""
@@ -309,8 +309,7 @@ class PaddingPrimitivesInterface(object):
             stopCond = to_pad > 0 and to_pad >= self.session.totalPadding
             log.debug("[wfpad %s] - Batch pad stop condition is %s."
                       "\n Visiting: %s, Total padding: %s, Num msgs: %s, Total Bytes: %s, L: %s"
-                      % (
-                self.end, stopCond, self.isVisiting(), self.session.totalPadding, self.session.numMessages, self.session.totalBytes, L))
+                      % (self.end, stopCond, self.isVisiting(), self.session.totalPadding, self.session.numMessages, self.session.totalBytes, L))
             return stopCond
 
         self.stopCondition = stopConditionBatchPad

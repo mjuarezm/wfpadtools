@@ -13,19 +13,16 @@ import time
 import psutil
 from twisted.internet import reactor
 
-from obfsproxy.transports.wfpadtools import histo
-from obfsproxy.transports.scramblesuit.fifobuf import Buffer
 import obfsproxy.common.log as logging
-from obfsproxy.transports.wfpadtools.common import deferLater
 import obfsproxy.transports.wfpadtools.const as const
+from obfsproxy.transports.base import BaseTransport, PluggableTransportError
+from obfsproxy.transports.scramblesuit.fifobuf import Buffer
+from obfsproxy.transports.wfpadtools import histo, message as mes, message, socks_shim, wfpad_shim
+from obfsproxy.transports.wfpadtools.common import deferLater
+from obfsproxy.transports.wfpadtools.kist import estimate_write_capacity
 from obfsproxy.transports.wfpadtools.primitives import PaddingPrimitivesInterface
 from obfsproxy.transports.wfpadtools.session import Session
-import obfsproxy.transports.wfpadtools.util.testutil as test_ut
-from obfsproxy.transports.wfpadtools import message as mes
-from obfsproxy.transports.wfpadtools import message, socks_shim
-from obfsproxy.transports.wfpadtools import wfpad_shim
-from obfsproxy.transports.wfpadtools.kist import estimate_write_capacity
-from obfsproxy.transports.base import BaseTransport, PluggableTransportError
+
 
 log = logging.get_obfslogger()
 
@@ -63,7 +60,6 @@ class WFPadTransport(BaseTransport, PaddingPrimitivesInterface):
         # Get the global shim object
         self._initializeShim()
 
-        # Initialize state0
         self._initializeState()
 
 
