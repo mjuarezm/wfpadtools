@@ -16,7 +16,7 @@ class PaddingPrimitivesInterface(object):
     """Padding primitives that can be used by any PT transport.
 
     See:
-        https://gitweb.torproject.org/user/mikeperry/torspec.git/blob/refs/heads/multihop-padding-primitives:/proposals/ideas/xxx-multihop-padding-primitives.txt
+        https://gitweb.torproject.org/user/mikeperry/torspec.git/tree/proposals/xxx-padding-negotiation.txt?h=padding_negotiation
     """
     def receiveControlMessage(self, opcode, args=None):
         """Do operation indicated by the _opcode."""
