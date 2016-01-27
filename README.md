@@ -1,7 +1,7 @@
 WFPadTools
 ==========
 
-The WFPadTools framework is a framework implemented as an Obfsproxy Pluggable Transport to develop lin-padding-based website fingerprinting strategies in Tor. It was forked from the obfsproxy master branch at the torproject git.
+The WFPadTools framework is a framework implemented as an Obfsproxy Pluggable Transport to develop link-padding-based website fingerprinting strategies in Tor. It was forked from the obfsproxy master branch at the torproject git.
 
 [![Build Status](https://drone.io/bitbucket.org/mjuarezm/obfsproxy_wfpadtools/status.png)](https://drone.io/bitbucket.org/mjuarezm/obfsproxy_wfpadtools/latest)
 
