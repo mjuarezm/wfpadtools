@@ -1,9 +1,9 @@
+![DISCLAIMER](https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Dialog-warning-orange.svg/40px-Dialog-warning-orange.svg.png "experimental")  **experimental - PLEASE BE CAREFUL. Intended for reasearch purposes.**
+
 WFPadTools
 ==========
 
 The WFPadTools framework is a framework implemented as an Obfsproxy Pluggable Transport to develop link-padding-based website fingerprinting strategies in Tor. It was forked from the obfsproxy master branch at the torproject git.
-
-[![Build Status](https://drone.io/bitbucket.org/mjuarezm/obfsproxy_wfpadtools/status.png)](https://drone.io/bitbucket.org/mjuarezm/obfsproxy_wfpadtools/latest)
 
 It implements a framing layer for the Tor protocol that allows to add cover traffic and provides a set of primitives that can be used to implement more specific anti-website fingerprinting strategies.
 
