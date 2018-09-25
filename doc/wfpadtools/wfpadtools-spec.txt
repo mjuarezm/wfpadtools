@@ -48,9 +48,9 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
                 +-----------------+
                 |   Application   |
                 +-----------------+
-                |   	Tor   	  |
+                |   	Tor       |
                 +-----------------+						
-                |      SOCKS  	  |						
+                |      SOCKS      |						
                 +-----------------+
         ----->  |   WFPadTools    |
                 +-----------------+
