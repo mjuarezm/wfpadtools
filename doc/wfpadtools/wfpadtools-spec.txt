@@ -125,7 +125,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
                     |       | operation.
     ----------------+-------+--------------------------------------------------
     FLAG_LAST       |   3   | Flags the control message as containing the last
-                    |	    | piece of arguments and piggybacked data.
+                    |       | piece of arguments and piggybacked data.
     ----------------+-------+--------------------------------------------------
     
 	There is a precedence on flags. When FLAG_PADDING is signaled, the message is 
